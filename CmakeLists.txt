@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 3.4)
+project(Stronk)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -pedantic -ggdb -fdiagnostics-color -Wall -Wextra -lpthread")
+
+include_directories(
+    lib/
+    src/
+)
+
+file(GLOB_RECURSE SOURCES src/*)
+file(GLOB_RECURSE HEADERS src/*.h)
+file(GLOB_RECURSE LIBRARY_SOURCES lib/*)
+add_executable(Stronk ${SOURCES} ${LIBRARY_SOURCES})
