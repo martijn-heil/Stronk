@@ -30,7 +30,7 @@ struct mcpr_slot {
 
 void mcpr_send_packet(struct mcpr_packet *pkt);
 void mcpr_on_packet(void (*on_packet)(mcpr_packet *pkt));
-void mcpr_on_specific_packet(uint8_t packet_id, void (*on_packet)(mcpr_packet *pkt));
+void mcpr_on_specific_packet(uint8_t packet_id, void (*on_packet)(struct mcpr_packet *pkt));
 
 /*
  Explanation of namings:
@@ -399,16 +399,72 @@ extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_ENCHH
 extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POWER_LVL;
 extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POTION_EFFECT_FIRST;
 extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POTION_EFFECT_SECOND;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ANVIL_ // TODO seriously this gets way too long.
+extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ANVIL_REPAIR_COST; // TODO seriously this gets way too long.
+extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BREWING_STAND_BREW_TIME;
 
 
 extern const uint8_t MCPR_PKT_PL_CB_SET_SLOT;
+struct mcpr_pkt_pl_cb_set_slot {
+    uint8_t packet_id;
+
+    int8_t window_id;
+    int16_t slot;
+    char* nbt_slot_data; // TODO
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_SET_COOLDOWN;
+struct mcpr_pkt_cb_set_cooldown {
+    uint8_t packet_id;
+
+    int32_t item_id;
+    int32_t cooldown_ticks;
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
+struct mcpr_pkt_cb_plugin_message {
+    uint8_t packet_id;
+
+    char *channel;
+    size_t bytes_size;
+    int8_t *bytes;
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_NAMED_SOUND_EFFECT;
+struct mcpr_pkt_pl_cb_named_sound_effect {
+    uint8_t packet_id;
+
+    char *sound_name;
+    int32_t sound_category;
+    int32_t effect_position_x;
+    int32_t effect_position_y;
+    int32_t effect_position_z;
+    float volume;
+    float pitch;
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_DISCONNECT;
+struct mcpr_pkt_pl_cb_disconnect {
+    uint8_t packet_id;
+
+    char *reason; // chat type. // TODO
+};
+
+
 extern const uint8_t MCPR_PKT_PL_CB_ENTITY_STATUS;
+struct mcpr_pkt_pl_cb_entity_status {
+    uint8_t packet_id;
+
+    int32_t entity_id;
+    int8_t entity_status; // byte enum. http://wiki.vg/Protocol#Entity_Status
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_EXPLOSION;
+struct mcpr_pkt_pl_cb_explosion {
+    uint8_t packet_id;
+
+    // TODO
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_UNLOAD_CHUNK;
 extern const uint8_t MCPR_PKT_PL_CB_CHANGE_GAME_STATE;
 extern const uint8_t MCPR_PKT_PL_CB_KEEP_ALIVE;

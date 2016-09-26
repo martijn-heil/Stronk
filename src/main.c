@@ -2,19 +2,15 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <string.h>
-#include "mcpr.h"
+//#include "mcpr.h"
 #include "pthread.h"
 
-#define tester testFunc
 
 void *doFancyStuffs(void *arg) {
-    printf("Aye ish doink fancy stuffs rite now! Like zis!");
+    printf("Aye ish doink fancy stuffs rite now! Like zis!\n");
+    printf("Oh ghai comrad!\n");
 
     return NULL;
-}
-
-void testFunc(char *gherro) {
-    puts(gherro);
 }
 
 int main(void) {
@@ -42,6 +38,5 @@ int main(void) {
 
     pthread_join(thread1, NULL);
 
-    tester("\nGherro\n");
     exit(EXIT_SUCCESS);
 }
