@@ -11,10 +11,6 @@
 
 #define PROTOCOL_VERSION 210
 
-struct mcpr_packet {
-    uint8_t id;
-};
-
 struct mcpr_entity_metadata_entry {
     uint8_t index;
     int8_t type;
@@ -28,9 +24,9 @@ struct mcpr_slot {
     char *nbt; // optional, not present if Block ID is -1. TODO: NBT...
 };
 
-void mcpr_send_packet(struct mcpr_packet *pkt);
-void mcpr_on_packet(void (*on_packet)(mcpr_packet *pkt));
-void mcpr_on_specific_packet(uint8_t packet_id, void (*on_packet)(struct mcpr_packet *pkt));
+void mcpr_send_packet(void *pkt, uint8_t pkt_type);
+void mcpr_on_packet(void (*on_packet)(void *pkt, uint8_t pkt_type));
+void mcpr_on_specific_packet(uint8_t packet_id, void (*on_packet)(void *pkt));
 
 /*
  Explanation of namings:
@@ -462,13 +458,64 @@ extern const uint8_t MCPR_PKT_PL_CB_EXPLOSION;
 struct mcpr_pkt_pl_cb_explosion {
     uint8_t packet_id;
 
-    // TODO
+    float x;
+    float y;
+    float z;
+    float radius;
+    int32_t record_count;
+    int8_t *records;
+    float player_motion_x;
+    float player_motion_y;
+    float player_motion_z;
 };
 
 extern const uint8_t MCPR_PKT_PL_CB_UNLOAD_CHUNK;
+struct mcpr_pkt_pl_cb_unload_chunk {
+    uint8_t packet_id;
+
+    int32_t chunk_x; // Block coordinate divided by 16, rounded down TODO create some utils for this.
+    int32_t chunk_z; // Block coordinate divided by 16, rounded down
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_CHANGE_GAME_STATE;
+struct mcpr_pkt_pl_cb_change_game_state {
+    uint8_t packet_id;
+
+    uint8_t reason;
+    float value;
+};
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_INVALID_BED;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_END_RAINING;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_BEGIN_RAINING;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_CHANGE_GAMEMODE;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_EXIT_END;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_DEMO_MESSAGE;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_ARROW_HITTING_PLAYER;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_FADE_VALUE;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_FADE_TIME;
+extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_ELDER_GUARDIAN_APPEARANCE;
+
+
 extern const uint8_t MCPR_PKT_PL_CB_KEEP_ALIVE;
+struct mcpr_pkt_pl_cb_keep_alive {
+    uint8_t packet_id;
+
+    int32_t keep_alive_id;
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_CHUNK_DATA;
+struct mcpr_pkt_pl_cb_chunk_data {
+    uint8_t packet_id;
+
+    int32_t chunk_x;
+    int32_t chunk_z;
+
+    // This is true if the packet represents all chunk sections in this vertical chunk column,
+    // where the Primary Bit Mask specifies exactly which chunk sections are included, and which are air.
+    // http://wiki.vg/Protocol#Chunk_Data
+    bool ground_up_continuous;
+};
+
 extern const uint8_t MCPR_PKT_PL_CB_EFFECT;
 extern const uint8_t MCPR_PKT_PL_CB_PARTICLE;
 extern const uint8_t MCPR_PKT_PL_CB_JOIN_GAME;
