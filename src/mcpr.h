@@ -4,599 +4,96 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <arpa/inet.h>
+
+#include <jansson/jansson.h>
+
 /*
     Minecraft Protocol (http://wiki.vg/Protocol)
     MCPR = MineCraft PRotocol.
 */
 
-#define PROTOCOL_VERSION 210
+#define MCPR_PROTOCOL_VERSION 210
 
-struct mcpr_entity_metadata_entry {
-    uint8_t index;
-    int8_t type;
-    void *value;
-};
+#define MCPR_STR_MAX 2147483652
 
-struct mcpr_slot {
-    int16_t block_id;
-    int8_t item_count; // optional, not present if Block ID is -1.
-    int16_t item_damage; // optional, not present if Block ID is -1.
-    char *nbt; // optional, not present if Block ID is -1. TODO: NBT...
-};
 
-void mcpr_send_packet(void *pkt, uint8_t pkt_type);
-void mcpr_on_packet(void (*on_packet)(void *pkt, uint8_t pkt_type));
-void mcpr_on_specific_packet(uint8_t packet_id, void (*on_packet)(void *pkt));
+// Encoding/decoding functions return the amount of bytes written for encode, and amount of
+// bytes read for decode. On error; they return -1
+
+int mcpr_encode_bool    (void *out, bool b);         // writes 1 byte
+int mcpr_encode_byte    (void *out, int8_t byte);    // writes 1 byte
+int mcpr_encode_ubyte   (void *out, uint8_t byte);   // writes 1 byte
+int mcpr_encode_short   (void *out, int16_t i);      // writes 2 bytes
+int mcpr_encode_ushort  (void *out, uint16_t i);     // writes 2 bytes
+int mcpr_encode_int     (void *out, int32_t i);      // writes 4 bytes
+int mcpr_encode_long    (void *out, int64_t i);      // writes 8 bytes
+int mcpr_encode_float   (void *out, float f);        // writes 4 bytes
+int mcpr_encode_double  (void *out, double d);       // writes 8 bytes
+
+
 
 /*
- Explanation of namings:
-
- MCPR = MineCraft PRotocol.
-
- sb = server-bound
- cb = client-bound
-
- st = status state
- hs = handshake state
- pl = play state
- lo = login state
-
- Format: (state)_(bound to?)_name
-
- Examples:
-    hs_sb_handshake     (handshake_serverbound_handshake),
-    lo_sb_login_start   (login_serverbound_login_start),
-    pl_cb_spawn_object  (play_clientbound_spawn_object)
+    ------------------- WARNING -----------------
+    THE FOLLOWING FUNCTIONS SHOULD BE USED WITH CARE!
 */
 
+ /*
+    Make sure the out buffer is (strlen(utf8Str) + 5)
+    Note that it is not guaranteed to write  (strlen(utf8Str) + 5) bytes, it can be less,
+    check the returned value for how many bytes exactly were written. (It will always write the whole string)
 
-// ----------------- Handshake state ------------------
+    returns the amount of bytes written.
+ */
+int mcpr_encode_string  (void *out, const char *utf8Str);
 
-//              --- Serverbound ---
-extern const uint8_t MCPR_PKT_HS_SB_HANDSHAKE;
+/*
+    out should at least be the size of (strlen(json_dumps(root, 0)) + 5).
+    Dont forget to free that returned string from json_dumps..
 
+    Note that this function is not guaranteed to write exactly (strlen(json_dumps(root, 0)) + 5) bytes,
+    it can write less bytes, check the return for how many bytes were exactly written.
 
+    returns the amount of bytes written.
+*/
+int mcpr_encode_chat    (void *out, const json_t *root);
 
 
-// ----------------- Status state ------------------
+int mcpr_encode_varint  (void *out, int32_t i);
+int mcpr_encode_varlong (void *out, int64_t i);
 
-//              --- Clientbound ---
-extern const uint8_t MCPR_PKT_ST_CB_RESPONSE;
-extern const uint8_t MCPR_PKT_ST_CB_PONG;
+int mcpr_decode_bool    (bool *out, void *in);
+int mcpr_decode_byte    (int8_t *out, void *in);
+int mcpr_decode_ubyte   (uint8_t *out, void *in);
+int mcpr_decode_short   (int16_t *out, void *in);
+int mcpr_decode_ushort  (uint16_t *out, void *in);
+int mcpr_decode_int     (int32_t *out, void *in);
+int mcpr_decode_long    (int64_t *out, void *in);
+int mcpr_decode_float   (float *out, void *in);
+int mcpr_decode_double  (double *out, void *in);
+int mcpr_decode_string  (char **out, void *in); // Will write a NUL terminated UTF-8 string to the buffer. out will be realloc'ed in all cases. Returns -1 on error.
+int mcpr_decode_chat    (char **out, void *in); // Should be free'd. out will be realloc'ed in all cases. returns -1 if memory could not be allocated or string is too big.
+int mcpr_decode_varint  (int32_t *out, void *in);
+int mcpr_decode_varlong (int64_t *out, void *in);
 
+// --- WARNING --- READ COMMENTS BELOW CAREFULLY.
+// data should be free'd by the receiver.
+// data is just the raw packet bytes, including the packet id and everything else.
+// data will be decrypted.
+void mcpr_on_pkt(uint8_t pkt_id, void (*on_packet)(uint8_t *data));
+void mcpr_on_any_pkt(void (*on_packet)(uint8_t *data));
 
-//              --- Serverbound ---
-extern const uint8_t MCPR_PKT_ST_SB_REQUEST;
-extern const uint8_t MCPR_PKT_ST_SB_PING;
+int mcpr_encrypt(void *buf, void *data, size_t data_len);
+int mcpr_decrypt(void *buf, void *data, size_t data_len);
 
 
 
 
-// ----------------- Login state ------------------
 
-//              --- Clientbound ---
-extern const uint8_t MCPR_PKT_LO_CB_DISCONNECT;
-extern const uint8_t MCPR_PKT_LO_CB_ENCRYPTION_REQUEST;
-extern const uint8_t MCPR_PKT_LO_CB_LOGIN_SUCCESS;
-extern const uint8_t MCPR_PKT_LO_CB_SET_COMPRESSION;
+// int mcpr_connect_to_server();
+// int mcpr_connect_to_client();
+//
+// int mcpr_disconnect_from_server();
+// int mcpr_disconnect_from_client();
 
-
-//              --- Serverbound ---
-extern const uint8_t MCPR_PKT_LO_SB_LOGIN_START;
-extern const uint8_t MCPR_PKT_LO_SB_ENCRYPTION_RESPONSE;
-
-
-
-// ------------------- Play state ----------------------
-
-//              --- Clientbound ---
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_OBJECT;
-struct pl_cb_spawn_object {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    uint64_t object_uuid;
-    int8_t type;
-    double x;
-    double y;
-    double z;
-};
-
-
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_EXPERIENCE_ORB;
-struct mcpr_pkt_pl_cb_spawn_experience_orb {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    double x;
-    double y;
-    double z;
-    int16_t count;
-};
-
-
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_GLOBAL_ENTITY;
-struct mcpr_pkt_pl_cb_spawn_global_entity {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    double x;
-    double y;
-    double z;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_MOB;
-struct mcpr_pkt_pl_cb_spawn_mob {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    uint64_t entity_uuid;
-    uint8_t type;
-    double x;
-    double y;
-    double z;
-    uint8_t yaw;
-    uint8_t pitch;
-    uint8_t head_pitch;
-    int16_t velocity_x;
-    int16_t velocity_y;
-    int16_t velocity_z;
-    struct mcpr_entity_metadata_entry *metadata;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_PAINTING;
-struct mcpr_pkt_pl_cb_spawn_painting {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    uint64_t entity_uuid;
-    char *title;
-    int64_t position;
-    int8_t direction;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_PLAYER;
-struct mcpr_pkt_pl_cb_spawn_player {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    uint64_t player_uuid;
-    double x;
-    double y;
-    double z;
-    uint8_t yaw;
-    uint8_t pitch;
-    struct mcpr_entity_metadata_entry *metadata;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_ANIMATON;
-struct mcpr_pkt_pl_cb_animation {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    uint8_t animation;
-};
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_SWING_MAIN_ARM;
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_TAKE_DAMAGE;
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_LEAVE_BED;
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_SWING_OFFHAND;
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_CRITICAL_EFFECT;
-extern const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_MAGIC_CRITICAL_EFFECT;
-
-extern const uint8_t MCPR_PKT_PL_CB_STATISTICS; // TODO http://wiki.vg/Protocol#Statistics
-
-extern const uint8_t MCPR_PKT_PL_CB_BLOCK_BREAK_ANIMATON;
-struct mcpr_pkt_pl_cb_block_break_animation {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    int64_t location;
-    int8_t destroy_stage;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_UPDATE_BLOCK_ENTITY;
-struct mcpr_pkt_pl_cb_update_block_entity {
-    uint8_t packet_id;
-
-    int64_t location;
-    uint8_t action;
-    int8_t *raw_nbt; // TODO
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_BLOCK_ACTION;
-struct mcpr_pkt_pl_cb_block_action {
-    uint8_t packet_id;
-
-    int64_t location;
-    uint8_t byte1;
-    uint8_t byte2;
-    int32_t block_type;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_BLOCK_CHANGE;
-struct mcpr_pkt_pl_cb_block_change {
-    uint8_t packet_id;
-
-    int64_t location;
-    int32_t blockId;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_BOSS_BAR;
-struct mcpr_pkt_pl_cb_boss_bar {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-};
-struct mcpr_pkt_pl_cb_boss_bar_action0 {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-
-    char *title_chat;
-    float health;
-    int32_t color;
-    int32_t division;
-    uint8_t flags;
-
-};
-// Action 1 doesn't actually have to exist since it has no fields and simply means, remove the bossbar.
-struct mcpr_pkt_pl_cb_boss_bar_action2 {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-
-    float health;
-};
-struct mcpr_pkt_pl_cb_boss_bar_action3 {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-
-    char *titleChat;
-};
-struct mcpr_pkt_pl_cb_boss_bar_action4 {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-
-    int32_t color;
-    int32_t dividers;
-};
-struct mcpr_pkt_pl_cb_boss_bar_action5 {
-    uint8_t packet_id;
-
-    uint64_t uuid;
-    int32_t action;
-
-    uint8_t flags;
-};
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_PINK;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_BLUE;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_RED;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_GREEN;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_YELLOW;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_PURPLE;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_WHITE;
-
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_NONE;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_6_NOTCHES;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_10_NOTCHES;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_12_NOTCHES;
-extern const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_20_NOTCHES;
-
-
-
-extern const uint8_t PL_CB_SERVER_DIFFICULTY;
-struct mcpr_pkt_pl_cb_server_difficulty {
-    uint8_t packet_id;
-
-    uint8_t difficulty;
-};
-extern const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_PEACEFUL;
-extern const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_EASY;
-extern const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_NORMAL;
-extern const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_HARD;
-
-extern const uint8_t PL_CB_TAB_COMPLETE;
-struct mcpr_pkt_pl_cb_tab_complete {
-    uint8_t packet_id;
-
-    int32_t count;
-    char **matches; // an array of strings.
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_CHAT_MESSAGE;
-struct mcpr_pkt_pl_cb_chat_message {
-    uint8_t packet_id;
-
-    char *json_data_chat;
-    int8_t position;
-};
-extern const int8_t MCPR_PKTENUM_PL_CB_CHAT_MESSAGE_POSITION_CHAT;
-extern const int8_t MCPR_PKTENUM_PL_CB_CHAT_MESSAGE_POSITION_SYSTEM;
-extern const int8_t MCPR_PKTENUM_PL_CB_CHAT_MESSAGE_POSITION_HOTBAR;
-
-extern const uint8_t MCPR_PKT_PL_CB_MULTI_BLOCK_CHANGE;
-struct mcpr_pkt_pl_cb_multi_block_change_record {
-    uint8_t horizontal_position;
-    uint8_t y_coordinate;
-    int32_t block_id;
-};
-struct mcpr_pkt_pl_cb_multi_block_change {
-    uint8_t packet_id;
-
-    int32_t chunk_x;
-    int32_t chunk_z;
-    int32_t record_count;
-    struct mcpr_pkt_pl_cb_multi_block_change_record *records;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_CONFIRM_TRANSACTION;
-struct mcpr_pkt_pl_cb_confirm_transaction {
-    uint8_t packet_id;
-
-    int8_t window_id;
-    int16_t action_number;
-    bool accepted;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_CLOSE_WINDOW;
-struct mcpr_pkt_pl_cb_close_window {
-    uint8_t packet_id;
-
-    uint8_t window_id;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_OPEN_WINDOW;
-struct mcpr_pkt_pl_cb_close_window {
-    uint8_t packet_id;
-
-    uint8_t window_id;
-    char *window_type;
-    char *window_title; // chat type.
-    uint8_t slot_count;
-    int32_t *entity_id; // NULLable
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_WINDOW_ITEMS;
-struct mcpr_pkt_pl_cb_window_items {
-    uint8_t packet_id;
-
-    uint8_t window_id;
-    int16_t count;
-    struct slot *slots;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_WINDOW_PROPERTY;
-struct mcpr_pkt_pl_cb_window_property {
-    uint8_t packet_id;
-
-    uint8_t window_id;
-    int16_t property;
-    int16_t value;
-};
-
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_FURNACE_FUEL_REMAINING;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_FURNACE_MAX_FUEL_BURN_TIME;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_FURNACE_PROGRESS;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_FURNACE_MAX_PROGRESS;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_LVL_REQUIRED_TOP;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_LVL_REQUIRED_MID;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_LVL_REQUIRED_BOTTOM;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_SEED;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_ENCHHOVER_TOP;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_ENCHHOVER_MID;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ENCHTABLE_ENCHHOVER_BOTTOM;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POWER_LVL;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POTION_EFFECT_FIRST;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BEACON_POTION_EFFECT_SECOND;
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_ANVIL_REPAIR_COST; // TODO seriously this gets way too long.
-extern const int16_t MCPR_PKTENUM_PL_CB_WINDOW_PROPERTY_PROPERTY_BREWING_STAND_BREW_TIME;
-
-
-extern const uint8_t MCPR_PKT_PL_CB_SET_SLOT;
-struct mcpr_pkt_pl_cb_set_slot {
-    uint8_t packet_id;
-
-    int8_t window_id;
-    int16_t slot;
-    char* nbt_slot_data; // TODO
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_SET_COOLDOWN;
-struct mcpr_pkt_cb_set_cooldown {
-    uint8_t packet_id;
-
-    int32_t item_id;
-    int32_t cooldown_ticks;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
-struct mcpr_pkt_cb_plugin_message {
-    uint8_t packet_id;
-
-    char *channel;
-    size_t bytes_size;
-    int8_t *bytes;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_NAMED_SOUND_EFFECT;
-struct mcpr_pkt_pl_cb_named_sound_effect {
-    uint8_t packet_id;
-
-    char *sound_name;
-    int32_t sound_category;
-    int32_t effect_position_x;
-    int32_t effect_position_y;
-    int32_t effect_position_z;
-    float volume;
-    float pitch;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_DISCONNECT;
-struct mcpr_pkt_pl_cb_disconnect {
-    uint8_t packet_id;
-
-    char *reason; // chat type. // TODO
-};
-
-
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_STATUS;
-struct mcpr_pkt_pl_cb_entity_status {
-    uint8_t packet_id;
-
-    int32_t entity_id;
-    int8_t entity_status; // byte enum. http://wiki.vg/Protocol#Entity_Status
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_EXPLOSION;
-struct mcpr_pkt_pl_cb_explosion {
-    uint8_t packet_id;
-
-    float x;
-    float y;
-    float z;
-    float radius;
-    int32_t record_count;
-    int8_t *records;
-    float player_motion_x;
-    float player_motion_y;
-    float player_motion_z;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_UNLOAD_CHUNK;
-struct mcpr_pkt_pl_cb_unload_chunk {
-    uint8_t packet_id;
-
-    int32_t chunk_x; // Block coordinate divided by 16, rounded down TODO create some utils for this.
-    int32_t chunk_z; // Block coordinate divided by 16, rounded down
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_CHANGE_GAME_STATE;
-struct mcpr_pkt_pl_cb_change_game_state {
-    uint8_t packet_id;
-
-    uint8_t reason;
-    float value;
-};
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_INVALID_BED;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_END_RAINING;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_BEGIN_RAINING;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_CHANGE_GAMEMODE;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_EXIT_END;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_DEMO_MESSAGE;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_ARROW_HITTING_PLAYER;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_FADE_VALUE;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_FADE_TIME;
-extern const uint8_t MCPR_PKTENUM_PL_CB_CHANGE_GAME_STATE_REASON_ELDER_GUARDIAN_APPEARANCE;
-
-
-extern const uint8_t MCPR_PKT_PL_CB_KEEP_ALIVE;
-struct mcpr_pkt_pl_cb_keep_alive {
-    uint8_t packet_id;
-
-    int32_t keep_alive_id;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_CHUNK_DATA;
-struct mcpr_pkt_pl_cb_chunk_data {
-    uint8_t packet_id;
-
-    int32_t chunk_x;
-    int32_t chunk_z;
-
-    // This is true if the packet represents all chunk sections in this vertical chunk column,
-    // where the Primary Bit Mask specifies exactly which chunk sections are included, and which are air.
-    // http://wiki.vg/Protocol#Chunk_Data
-    bool ground_up_continuous;
-};
-
-extern const uint8_t MCPR_PKT_PL_CB_EFFECT;
-extern const uint8_t MCPR_PKT_PL_CB_PARTICLE;
-extern const uint8_t MCPR_PKT_PL_CB_JOIN_GAME;
-extern const uint8_t MCPR_PKT_PL_CB_MAP;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_RELATIVE_MOVE;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_LOOK_AND_RELATIVE_MOVE;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_LOOK;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY;
-extern const uint8_t MCPR_PKT_PL_CB_VEHICLE_MOVE;
-extern const uint8_t MCPR_PKT_PL_CB_OPEN_SIGN_EDITOR;
-extern const uint8_t MCPR_PKT_PL_CB_PLAYER_ABILITIES;
-extern const uint8_t MCPR_PKT_PL_CB_COMBAT_EVENT;
-extern const uint8_t MCPR_PKT_PL_CB_PLAYER_LIST_ITEM;
-extern const uint8_t MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
-extern const uint8_t MCPR_PKT_PL_CB_USE_BED;
-extern const uint8_t MCPR_PKT_PL_CB_DESTROY_ENTITIES;
-extern const uint8_t MCPR_PKT_PL_CB_REMOVE_ENTITY_EFFECT;
-extern const uint8_t MCPR_PKT_PL_CB_RESOURCE_PACK_SEND;
-extern const uint8_t MCPR_PKT_PL_CB_RESPAWN;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_HEAD_LOOK;
-extern const uint8_t MCPR_PKT_PL_CB_WORLD_BORDER;
-extern const uint8_t MCPR_PKT_PL_CB_CAMERA;
-extern const uint8_t MCPR_PKT_PL_CB_HELD_ITEM_CHANGE;
-extern const uint8_t MCPR_PKT_PL_CB_DISPLAY_SCOREBOARD;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_METADATA;
-extern const uint8_t MCPR_PKT_PL_CB_ATTACH_ENTITY;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_VELOCITY;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_EQUIPMENT;
-extern const uint8_t MCPR_PKT_PL_CB_SET_EXPERIENCE;
-extern const uint8_t MCPR_PKT_PL_CB_UPDATE_HEALTH;
-extern const uint8_t MCPR_PKT_PL_CB_SCOREBOARD_OBJECTIVE;
-extern const uint8_t MCPR_PKT_PL_CB_SET_PASSENGERS;
-extern const uint8_t MCPR_PKT_PL_CB_TEAMS;
-extern const uint8_t MCPR_PKT_PL_CB_UPDATE_SCORE;
-extern const uint8_t MCPR_PKT_PL_CB_SPAWN_POSITION;
-extern const uint8_t MCPR_PKT_PL_CB_TIME_UPDATE;
-extern const uint8_t MCPR_PKT_PL_CB_TITLE;
-extern const uint8_t MCPR_PKT_PL_CB_SOUND_EFFECT;
-extern const uint8_t MCPR_PKT_PL_CB_PLAYER_LIST_HEADER_AND_FOOTER;
-extern const uint8_t MCPR_PKT_PL_CB_COLLECT_ITEM;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_TELEPORT;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_PROPERTIES;
-extern const uint8_t MCPR_PKT_PL_CB_ENTITY_EFFECT;
-
-//              --- Serverbound ---
-extern const uint8_t MCPR_PKT_PL_SB_TELEPORT_CONFIRM;
-extern const uint8_t MCPR_PKT_PL_SB_TAB_COMPLETE;
-extern const uint8_t MCPR_PKT_PL_SB_CHAT_MESSAGE;
-extern const uint8_t MCPR_PKT_PL_SB_CLIENT_STATUS;
-extern const uint8_t MCPR_PKT_PL_SB_CLIENT_SETTINGS;
-extern const uint8_t MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;
-extern const uint8_t MCPR_PKT_PL_SB_ENCHANT_ITEM;
-extern const uint8_t MCPR_PKT_PL_SB_CLICK_WINDOW;
-extern const uint8_t MCPR_PKT_PL_SB_CLOSE_WINDOW;
-extern const uint8_t MCPR_PKT_PL_SB_PLUGIN_MESSAGE;
-extern const uint8_t MCPR_PKT_PL_SB_USE_ENTITY;
-extern const uint8_t MCPR_PKT_PL_SB_KEEP_ALIVE;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_POSITION;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_LOOK;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER;
-extern const uint8_t MCPR_PKT_PL_SB_VEHICLE_MOVE;
-extern const uint8_t MCPR_PKT_PL_SB_STEER_BOAT;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_ABILITIES;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_DIGGING;
-extern const uint8_t MCPR_PKT_PL_SB_ENTITY_ACTION;
-extern const uint8_t MCPR_PKT_PL_SB_STEER_VEHICLE;
-extern const uint8_t MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS;
-extern const uint8_t MCPR_PKT_PL_SB_HELD_ITEM_CHANGE;
-extern const uint8_t MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION;
-extern const uint8_t MCPR_PKT_PL_SB_UPDATE_SIGN;
-extern const uint8_t MCPR_PKT_PL_SB_ANIMATION;
-extern const uint8_t MCPR_PKT_PL_SB_SPECTATE;
-extern const uint8_t MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT;
-extern const uint8_t MCPR_PKT_PL_SB_USE_ITEM;
-
-
-    #ifdef MCPR_SHORT_NAMES
-
-        // TODO: #define short_func_name long_very_long_func_name
-        // And all other identifiers, ofcourse.
-
-    #endif
 #endif

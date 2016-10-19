@@ -1,179 +1,239 @@
-#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
 
-// #include "mcpr.h"
-//
-//
-//
-// // ----------------- Handshake state ------------------
-//
-// //              --- Serverbound ---
-// const uint8_t MCPR_PKT_HS_SB_HANDSHAKE                     = 0x00;
-//
-//
-//
-//
-// // ----------------- Status state ------------------
-//
-// //              --- Clientbound ---
-// const uint8_t MCPR_PKT_ST_CB_RESPONSE                      = 0x00;
-// const uint8_t MCPR_PKT_ST_CB_PONG                          = 0x01;
-//
-//
-// //              --- Serverbound ---
-// const uint8_t MCPR_PKT_ST_SB_REQUEST                       = 0x00;
-// const uint8_t MCPR_PKT_ST_SB_PING                          = 0x01;
-//
-//
-//
-//
-// // ----------------- Login state ------------------
-//
-// //              --- Clientbound ---
-// const uint8_t MCPR_PKT_LO_CB_DISCONNECT                    = 0x00;
-// const uint8_t MCPR_PKT_LO_CB_ENCRYPTION_REQUEST            = 0x01;
-// const uint8_t MCPR_PKT_LO_CB_LOGIN_SUCCESS                 = 0x02;
-// const uint8_t MCPR_PKT_LO_CB_SET_COMPRESSION               = 0x03;
-//
-//
-// //              --- Serverbound ---
-// const uint8_t MCPR_PKT_LO_SB_LOGIN_START                   = 0x00;
-// const uint8_t MCPR_PKT_LO_SB_ENCRYPTION_RESPONSE           = 0x01;
-//
-//
-//
-// // ------------------- Play state ----------------------
-//
-// //              --- Clientbound ---
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_OBJECT                  = 0x00;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_EXPERIENCE_ORB          = 0x01;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_GLOBAL_ENTITY           = 0x02;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_MOB                     = 0x03;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_PAINTING                = 0x04;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_PLAYER                  = 0x05;
-// const uint8_t MCPR_PKT_PL_CB_ANIMATON                      = 0x06;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_SWING_MAIN_ARM        = 0x00;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_TAKE_DAMAGE           = 0x01;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_LEAVE_BED             = 0x02;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_SWING_OFFHAND         = 0x03;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_CRITICAL_EFFECT       = 0x04;
-// const uint8_t MCPR_PKTENUM_PL_CB_ANIMATION_ANIMATION_MAGIC_CRITICAL_EFFECT = 0x05;
-//
-// const uint8_t MCPR_PKT_PL_CB_STATISTICS                    = 0x07; // TODO http://wiki.vg/Protocol#Statistics
-// const uint8_t MCPR_PKT_PL_CB_BLOCK_BREAK_ANIMATON          = 0x08;
-// const uint8_t MCPR_PKT_PL_CB_UPDATE_BLOCK_ENTITY           = 0x09;
-// const uint8_t MCPR_PKT_PL_CB_BLOCK_ACTION                  = 0x0A;
-// const uint8_t MCPR_PKT_PL_CB_BLOCK_CHANGE                  = 0x0B;
-// const uint8_t MCPR_PKT_PL_CB_BOSS_BAR                      = 0x0C;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_PINK   = 0;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_BLUE   = 1;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_RED    = 2;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_GREEN  = 3;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_YELLOW = 4;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_PURPLE = 5;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_COLOR_WHITE  = 6;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_NONE        = 0;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_6_NOTCHES   = 1;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_10_NOTCHES  = 2;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_12_NOTCHES  = 3;
-// const int32_t MCPR_PKTENUM_PL_CB_BOSS_BAR_DIVISION_20_NOTCHES  = 4;
-//
-// const uint8_t MCPR_PKT_PL_CB_SERVER_DIFFICULTY             = 0x0D;
-// const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_PEACEFUL = 0;
-// const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_EASY     = 1;
-// const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_NORMAL   = 2;
-// const uint8_t MCPR_PKTENUM_PL_CB_SERVER_DIFFICULTY_DIFFICULTY_HARD     = 3;
-//
-// const uint8_t MCPR_PKT_PL_CB_TAB_COMPLETE                  = 0x0E;
-// const uint8_t MCPR_PKT_PL_CB_CHAT_MESSAGE                  = 0x0F;
-// const uint8_t MCPR_PKT_PL_CB_MULTI_BLOCK_CHANGE            = 0x10;
-// const uint8_t MCPR_PKT_PL_CB_CONFIRM_TRANSACTION           = 0x11;
-// const uint8_t MCPR_PKT_PL_CB_CLOSE_WINDOW                  = 0x12;
-// const uint8_t MCPR_PKT_PL_CB_OPEN_WINDOW                   = 0x13;
-// const uint8_t MCPR_PKT_PL_CB_WINDOW_ITEMS                  = 0x14;
-// const uint8_t MCPR_PKT_PL_CB_WINDOW_PROPERTY               = 0x15;
-// const uint8_t MCPR_PKT_PL_CB_SET_SLOT                      = 0x16;
-// const uint8_t MCPR_PKT_PL_CB_SET_COOLDOWN                  = 0x17;
-// const uint8_t MCPR_PKT_PL_CB_PLUGIN_MESSAGE                = 0x18;
-// const uint8_t MCPR_PKT_PL_CB_NAMED_SOUND_EFFECT            = 0x19;
-// const uint8_t MCPR_PKT_PL_CB_DISCONNECT                    = 0x1A;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_STATUS                 = 0x1B;
-// const uint8_t MCPR_PKT_PL_CB_EXPLOSION                     = 0x1C;
-// const uint8_t MCPR_PKT_PL_CB_UNLOAD_CHUNK                  = 0x1D;
-// const uint8_t MCPR_PKT_PL_CB_CHANGE_GAME_STATE             = 0x1E;
-// const uint8_t MCPR_PKT_PL_CB_KEEP_ALIVE                    = 0x1F;
-// const uint8_t MCPR_PKT_PL_CB_CHUNK_DATA                    = 0x20;
-// const uint8_t MCPR_PKT_PL_CB_EFFECT                        = 0x21;
-// const uint8_t MCPR_PKT_PL_CB_PARTICLE                      = 0x22;
-// const uint8_t MCPR_PKT_PL_CB_JOIN_GAME                     = 0x23;
-// const uint8_t MCPR_PKT_PL_CB_MAP                           = 0x24;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_RELATIVE_MOVE          = 0x25;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_LOOK_AND_RELATIVE_MOVE = 0x26;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_LOOK                   = 0x27;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY                        = 0x28;
-// const uint8_t MCPR_PKT_PL_CB_VEHICLE_MOVE                  = 0x29;
-// const uint8_t MCPR_PKT_PL_CB_OPEN_SIGN_EDITOR              = 0x2A;
-// const uint8_t MCPR_PKT_PL_CB_PLAYER_ABILITIES              = 0x2B;
-// const uint8_t MCPR_PKT_PL_CB_COMBAT_EVENT                  = 0x2C;
-// const uint8_t MCPR_PKT_PL_CB_PLAYER_LIST_ITEM              = 0x2D;
-// const uint8_t MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK      = 0x2E;
-// const uint8_t MCPR_PKT_PL_CB_USE_BED                       = 0x2F;
-// const uint8_t MCPR_PKT_PL_CB_DESTROY_ENTITIES              = 0x30;
-// const uint8_t MCPR_PKT_PL_CB_REMOVE_ENTITY_EFFECT          = 0x31;
-// const uint8_t MCPR_PKT_PL_CB_RESOURCE_PACK_SEND            = 0x32;
-// const uint8_t MCPR_PKT_PL_CB_RESPAWN                       = 0x33;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_HEAD_LOOK              = 0x34;
-// const uint8_t MCPR_PKT_PL_CB_WORLD_BORDER                  = 0x35;
-// const uint8_t MCPR_PKT_PL_CB_CAMERA                        = 0x36;
-// const uint8_t MCPR_PKT_PL_CB_HELD_ITEM_CHANGE              = 0x37;
-// const uint8_t MCPR_PKT_PL_CB_DISPLAY_SCOREBOARD            = 0x38;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_METADATA               = 0x39;
-// const uint8_t MCPR_PKT_PL_CB_ATTACH_ENTITY                 = 0x3A;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_VELOCITY               = 0x3B;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_EQUIPMENT              = 0x3C;
-// const uint8_t MCPR_PKT_PL_CB_SET_EXPERIENCE                = 0x3D;
-// const uint8_t MCPR_PKT_PL_CB_UPDATE_HEALTH                 = 0x3E;
-// const uint8_t MCPR_PKT_PL_CB_SCOREBOARD_OBJECTIVE          = 0x3F;
-// const uint8_t MCPR_PKT_PL_CB_SET_PASSENGERS                = 0x40;
-// const uint8_t MCPR_PKT_PL_CB_TEAMS                         = 0x41;
-// const uint8_t MCPR_PKT_PL_CB_UPDATE_SCORE                  = 0x42;
-// const uint8_t MCPR_PKT_PL_CB_SPAWN_POSITION                = 0x43;
-// const uint8_t MCPR_PKT_PL_CB_TIME_UPDATE                   = 0x44;
-// const uint8_t MCPR_PKT_PL_CB_TITLE                         = 0x45;
-// const uint8_t MCPR_PKT_PL_CB_SOUND_EFFECT                  = 0x46;
-// const uint8_t MCPR_PKT_PL_CB_PLAYER_LIST_HEADER_AND_FOOTER = 0x47;
-// const uint8_t MCPR_PKT_PL_CB_COLLECT_ITEM                  = 0x48;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_TELEPORT               = 0x49;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_PROPERTIES             = 0x4A;
-// const uint8_t MCPR_PKT_PL_CB_ENTITY_EFFECT                 = 0x4B;
-//
-// //              --- Serverbound ---
-// const uint8_t MCPR_PKT_PL_SB_TELEPORT_CONFIRM              = 0x00;
-// const uint8_t MCPR_PKT_PL_SB_TAB_COMPLETE                  = 0x01;
-// const uint8_t MCPR_PKT_PL_SB_CHAT_MESSAGE                  = 0x02;
-// const uint8_t MCPR_PKT_PL_SB_CLIENT_STATUS                 = 0x03;
-// const uint8_t MCPR_PKT_PL_SB_CLIENT_SETTINGS               = 0x04;
-// const uint8_t MCPR_PKT_PL_SB_CONFIRM_TRANSACTION           = 0x05;
-// const uint8_t MCPR_PKT_PL_SB_ENCHANT_ITEM                  = 0x06;
-// const uint8_t MCPR_PKT_PL_SB_CLICK_WINDOW                  = 0x07;
-// const uint8_t MCPR_PKT_PL_SB_CLOSE_WINDOW                  = 0x08;
-// const uint8_t MCPR_PKT_PL_SB_PLUGIN_MESSAGE                = 0x09;
-// const uint8_t MCPR_PKT_PL_SB_USE_ENTITY                    = 0x0A;
-// const uint8_t MCPR_PKT_PL_SB_KEEP_ALIVE                    = 0x0B;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_POSITION               = 0x0C;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK      = 0x0D;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_LOOK                   = 0x0E;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER                        = 0x0F;
-// const uint8_t MCPR_PKT_PL_SB_VEHICLE_MOVE                  = 0x10;
-// const uint8_t MCPR_PKT_PL_SB_STEER_BOAT                    = 0x11;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_ABILITIES              = 0x12;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_DIGGING                = 0x13;
-// const uint8_t MCPR_PKT_PL_SB_ENTITY_ACTION                 = 0x14;
-// const uint8_t MCPR_PKT_PL_SB_STEER_VEHICLE                 = 0x15;
-// const uint8_t MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS          = 0x16;
-// const uint8_t MCPR_PKT_PL_SB_HELD_ITEM_CHANGE              = 0x17;
-// const uint8_t MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION     = 0x18;
-// const uint8_t MCPR_PKT_PL_SB_UPDATE_SIGN                   = 0x19;
-// const uint8_t MCPR_PKT_PL_SB_ANIMATION                     = 0x1A;
-// const uint8_t MCPR_PKT_PL_SB_SPECTATE                      = 0x1B;
-// const uint8_t MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT        = 0x1C;
-// const uint8_t MCPR_PKT_PL_SB_USE_ITEM                      = 0x1D;
+#include <arpa/inet.h>
+
+#include <jansson/jansson.h>
+
+#include "mcpr.h"
+#include "util.h"
+
+int mcpr_encode_bool(void *out, bool b) {
+    *((uint8_t *) out) = (b ? 0x01 : 0x00);
+    return 1;
+}
+
+int mcpr_encode_byte(void *out, int8_t byte) {
+    memcpy(out, &byte, sizeof(byte));
+    return sizeof(byte);
+}
+
+int mcpr_encode_ubyte(void *out, uint8_t byte) {
+    memcpy(out, &byte, sizeof(byte));
+    return sizeof(byte);
+}
+
+int mcpr_encode_short(void *out, int16_t i) {
+    hton(&i, sizeof(i));
+    memcpy(out, &i, sizeof(i));
+    return sizeof(i);
+}
+
+int mcpr_encode_ushort(void *out, uint16_t i) {
+    hton(&i, sizeof(i));
+    memcpy(out, &i, sizeof(i));
+    return sizeof(i);
+}
+
+int mcpr_encode_int(void *out, int32_t i) {
+    hton(&i, sizeof(i));
+    memcpy(out, &i, sizeof(i));
+    return sizeof(i);
+}
+
+int mcpr_encode_long(void *out, int64_t i) {
+    hton(&i, sizeof(i));
+    memcpy(out, &i, sizeof(i));
+    return sizeof(i);
+}
+
+int mcpr_encode_float(void *out, float f) {
+    hton(&f, sizeof(f));
+    memcpy(out, &f, sizeof(f));
+    return sizeof(f);
+}
+
+int mcpr_encode_double(void *out, double d) {
+    hton(&d, sizeof(d));
+    memcpy(out, &d, sizeof(d));
+    return sizeof(d);
+}
+
+int mcpr_encode_string(void *out, const char *utf8Str) {
+    size_t len = strlen(utf8Str);
+
+    size_t bytes_written = mcpr_encode_varint(out, strlen(utf8Str));
+    memcpy(out + bytes_written, utf8Str, len); // doesn't copy the NUL byte, on purpose.
+    bytes_written += len;
+
+    return bytes_written;
+}
+
+int mcpr_encode_chat(void *out, const json_t *root) {
+    char *chat = json_dumps(root, 0); // this should be free'd
+    size_t bytes_written = mcpr_encode_string(out, chat);
+    free(chat);
+    return bytes_written;
+}
+
+int mcpr_encode_varint(void *out, int32_t value) {
+    size_t i = 0;
+    hton(&value, sizeof(value));
+
+    do {
+        uint8_t temp = (uint8_t)(value & 0x7F); // 0x7F == 0b01111111
+
+        value = ((uint32_t) value)>>7;
+        if (value != 0) {
+            temp |= 0x80; // 0x80 == 0b10000000
+        }
+        ((uint8_t *) out)[i] = temp;
+        i++;
+    } while (value != 0);
+
+    return i;
+}
+
+int mcpr_encode_varlong(void *out, int64_t value) {
+    size_t i = 0;
+    hton(&value, sizeof(value));
+
+    do {
+        uint8_t temp = (uint8_t)(value & 0x7F); // 0x7F == 0b01111111
+
+        value = ((uint32_t) value)>>7;
+        if (value != 0) {
+            temp |= 0x80; // 0x80 == 0b10000000
+        }
+        ((uint8_t *) out)[i] = temp;
+        i++;
+    } while (value != 0);
+
+    return i;
+}
+
+
+
+
+int mcpr_decode_bool(bool *out, void *in) {
+    *out = (*((uint8_t *) out)) == 0x01 ? true: false;
+    return 1;
+}
+
+int mcpr_decode_byte(int8_t *out, void *in) {
+    memcpy(out, in, sizeof(int8_t));
+    return sizeof(int8_t);
+}
+
+int mcpr_decode_ubyte(uint8_t *out, void *in) {
+    memcpy(out, in, sizeof(uint8_t));
+    return sizeof(uint8_t);
+}
+
+int mcpr_decode_short(int16_t *out, void *in) {
+    memcpy(out, in, sizeof(int16_t));
+    ntoh(out, sizeof(int16_t));
+    return sizeof(int16_t);
+}
+
+int mcpr_decode_ushort(uint16_t *out, void *in) {
+    memcpy(out, in, sizeof(uint16_t));
+    ntoh(out, sizeof(uint16_t));
+    return sizeof(uint16_t);
+}
+
+int mcpr_decode_int(int32_t *out, void *in) {
+    memcpy(out, in, sizeof(int32_t));
+    ntoh(out, sizeof(int32_t));
+    return sizeof(int32_t);
+}
+
+int mcpr_decode_long(int64_t *out, void *in) {
+    memcpy(out, in, sizeof(int64_t));
+    ntoh(out, sizeof(int64_t));
+    return sizeof(int64_t);
+}
+
+int mcpr_decode_float(float *out, void *in) {
+    memcpy(out, in, sizeof(float));
+    ntoh(out, sizeof(float));
+    return sizeof(float);
+}
+
+int mcpr_decode_double(double *out, void *in) {
+    memcpy(out, in, sizeof(double));
+    ntoh(out, sizeof(double));
+    return sizeof(double);
+}
+
+int mcpr_decode_string(char **out, void *in) {
+    int32_t len;
+    int32_t bytes_read = mcpr_decode_varint(&len, in);
+    // 2147483652 is the max string size allowed by the Minecraft Protocol.
+    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX)
+    *out = realloc(*out, len * sizeof(char) + 1);
+    if(*out == NULL) { return -1; }
+    memcpy(*out, (in + bytes_read), len);
+    ntoh(out, len * sizeof(char));
+    (*out)[len] = '\0';
+
+    return bytes_read + len + 1;
+}
+
+int mcpr_decode_chat(char **out, void *in) {
+    return mcpr_decode_string(out, in);
+}
+
+int mcpr_decode_varint(int32_t *out, void *in) {
+    uint8_t *bytes = (uint8_t *) in;
+
+    unsigned int num_read = 0;
+    int32_t result = 0;
+    uint8_t read;
+    do {
+        read = bytes[num_read];
+        int value = (read & 0x7F); // 0x7F == 0b01111111
+        result |= (value << (7 * num_read));
+
+        num_read++;
+        if (num_read > 5) {
+            return -1;
+        }
+    } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+
+    ntoh(&result, sizeof(result));
+    *out = result;
+    return num_read;
+}
+
+int mcpr_decode_varlong(int64_t *out, void *in) {
+    uint8_t *bytes = (uint8_t *) in;
+
+    unsigned int num_read = 0;
+    int64_t result = 0;
+    uint8_t read;
+    do {
+        read = bytes[num_read];
+        int64_t value = (read & 0x7F); // 0x7F == 0b01111111
+        result |= (value << (7 * num_read));
+
+        num_read++;
+        if (num_read > 10) {
+            return -1;
+        }
+    } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+
+    *out = result;
+    return num_read;
+}
+
+// data should be free'd by the receiver.
+// data is just the raw packet bytes, including the packet id and everything else.
+void mcpr_on_pkt(uint8_t pkt_id, void (*on_packet)(uint8_t *data)) {
+
+}
+
+void mcpr_on_any_pkt(void (*on_packet)(uint8_t *data)) {
+
+}
