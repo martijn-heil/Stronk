@@ -21,14 +21,50 @@ enum endianness get_endianness() {
 }
 
 void hton(void *what, size_t n) {
-    if(get_endianness() == S_LITTLE_ENDIAN) {
-        bswap(what, n);
+    // This will most likely be optimized away when optimizations are turned on.
+    // normal hton/ntoh functions are slightly faster than our custom one.
+    switch(n) {
+        case 4: // 32 bits
+            (*CAST(uint32_t*, what)) = htonl(*CAST(uint32_t*, what));
+        break;
+
+        case 8: // 64 bits
+            (*CAST(uint64_t*, what)) = htonll(*CAST(uint64_t*, what));
+        break;
+
+        case 2: // 16 bits
+            (*CAST(uint16_t*, what)) = htons(*CAST(uint16_t*, what));
+        break;
+
+        default:
+            if(get_endianness() == S_LITTLE_ENDIAN) {
+                bswap(what, n);
+            }
+        break;
     }
 }
 
 void ntoh(void *what, size_t n) {
-    if(get_endianness() == S_LITTLE_ENDIAN) {
-        bswap(what, n);
+    // This will most likely be optimized away when optimizations are turned on.
+    // normal hton/ntoh functions are slightly faster than our custom one.
+    switch(n) {
+        case 4: // 32 bits
+            (*CAST(uint32_t*, what)) = ntohl(*CAST(uint32_t*, what));
+        break;
+
+        case 8: // 64 bits
+            (*CAST(uint64_t*, what)) = ntohll(*CAST(uint64_t*, what));
+        break;
+
+        case 2: // 16 bits
+            (*CAST(uint16_t*, what)) = ntohs(*CAST(uint16_t*, what));
+        break;
+
+        default:
+            if(get_endianness() == S_LITTLE_ENDIAN) {
+                bswap(what, n);
+            }
+        break;
     }
 }
 
@@ -40,3 +76,33 @@ void bswap(void *what, size_t n) {
         ((uint8_t *) what)[i] = tmp[n - 1 - i];
     }
 }
+
+// char* itostr(char *dest, size_t size, int a, int base) {
+//   static char buffer[sizeof a * CHAR_BIT + 1 + 1];
+//   static const char digits[36] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+//
+//   if (base < 2 || base > 36) {
+//     return NULL;
+//   }
+//
+//   char* p = &buffer[sizeof(buffer) - 1];
+//   *p = '\0';
+//
+//   int an = a < 0 ? a : -a;
+//
+//   // Works with negative `int`
+//   do {
+//     *(--p) = digits[-(an % base)];
+//     an /= base;
+//   } while (an);
+//
+//   if (a < 0) {
+//     *(--p) = '-';
+//   }
+//
+//   size_t size_used = &buffer[sizeof(buffer)] - p;
+//   if (size_used > size) {
+//     return NULL;
+//   }
+//   return memcpy(dest, p, size_used);
+// }
