@@ -98,23 +98,14 @@ int mcpr_decode_float           (float *out, const void *in);
 int mcpr_decode_double          (double *out, const void *in);
 int mcpr_decode_string          (char *out, const void *in, int32_t len); // Will write a NUL terminated UTF-8 string to the buffer. Beware buffer overflows! Make sure that out is big enough!
 int mcpr_decode_chat            (json_t **out, const void *in); // Will write a NUL terminated UTF-8 string to the buffer. Beware buffer overflows! Make sure that out is big enough!
-int mcpr_decode_varint          (int32_t *out, const void *in);
-int mcpr_decode_varlong         (int64_t *out, const void *in);
+int mcpr_decode_varint          (int32_t *out, const void *in, size_t maxlen);
+int mcpr_decode_varlong         (int64_t *out, const void *in, size_t maxlen);
 int mcpr_deocde_chunk_section   (const void *in);
 int mcpr_decode_position        (struct mcpr_position *out, const void *in);
 int mcpr_decode_angle           (uint8_t *out, const void *in); // Angles start at 0 all the way to 255.
 int mcpr_decode_uuid            (uuid_t out, const void *in);
 //int mcpr_decode_entity_metadata (struct mcpr_entity_metadata *out, const void *in);
 
-// --- WARNING --- READ COMMENTS BELOW CAREFULLY.
-// data should be free'd by the receiver.
-// data is just the raw packet bytes, including the packet id and everything else.
-// data will be decrypted.
-// void mcpr_on_pkt(uint8_t pkt_id, void (*on_packet)(uint8_t *data));
-// void mcpr_on_any_pkt(void (*on_packet)(uint8_t *data));
-
-int mcpr_encrypt(void *buf, void *data, size_t data_len);
-int mcpr_decrypt(void *buf, void *data, size_t data_len);
 
 int mcpr_compress(void **out, void *in); // will malloc *out for you. Don't forget to free it.
 int mcpr_decompress(void **out, void *in); // will malloc *out for you. Don't forget to free it.
@@ -147,8 +138,8 @@ struct mcpr_client_sess {
     EVP_CIPHER_CTX ctx_decrypt;
 };
 
-int mcpr_encrypt(EVP_CIPHER_CTX ctx_encrypt, uint8_t *data);
-int mcpr_encrypt(EVP_CIPHER_CTX ctx_decrypt, char *data);
+int mcpr_encrypt(EVP_CIPHER_CTX ctx_encrypt, void *data, size_t len);
+int mcpr_encrypt(EVP_CIPHER_CTX ctx_decrypt, void *data, size_t len);
 
 
 //struct mcpr_server_sess mcpr_init_server_sess(const char *host, int port);

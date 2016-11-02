@@ -18,6 +18,7 @@
 #include <safe_math.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
+#include <openssl/sha.h>
 
 #include "mcpr.h"
 #include "util.h"
@@ -101,7 +102,7 @@ int mcpr_encode_chat(void *out, const json_t *root) {
     char *chat = json_dumps(root, 0); // this should be free'd
     if(chat == NULL) {
         #ifdef MCPR_DO_LOGGING
-            syslog(LOG_ERR, "Could not dump JSON to string in mcpr_encode_chat()")
+            syslog(LOG_ERR, "Could not dump JSON to string in mcpr_encode_chat()");
         #endif
         return -1;
     }
@@ -252,7 +253,7 @@ int mcpr_decode_string(char *out, const void *in, int32_t len) {
 
 int mcpr_decode_chat(json_t **out, const void *in) {
     int32_t len;
-    int bytes_read = mcpr_decode_varint(&len, in);
+    int bytes_read = mcpr_decode_varint(&len, in, 5);
     if(bytes_read < 0) {
         #ifdef MCPR_DO_LOGGING
             syslog(LOG_ERR, "Error whilst decoding varint in mcpr_decode_chat()");
@@ -468,7 +469,62 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
     return 0;
 }
 
+int minecraft_stringify_sha1(char *stringified_hash, const unsigned char *hash1) {
+    unsigned char uhash[SHA_DIGEST_LENGTH];
+    for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        uhash[i] = hash1[i];
+    }
+
+    char *hash = (char *) uhash;
+    char *stringified_hashp = stringified_hash + 1;
+
+    bool is_negative = *hash < 0;
+    if(is_negative) {
+        bool carry = true;
+        int i;
+        unsigned char new_byte;
+        unsigned char value;
+
+        for(i = SHA_DIGEST_LENGTH - 1; i >= 0; --i) {
+            value = uhash[i];
+            new_byte = ~value & 0xFF;
+            if(carry) {
+                carry = new_byte == 0xFF;
+                uhash[i] = new_byte + 1;
+            } else {
+                uhash[i] = new_byte;
+            }
+        }
+    }
+
+    // Write it as a hex string.
+    for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        sprintf(stringified_hashp, "%02x", uhash[i]);
+        //printf("%02x", hash[i]);
+        stringified_hashp += 2;
+    }
+    *stringified_hashp = '\0';
+
+    // Trim leading zeros
+    stringified_hashp = stringified_hash + 1;
+    for(int i = 0; i < SHA_DIGEST_LENGTH * 2; i++) {
+        if(*stringified_hashp != '0') { break; }
+        stringified_hashp++;
+    }
+
+
+    if(is_negative) { // Hash is negative.
+        *stringified_hash = '-';
+    }
+
+
+    return 0;
+}
+
 int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int port) {
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpointer-arith"
+
     int tmpsockfd;
     int status = init_socket(&tmpsockfd, host, port);
     if(status < 0) {
@@ -597,6 +653,10 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     unsigned char *encrypted_verify_token;
     int encrypted_verify_token_len;
 
+    char *server_id;
+    int8_t *server_pubkey;
+    size_t server_pubkey_len;
+
 
     //
     // Read encryption request packet
@@ -646,44 +706,45 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         len_left -= bytes_read_5;
 
         if(len_left < str_len) { free(buf); return -1; }
-        char *server_id = malloc((str_len + 1) * sizeof(char));
+        server_id = malloc((str_len + 1) * sizeof(char));
+        if(server_id == NULL) { free(buf); return -1; }
         int bytes_read_6 = mcpr_decode_string(&server_id, bufpointer);
-        if(bytes_read_6 < 0) { free(buf); return -1; }
+        if(bytes_read_6 < 0) { free(server_id); free(buf); return -1; }
         bufpointer += bytes_read_6;
         len_left -= bytes_read_6;
 
-        if(len_left < 1) { free(buf); return -1; }
+        if(len_left < 1) { free(server_id); free(buf); return -1; }
         int32_t pubkeylen;
         int bytes_read_7 = mcpr_decode_varint(&pubkeylen, bufpointer, len_left);
-        if(bytes_read_7 < 0) { free(buf); return -1; }
-        if(pubkeylen > SIZE_MAX) { free(buf); return -1; }
+        if(bytes_read_7 < 0) { free(server_id); free(buf); return -1; }
+        if(pubkeylen > SIZE_MAX) { free(server_id); free(buf); return -1; }
         bufpointer += bytes_read_7;
         len_left -= bytes_read_6;
 
-        if(len_left < pubkeylen) { free(buf); return -1; }
+        if(len_left < pubkeylen) { free(server_id); free(buf); return -1; }
         int8_t *pubkey = malloc((size_t) pubkeylen);
         int8_t *pubkeyp = pubkey;
         for(int32_t i = 0; i < pubkeylen; i++) {
             int bytes_read_8 = mcpr_decode_byte(pubkeyp, bufpointer);
-            if(bytes_read_8 < 0) { free(buf); free(pubkey); return -1; }
+            if(bytes_read_8 < 0) { free(server_id); free(buf); free(pubkey); return -1; }
             pubkey++;
             bufpointer++;
             len_left--;
         }
 
-        if(len_left < 1) { free(buf); free(pubkey); return -1; }
+        if(len_left < 1) { free(server_id); free(buf); free(pubkey); return -1; }
         int bytes_read_9 = mcpr_decode_varint(&verify_token_len, bufpointer, len_left);
-        if(bytes_read_9 < 0) { free(buf); free(pubkey); return -1; }
-        if(verify_token_len > SIZE_MAX) { free(buf); free(pubkey); return -1; }
+        if(bytes_read_9 < 0) { free(server_id); free(buf); free(pubkey); return -1; }
+        if(verify_token_len > SIZE_MAX) { free(server_id); free(buf); free(pubkey); return -1; }
         bufpointer += bytes_read_9;
         len_left -= bytes_read_9;
 
-        if(len_left < verify_token_len) { free(buf); free(pubkey); return -1; }
+        if(len_left < verify_token_len) { free(server_id); free(buf); free(pubkey); return -1; }
         verify_token = malloc((size_t) verify_token_len);
         int8_t *verify_tokenp = verify_token;
         for(int32_t i = 0; i < verify_token_len; i++) {
             int bytes_read_10 = mcpr_decode_byte(verifytokenp, bufpointer);
-            if(bytes_read_10 < 0) { free(buf); free(pubkey); free(verify_token); return -1; }
+            if(bytes_read_10 < 0) { free(server_id); free(buf); free(pubkey); free(verify_token); return -1; }
             verify_tokenp++;
             bufpointer++;
         }
@@ -702,6 +763,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
             free(buf);
             free(pubkey);
             free(verify_token);
+            free(server_id);
             return -1;
         }
         RSA_public_encrypt(shared_secret_len, shared_secret, encrypted_shared_secret_buf, RSA_PKCS1_PADDING);
@@ -713,16 +775,75 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
             free(buf);
             free(pubkey);
             free(verify_token);
+            free(server_id);
             return -1;
         }
         RSA_public_encrypt(verify_token_len, (unsigned char *) verify_token, encrypted_verify_token, RSA_PKCS1_PADDING);
         RSA_free(rsa);
         free(buf);
-        free(pubkey);
         free(verify_token);
+        server_pubkey = pubkey;
+        server_pubkey_len = pubkeylen;
     }
 
-    // TODO client auth!
+    /*
+     * Do client authentication with the Mojang servers.
+     * TODO make this optional for offline mode?
+     */
+
+    unsigned char *client_auth_hash = malloc(SHA_DIGEST_LENGTH);
+    if(hash == NULL) {
+        free(encrypted_shared_secret_buf);
+        free(encrypted_verify_token);
+        free(server_pubkey);
+        free(server_id);
+        return -1;
+    }
+
+    SHA_CTX sha_ctx;
+    SHA1_Init(&sha_ctx);
+
+    if(server_id != '\0') { // Make sure the string isn't empty.
+        SHA1_Update(&sha_ctx, server_id, strlen(server_id));
+    }
+    SHA1_Update(&sha_ctx, shared_secret, shared_secret_len);
+    SHA1_Update(&sha_ctx, server_pubkey, server_pubkey_len);
+    SHA1_Final(client_auth_hash, &sha_ctx);
+
+
+    char *stringified_client_auth_hash == malloc(SHA_DIGEST_LENGTH * 2 + 2);
+    if(stringified_client_auth_hash == NULL) {
+        #ifdef MCPR_DO_LOGGING
+            syslog(LOG_ERR, "Could not allocate memory for stringified_client_auth_hash");
+        #endif
+        free(encrypted_shared_secret_buf);
+        free(encrypted_verify_token);
+        free(server_pubkey);
+        free(server_id);
+        free(client_auth_hash);
+        return -1;
+    }
+    int status = minecraft_stringify_sha1(stringified_client_auth_hash, client_auth_hash);
+    if(status < 0) {
+        #ifdef MCPR_DO_LOGGING
+            syslog(LOG_ERR, "Error stringifying SHA1 hash for client authentication.");
+        #endif
+        free(encrypted_shared_secret_buf);
+        free(encrypted_verify_token);
+        free(server_pubkey);
+        free(server_id);
+        free(client_auth_hash);
+        free(stringified_client_auth_hash);
+        return -1;
+    }
+
+
+    // TODO send post request with data to Mojang servers.
+
+
+    free(client_auth_hash);
+    free(stringified_client_auth_hash);
+
 
 
     // Send Encryption response packet.
@@ -801,5 +922,9 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
     free(encrypted_shared_secret_buf);
     free(encrypted_verify_token);
+    free(server_pubkey);
+    free(server_id);
     return 0;
+
+    #pragma GCC diagnostic pop
 }
