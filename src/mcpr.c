@@ -245,7 +245,6 @@ int mcpr_decode_string(char *out, const void *in, int32_t len) {
     #pragma GCC diagnostic pop
 
     memcpy(out, in, len);
-    ntoh(out, len * sizeof(char));
     out[len] = '\0';
 
     return len;
@@ -469,7 +468,7 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
     return 0;
 }
 
-int minecraft_stringify_sha1(char *stringified_hash, const unsigned char *hash1) {
+static int minecraft_stringify_sha1(char *stringified_hash, const unsigned char *hash1) {
     unsigned char uhash[SHA_DIGEST_LENGTH];
     for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
         uhash[i] = hash1[i];
@@ -500,7 +499,6 @@ int minecraft_stringify_sha1(char *stringified_hash, const unsigned char *hash1)
     // Write it as a hex string.
     for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
         sprintf(stringified_hashp, "%02x", uhash[i]);
-        //printf("%02x", hash[i]);
         stringified_hashp += 2;
     }
     *stringified_hashp = '\0';
@@ -597,6 +595,10 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         }
         free(buf);
     }
+
+
+    sess->state = MCPR_STATE_LOGIN;
+
 
     //
     // Send login start packet.
@@ -750,8 +752,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         }
 
 
-        unsigned char *pubkeychar = (char *) pubkey;
-        RSA *rsa = d2i_RSA_PUBKEY(NULL, pubkeychar, pubkeylen);
+        RSA *rsa = d2i_RSA_PUBKEY(NULL, (unsigned char *) pubkeychar, pubkeylen);
 
         // Encrypt shared secret.
         shared_secret_len = 16;
