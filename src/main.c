@@ -7,26 +7,25 @@
 #endif
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <locale.h>
 #include <errno.h>
-#include <syslog.h>
 #include <string.h>
+
+#include <zlog.h>
 
 #include "stronk.h"
 #include "util.h"
 #include "mcpr.h"
 
 threadpool thpool;
+zlog_category_t *zc;
 
 
 /*
-    List of supported systems:
-
-    POSIX (Including Cygwin)
-
-
-    Win32 is not really supported, but there will be some Win32 code around..
-    maybe it will be supported in the future.
+    System requirements:
+    C11 (including variable length arrays)
+    POSIX
 */
 
 // returns 0 if unable to detect.
@@ -80,39 +79,51 @@ int count_cores(void) {
 }
 
 void cleanup(void) {
-    syslog(LOG_INFO, "Cleaning up..");
+    nlog_info("Cleaning up..");
 
-    syslog(LOG_INFO, "Destroying thread pool..");
+    nlog_info("Destroying thread pool..");
     thpool_destroy(thpool);
 
-    syslog(LOG_INFO, "Closing log..");
-    closelog();
+    nlog_info("Closing zlog..");
+    zlog_fini();
 }
 
 int main(void) {
-    openlog("slog", LOG_PID|LOG_CONS, LOG_USER);
+    nlog_info("Test nlog %i", 1);
+    int zlog_status = zlog_init("/etc/zlog.conf");
+    if(zlog_status) {
+        fprintf(stderr, "Could not initialize zlog with /etc/zlog.conf (%s ?)\n", strerror(errno));
+        return EXIT_FAILURE;
+    }
 
-    syslog(LOG_INFO, "Setting application locale to make sure we use UTF-8..");
+    zc = zlog_get_category("stronk");
+    if(!zc) {
+        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf");
+        return EXIT_FAILURE;
+    }
+
+    nlog_info("Setting application locale to make sure we use UTF-8..");
     setlocale(LC_ALL, ""); // important, make sure we can use UTF-8.
 
-    syslog(LOG_INFO, "Setting up thread pool..");
+
+    nlog_info("Setting up thread pool..");
     int numcores = count_cores(); // Set up thread pool. -2 because we already have a main thread and a network thread.
     if(numcores <= 0) {
         numcores = 4;
-        syslog(LOG_INFO, "Could not detect amount of CPU cores, using 4 as a default.");
+        nlog_info("Could not detect amount of CPU cores, using 4 as a default.");
     } else {
-        syslog(LOG_INFO, "Detected %i CPU cores", numcores);
+        nlog_info("Detected %i CPU cores", numcores);
     }
     int numthreads = numcores - 2; // -2 because we already have two threads, a main one and a network thread.
     if(numthreads <= 0) {
         numthreads = 2; // If we simply don't have enough cores, use 2 worker threads.
     }
-    syslog(LOG_INFO, "Creating thread pool with %i threads..", numthreads);
+    nlog_info("Creating thread pool with %i threads..", numthreads);
     thpool = thpool_init(numthreads);
 
     if(thpool == NULL) {
-        syslog(LOG_CRIT, "Failed to create thread pool, aborting.. (%s)?", strerror(errno));
-        abort();
+        nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));
+        return EXIT_FAILURE;
     }
 
     cleanup();

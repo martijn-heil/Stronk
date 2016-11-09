@@ -35,6 +35,8 @@ struct mcpr_position {
 char *mcpr_err_to_str(int status); // result return value NOT be free'd or modified, the return value is a NUL terminated string!
 
 
+void mcpr_set_malloc_func(void *(*new_malloc_func)(size_t size));
+void mcpr_set_free_func(void (*new_free_func)(void *ptr));
 
 
 // Encoding/decoding functions return the amount of bytes written for encode, and amount of

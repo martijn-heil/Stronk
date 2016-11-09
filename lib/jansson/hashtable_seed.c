@@ -9,9 +9,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#ifdef HAVE_STDINT_H
+//#ifdef HAVE_STDINT_H
 #include <stdint.h>
-#endif
+//#endif
 
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>

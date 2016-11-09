@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if HAVE_STDINT_H
+//#if HAVE_STDINT_H
 #include <stdint.h>
-#endif
+//#endif
 
 #include "jansson_config.h"   /* for JSON_INLINE */
 #include "jansson_private.h"  /* for container_of() */

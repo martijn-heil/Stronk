@@ -8,6 +8,9 @@
  *
  ********************************/
 
+// TODO: I seriously need to take a look at the portability of this damn thing,
+// it appears to be terrible, especially the sigaction stuff  - Nin
+
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>

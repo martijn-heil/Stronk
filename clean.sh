@@ -1,8 +1,7 @@
 #!/bin/bash
 
-rm -rf ./Cmakefiles
-rm -f ./CmakeCache.txt
+rm -rf ./CMakeFiles
+rm -f ./CMakeCache.txt
 rm -f ./Makefile
-rm -f ./CmakeBoot.exe
-rm -f ./cmake_install.cmake
 rm -f ./Stronk.exe
+rm -f ./cMake_install.cmake

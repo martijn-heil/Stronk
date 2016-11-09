@@ -73,7 +73,7 @@ int thpool_add_work(threadpool, void (*function_p)(void*), void* arg_p);
  * Will wait for all jobs - both queued and currently running to finish.
  * Once the queue is empty and all work has completed, the calling thread
  * (probably the main program) will continue.
- * 
+ *
  * Smart polling is used in wait. The polling is initially 0 - meaning that
  * there is virtually no polling at all. If after 1 seconds the threads
  * haven't finished, the polling interval starts growing exponentially

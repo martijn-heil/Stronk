@@ -3,7 +3,17 @@
 
 #include <arpa/inet.h>
 
-#define DO_PRAGMA(x) _Pragma (#x)
+#ifdef __GNUC__
+    #define DO_PRAGMA(x) _Pragma (#x)
+#else
+    #define DO_PRAGMA(x)
+#endif
+
+#ifdef __GNUC__
+    #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
+#else
+    #define DO_GCC_PRAGMA(x)
+#endif
 
 // Use as: TODO("Kill sum more tigers")
 #define TODO(x) DO_PRAGMA(message "TODO - " x)
