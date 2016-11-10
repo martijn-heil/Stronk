@@ -96,7 +96,7 @@ int mcpr_encode_double(void *out, double d) {
 int mcpr_encode_string(void *out, const char *utf8Str) {
     size_t len = strlen(utf8Str);
     char *tmp = malloc_func(len * sizeof(char) + 1);
-    if(tmp == NULL) {
+    if(unlikely(tmp == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not allocate memory (%s ?)", strerror(errno));
         #endif
@@ -117,7 +117,7 @@ int mcpr_encode_string(void *out, const char *utf8Str) {
 
 int mcpr_encode_chat(void *out, const json_t *root) {
     char *chat = json_dumps(root, 0); // this should be free'd
-    if(chat == NULL) {
+    if(unlikely(chat == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not dump JSON to string (%s ?)", strerror(errno));
         #endif
@@ -294,7 +294,7 @@ int mcpr_decode_chat(json_t **out, const void *in) {
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wtype-limits"
-        if((ulen + 1) > SIZE_MAX) {
+        if(unlikely((ulen + 1) > SIZE_MAX)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Length of string does not fit iside size_t, arithmetic overflow error.");
             #endif
@@ -304,12 +304,12 @@ int mcpr_decode_chat(json_t **out, const void *in) {
     #pragma GCC diagnostic pop
 
     size_t bufsize;
-    if(safe_mul(&bufsize, (size_t) (ulen + 1), sizeof(char))) { return MCPR_ERR_ARITH_OVERFLOW; }
+    if(unlikely(safe_mul(&bufsize, (size_t) (ulen + 1), sizeof(char)))) { return MCPR_ERR_ARITH_OVERFLOW; }
 
 
 
     char *buf = malloc_func(bufsize);
-    if(buf == NULL) {
+    if(unlikely(buf == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not allocate memory for buffer. (%s ?)", strerror(errno));
         #endif
@@ -321,7 +321,7 @@ int mcpr_decode_chat(json_t **out, const void *in) {
         int status = mcpr_decode_string(buf, (in + bytes_read), len);
     #pragma GCC diagnostic pop
 
-    if(status < 0) {
+    if(unlikely(status < 0)) {
         free_func(buf);
         return status;
     }
@@ -329,7 +329,7 @@ int mcpr_decode_chat(json_t **out, const void *in) {
     json_error_t err;
     *out = json_loads(buf, 0, &err);
     free_func(buf); // important we do this exactly here, we don't need buf anymore, but it has to be free'd in case of error return on the next line.
-    if(*out == NULL) {
+    if(unlikely(*out == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not load JSON string. (%s ?)", strerror(errno));
         #endif
@@ -338,7 +338,7 @@ int mcpr_decode_chat(json_t **out, const void *in) {
     }
 
     int result;
-    if(safe_add(&result, bytes_read, (int) len)) {
+    if(unlikely(safe_add(&result, bytes_read, (int) len))) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Safe add (result = bytes_read + len) failed. Arithmetic overflow error.");
         #endif
@@ -361,12 +361,12 @@ int mcpr_decode_varint(int32_t *out, const void *in, size_t max_len) { // TODO a
         result |= (value << (7 * num_read));
 
         num_read++;
-        if (num_read > 5) {
+        if (unlikely(num_read > 5)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("VarInt is longer than 5 bytes!");
             #endif
             return -1;
-        } else if ((num_read - 1) >= max_len) {
+        } else if (unlikely((num_read - 1) >= max_len)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Max length (%zu) exceeded whilst decoding VarInt", max_len);
             #endif
@@ -393,12 +393,12 @@ int mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len) {
         result |= (value << (7 * num_read));
 
         num_read++;
-        if (num_read > 10) {
+        if (unlikely(num_read > 10)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("VarLong is longer than 10 bytes!");
             #endif
             return -1;
-        } else if ((num_read - 1) >= max_len) {
+        } else if (unlikely((num_read - 1) >= max_len)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Max length (%zu) exceeded whilst decoding VarLong", max_len);
             #endif
@@ -434,6 +434,7 @@ int mcpr_decode_uuid(uuid_t out, const void *in) {
     DO_GCC_PRAGMA(GCC diagnostic ignored "-Wsizeof-array-argument")
 
         // This is kinda hacky.. uuid_t is USUALLY a typedef'd unsigned char raw[16]
+        // If there is an implementation which does not define uuid_t as unsigned char raw[16] we have a bit of an issue here.
         uuid_t uuid;
         memcpy(uuid, in, 16 * sizeof(uuid_t));
         ntoh(uuid, 16 * sizeof(uuid_t));
@@ -454,7 +455,7 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
 
     /* socket: create the socket */
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
+    if (unlikely(sockfd < 0)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not create socket. (%s ?)", strerror(errno));
         #endif
@@ -463,7 +464,7 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
 
     /* gethostbyname: get the server's DNS entry */
     server = gethostbyname(host);
-    if (server == NULL)
+    if (unlikely(server == NULL))
     {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not get by name. (host: %s).", host);
@@ -480,7 +481,7 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
     serveraddr.sin_port = htons(portno);
 
     /* connect: create a connection with the server */
-    if (connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0) {
+    if (unlikely(connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not connect to server. (%s ?)", strerror(errno));
         #endif
@@ -548,7 +549,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
     int tmpsockfd;
     int status = init_socket(&tmpsockfd, host, port);
-    if(status < 0) {
+    if(unlikely(status < 0)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not initialize socket. (%s ?)", strerror(errno));
         #endif
@@ -562,25 +563,25 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     //
     {
         uint8_t *buf = malloc(strlen(host) + 27);
-        if(buf == NULL) return -1;
+        if(unlikely(buf == NULL)) return -1;
         size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
 
         // Writes 5 bytes at most
         // write Packet ID
         int bytes_written_1 = mcpr_encode_varint(buf + offset, 0x00);
-        if(bytes_written_1 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_1 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_1;
 
         // Writes 5 bytes at most
         // write Protocol version
         int bytes_written_2 = mcpr_encode_varint(buf + offset, MCPR_PROTOCOL_VERSION);
-        if(bytes_written_2 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_2 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_2;
 
         // Writes strlen(host) + 5 bytes at most
         // write server host used to connect
         int bytes_written_3 = mcpr_encode_string(buf + offset, host);
-        if(bytes_written_3 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_3 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_3;
 
         // writes 2 bytes
@@ -590,13 +591,13 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
             if(port > UINT16_MAX) { free_func(buf); return -1; } // Integer overflow protection.
         #pragma GCC diagnostic pop
         int bytes_written_4 = mcpr_encode_ushort(buf + offset, (uint16_t) port);
-        if(bytes_written_4 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_4 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_4;
 
         // writes 5 bytes at most
         // write next state
         int bytes_written_5 = mcpr_encode_varint(buf + offset, MCPR_STATE_LOGIN);
-        if(bytes_written_5 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_5 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_5;
 
 
@@ -604,13 +605,13 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         uint8_t tmplenbuf[5];
         size_t data_len = offset - 5;
         int bytes_written_6 = mcpr_encode_varint(&tmplenbuf, data_len); // -5 because of the initial offset.
-        if(bytes_written_6 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_6 < 0)) { free_func(buf); return -1; }
         uint8_t *new_start_of_pkt = buf + (5 - bytes_written_6);
         memcpy(new_start_of_pkt, &tmplenbuf, bytes_written_6);
 
         // Send the packet.
         ssize_t status = write(sess->sockfd, new_start_of_pkt, data_len + bytes_written_6);
-        if(status == -1) {
+        if(unlikely(status == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Error writing to socket. (%s ?)", strerror(errno));
             #endif
@@ -630,31 +631,31 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         char *username = "tmp"; // TODO: We need username information.
 
         uint8_t *buf = malloc(strlen(username) + 15);
-        if(buf == NULL) return -1;
+        if(unlikely(buf == NULL)) return -1;
         size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
 
         // Writes 5 bytes at most
         // write Packet ID
         int bytes_written_1 = mcpr_encode_varint(buf + offset, 0x00);
-        if(bytes_written_1 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_1 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_1;
 
         // Writes strlen(username) + 5 bytes at most.
         int bytes_written_2 = mcpr_encode_string(buf + offset, username); // TODO: We need username information.
-        if(bytes_written_2 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_2 < 0)) { free_func(buf); return -1; }
         offset += bytes_written_2;
 
         // Prefix data with length of packet.
         size_t data_len = offset - 5;
         uint8_t tmplenbuf[5];
         int bytes_written_3 = mcpr_encode_varint(&tmplenbuf, data_len);
-        if(bytes_written_3 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_3 < 0)) { free_func(buf); return -1; }
         uint8_t *pkt_start = buf + (5 - bytes_written_3);
         memcpy(pkt_start, &tmplenbuf, bytes_written_3);
 
         // Send the packet.
         ssize_t write_status = write(sess->sockfd, pkt_start, data_len + bytes_written_3);
-        if(write_status == -1) {
+        if(unlikely(write_status == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Error writing to socket. (%s ?)", strerror(errno));
             #endif
@@ -690,7 +691,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         uint8_t pkt_len_raw[5];
 
         ssize_t bytes_read = read(sess->sockfd, &pkt_len_raw, 1);
-        if(bytes_read == -1) {
+        if(unlikely(bytes_read == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Error reading from socket. (%s ?)", strerror(errno));
             #endif
@@ -703,12 +704,12 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         if(pktlen < 0) { return -1; }
         DO_GCC_PRAGMA(GCC diagnostic push)
         DO_GCC_PRAGMA(GCC diagnostic ignored "-Wtype-limits")
-            if((uint32_t) pktlen > SIZE_MAX) { return -1; }
+            if(unlikely((uint32_t) pktlen > SIZE_MAX)) { return -1; }
         DO_GCC_PRAGMA(GCC diagnostic pop)
-        if(pktlen < 1) { return -1; }
+        if(unlikely(pktlen < 1)) { return -1; }
 
         uint8_t *buf = malloc_func((size_t) pktlen);
-        if(buf == NULL) {
+        if(unlikely(buf == NULL)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Could not allocate memory. (%s ?)", strerror(errno));
             #endif
@@ -723,63 +724,75 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         uint8_t *bufpointer = buf;
 
 
+        // Read packet ID
         int32_t pkt_id;
         int bytes_read_4 = mcpr_decode_varint(&pkt_id, bufpointer, len_left);
-        if(bytes_read_4 < 0) { free_func(buf); return -1; }
-        if(pkt_id != 0x01) { free_func(buf); return -1; } // Ensure that this packet is actually an encryption request packet..
+        if(unlikely(bytes_read_4 < 0)) { free_func(buf); return -1; }
+        if(unlikely(pkt_id != 0x01)) { free_func(buf); return -1; } // Ensure that this packet is actually an encryption request packet..
         bufpointer += bytes_read_4;
         len_left -= bytes_read_4;
 
-        if(len_left < 1) { free_func(buf); return -1; }
+        // Read server ID string length
+        if(unlikely(len_left < 1)) { free_func(buf); return -1; }
         int32_t str_len;
         int bytes_read_5 = mcpr_decode_varint(&str_len, bufpointer, len_left);
-        if(bytes_read_5 < 0) { free_func(buf); return -1; }
-        if(str_len < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_read_5 < 0)) { free_func(buf); return -1; }
+        if(unlikely(str_len < 0)) { free_func(buf); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic push)
         DO_GCC_PRAGMA(GCC diagnostic ignored "-Wtype-limits")
-            if(((uint32_t) str_len) > SIZE_MAX) { free_func(buf); return -1; }
+            if(unlikely(((uint32_t) str_len) > SIZE_MAX)) { free_func(buf); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic pop)
         bufpointer += bytes_read_5;
         len_left -= bytes_read_5;
 
+        // Read server ID
         if(len_left < (uint32_t) str_len) { free_func(buf); return -1; }
         server_id = malloc_func((str_len + 1) * sizeof(char));
-        if(server_id == NULL) { free_func(buf); return -1; }
+        if(unlikely(server_id == NULL)) { free_func(buf); return -1; }
         int bytes_read_6 = mcpr_decode_string(server_id, bufpointer, len_left);
-        if(bytes_read_6 < 0) { free_func(server_id); free_func(buf); return -1; }
+        if(unlikely(bytes_read_6 < 0)) { free_func(server_id); free_func(buf); return -1; }
         bufpointer += bytes_read_6;
         len_left -= bytes_read_6;
 
+        // Read public key length
         if(len_left < 1) { free_func(server_id); free_func(buf); return -1; }
         int32_t pubkeylen;
         int bytes_read_7 = mcpr_decode_varint(&pubkeylen, bufpointer, len_left);
-        if(bytes_read_7 < 0) { free_func(server_id); free_func(buf); return -1; }
-        if(pubkeylen < 0) { free_func(server_id); free_func(buf); return -1; }
+        if(unlikely(bytes_read_7 < 0)) { free_func(server_id); free_func(buf); return -1; }
+        if(unlikely(pubkeylen < 0)) { free_func(server_id); free_func(buf); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic push)
         DO_GCC_PRAGMA(GCC diagnostic ignored "-Wtype-limits")
-            if(((uint32_t) pubkeylen) > SIZE_MAX) { free_func(server_id); free_func(buf); return -1; }
+            if(unlikely(((uint32_t) pubkeylen) > SIZE_MAX)) { free_func(server_id); free_func(buf); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic pop)
         bufpointer += bytes_read_7;
         len_left -= bytes_read_6;
 
+        // Read public key
         if(len_left < ((uint32_t) pubkeylen)) { free_func(server_id); free_func(buf); return -1; }
         int8_t *pubkey = malloc_func((size_t) pubkeylen);
+        if(unlikely(pubkey == NULL)) {
+            #ifdef MCPR_DO_LOGGING
+                nlog_error("Could not allocate memory. (%s ?)", strerror(errno));
+            #endif
+            return -1;
+        }
         int8_t *pubkeyp = pubkey;
         for(int32_t i = 0; i < pubkeylen; i++) {
             int bytes_read_8 = mcpr_decode_byte(pubkeyp, bufpointer);
-            if(bytes_read_8 < 0) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
+            if(unlikely(bytes_read_8 < 0)) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
             pubkey++;
             bufpointer++;
             len_left--;
         }
 
-        if(len_left < 1) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
+        // Read verify token length
+        if(unlikely(len_left < 1)) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
         int bytes_read_9 = mcpr_decode_varint(&verify_token_len, bufpointer, len_left);
-        if(bytes_read_9 < 0) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
-        if(verify_token_len < 0) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
+        if(unlikely(bytes_read_9 < 0)) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
+        if(unlikely(verify_token_len < 0)) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic push)
         DO_GCC_PRAGMA(GCC diagnostic ignored "-Wtype-limits")
-            if(((uint32_t) verify_token_len) > SIZE_MAX) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
+            if(unlikely(((uint32_t) verify_token_len) > SIZE_MAX)) { free_func(server_id); free_func(buf); free_func(pubkey); return -1; }
         DO_GCC_PRAGMA(GCC diagnostic pop)
         bufpointer += bytes_read_9;
         len_left -= bytes_read_9;
@@ -789,7 +802,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         int8_t *verify_tokenp = verify_token;
         for(int32_t i = 0; i < verify_token_len; i++) {
             int bytes_read_10 = mcpr_decode_byte(verify_tokenp, bufpointer);
-            if(bytes_read_10 < 0) { free_func(server_id); free_func(buf); free_func(pubkey); free_func(verify_token); return -1; }
+            if(unlikely(bytes_read_10 < 0)) { free_func(server_id); free_func(buf); free_func(pubkey); free_func(verify_token); return -1; }
             verify_tokenp++;
             bufpointer++;
         }
@@ -800,7 +813,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
         // Generate shared secret.
         int urandom = open("/dev/urandom", O_RDONLY);
-        if(urandom == -1) {
+        if(unlikely(urandom == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Error opening /dev/urandom (%s ?)", strerror(errno));
                 RSA_free(rsa);
@@ -813,7 +826,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         }
 
         ssize_t urandom_read_status = read(urandom, shared_secret, 16);
-        if(urandom_read_status == -1) {
+        if(unlikely(urandom_read_status == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Error reading from /dev/urandom (%s ?)", strerror(errno));
                 RSA_free(rsa);
@@ -825,7 +838,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
             return -1;
         }
 
-        if(urandom_read_status < 16) { // This shouldn't happen, but let's keep this in here for now.
+        if(unlikely(urandom_read_status < 16)) { // This shouldn't happen, but let's keep this in here for now.
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Reading from /dev/urandom did read less than the required 16 bytes!");
                 RSA_free(rsa);
@@ -838,7 +851,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         }
 
         int urandom_close_status = close(urandom);
-        if(urandom_close_status == -1) {
+        if(unlikely(urandom_close_status == -1)) {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Could not close /dev/urandom (%s ?)", strerror(errno));
                 RSA_free(rsa);
@@ -854,7 +867,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         // Encrypt shared secret.
         encrypted_shared_secret_len = RSA_size(rsa);
         encrypted_shared_secret_buf = malloc_func(encrypted_shared_secret_len);
-        if(encrypted_shared_secret_buf == NULL) {
+        if(unlikely(encrypted_shared_secret_buf == NULL)) {
             RSA_free(rsa);
             free_func(buf);
             free_func(pubkey);
@@ -866,7 +879,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
         encrypted_verify_token_len = RSA_size(rsa);
         encrypted_verify_token = malloc_func(encrypted_verify_token_len);
-        if(encrypted_verify_token == NULL) {
+        if(unlikely(encrypted_verify_token == NULL)) {
             RSA_free(rsa);
             free_func(buf);
             free_func(pubkey);
@@ -888,7 +901,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
      */
 
     unsigned char *client_auth_hash = malloc_func(SHA_DIGEST_LENGTH);
-    if(client_auth_hash == NULL) {
+    if(unlikely(client_auth_hash == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not allocate memory. (%s ?)", strerror(errno));
         #endif
@@ -912,7 +925,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
 
     char *stringified_client_auth_hash = malloc_func(SHA_DIGEST_LENGTH * 2 + 2);
-    if(stringified_client_auth_hash == NULL) {
+    if(unlikely(stringified_client_auth_hash == NULL)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not allocate memory. (%s ?)", strerror(errno));
         #endif
@@ -924,7 +937,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         return -1;
     }
     int mc_stringify_status = minecraft_stringify_sha1(stringified_client_auth_hash, client_auth_hash);
-    if(mc_stringify_status < 0) {
+    if(unlikely(mc_stringify_status < 0)) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Error stringifying SHA1 hash for client authentication.");
         #endif
@@ -953,33 +966,33 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
 
         // Write packet ID.
         int bytes_written_1 = mcpr_encode_varint(bufpointer, 0x01);
-        if(bytes_written_1 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_1 < 0)) { free_func(buf); return -1; }
         bufpointer += bytes_written_1;
 
         // Write shared secret length.
         int bytes_written_2 = mcpr_encode_varint(bufpointer, (int32_t) shared_secret_len);
-        if(bytes_written_2 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_2 < 0)) { free_func(buf); return -1; }
         bufpointer += bytes_written_1;
 
         // Write shared secret. (Encrypted using the server's public key)
         unsigned char *encrypted_shared_secret_pointer = encrypted_shared_secret_buf;
         for(int i = 0; i < encrypted_shared_secret_len; i++) {
             int bytes_written_3 = mcpr_encode_byte(bufpointer, (int8_t)(*encrypted_shared_secret_pointer));
-            if(bytes_written_3 < 0) { free_func(buf); return -1; }
+            if(unlikely(bytes_written_3 < 0)) { free_func(buf); return -1; }
             bufpointer++;
             encrypted_shared_secret_pointer++;
         }
 
         // Write verify token length.
         int bytes_written_4 = mcpr_encode_varint(bufpointer, verify_token_len);
-        if(bytes_written_4 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_4 < 0)) { free_func(buf); return -1; }
         bufpointer += bytes_written_4;
 
         // Write verify token. (Encrypted using the server's public key)
         uint8_t *encrypted_verify_token_pointer = encrypted_verify_token;
         for(int i = 0; i < encrypted_verify_token_len; i++) {
             int bytes_written_5 = mcpr_encode_byte(bufpointer, *((int8_t *) encrypted_verify_token_pointer));
-            if(bytes_written_5 < 0) { free_func(buf); return -1; }
+            if(unlikely(bytes_written_5 < 0)) { free_func(buf); return -1; }
             bufpointer++;
             encrypted_verify_token_pointer++;
         }
@@ -988,7 +1001,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         int32_t pktlen = bufpointer - (buf + 5);
         int8_t tmppktlen[5];
         int bytes_written_6 = mcpr_encode_varint(&tmppktlen, pktlen);
-        if(bytes_written_6 < 0) { free_func(buf); return -1; }
+        if(unlikely(bytes_written_6 < 0)) { free_func(buf); return -1; }
         memcpy(buf + (5 - bytes_written_6), &tmppktlen, bytes_written_6);
 
         ssize_t status = write(sess->sockfd, buf + (5 - bytes_written_6), pktlen);
@@ -1007,15 +1020,15 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     //  Enable & initialize encryption
     //  See https://gist.github.com/Dav1dde/3900517
     //
-    unsigned char *key = shared_secret;
-    unsigned char *iv = shared_secret;
+    //unsigned char *key = shared_secret;
+    //unsigned char *iv = shared_secret; // TODO why this weirdness in the example?
 
     // Initialize this stuff.. TODO check for errors
     EVP_CIPHER_CTX_init(&(sess->ctx_encrypt));
-    EVP_EncryptInit_ex(&(sess->ctx_encrypt), EVP_aes_128_cfb8(), NULL, key, iv); // Should engine be NULL?? I don't know
+    EVP_EncryptInit_ex(&(sess->ctx_encrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret); // Should engine be NULL?? I don't know
 
     EVP_CIPHER_CTX_init(&(sess->ctx_decrypt));
-    EVP_DecryptInit_ex(&(sess->ctx_decrypt), EVP_aes_128_cfb8(), NULL, key, iv); // Should engine be NULL?? I don't know
+    EVP_DecryptInit_ex(&(sess->ctx_decrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret); // Should engine be NULL?? I don't know
 
     // TODO Finish the rest here..
 

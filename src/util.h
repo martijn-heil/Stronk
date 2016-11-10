@@ -10,12 +10,26 @@
 #endif
 
 #ifdef __GNUC__
+    #define likely(x)       __builtin_expect(!!(x), 1)
+    #define unlikely(x)     __builtin_expect(!!(x), 0)
+#else
+    #define likely(x) (x)
+    #define unlikely(x) (x)
+#endif
+
+#ifdef __GNUC__
     #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
 #else
     #define DO_GCC_PRAGMA(x)
 #endif
 
-// Use as: TODO("Kill sum more tigers")
+#ifdef __GNUC__
+    #define IF_GCC(x) (x)
+#else
+    #define IF_GCC(x)
+#endif
+
+// Use as: TODO("Kill sum more tigers"), also, make sure to use it on it's own line.
 #define TODO(x) DO_PRAGMA(message "TODO - " x)
 
 
@@ -38,7 +52,7 @@ void bswap(void *what, size_t n);
 
 
 
-enum endianness {
+enum endianness { // S_* to avoid naming conflicts
     S_BIG_ENDIAN,
     S_LITTLE_ENDIAN
 };

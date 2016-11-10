@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdint.h>
 
 #include "util.h"
 
@@ -24,17 +25,17 @@ void hton(void *what, size_t n) {
     // This will most likely be optimized away when optimizations are turned on.
     // normal hton/ntoh functions are slightly faster than our custom one.
     switch(n) {
-        case 4: // 32 bits
-            (*CAST(uint32_t*, what)) = htonl(*CAST(uint32_t*, what));
-        break;
-
-        case 8: // 64 bits
-            (*CAST(uint64_t*, what)) = htonll(*CAST(uint64_t*, what));
-        break;
-
-        case 2: // 16 bits
-            (*CAST(uint16_t*, what)) = htons(*CAST(uint16_t*, what));
-        break;
+        // case 4: // 32 bits
+        //     (*CAST(uint32_t*, what)) = htonl(*CAST(uint32_t*, what));
+        // break;
+        //
+        // case 8: // 64 bits
+        //     (*CAST(uint64_t*, what)) = htonll(*CAST(uint64_t*, what));
+        // break;
+        //
+        // case 2: // 16 bits
+        //     (*CAST(uint16_t*, what)) = htons(*CAST(uint16_t*, what));
+        // break;
 
         default:
             if(get_endianness() == S_LITTLE_ENDIAN) {
@@ -48,17 +49,17 @@ void ntoh(void *what, size_t n) {
     // This will most likely be optimized away when optimizations are turned on.
     // normal hton/ntoh functions are slightly faster than our custom one.
     switch(n) {
-        case 4: // 32 bits
-            (*CAST(uint32_t*, what)) = ntohl(*CAST(uint32_t*, what));
-        break;
-
-        case 8: // 64 bits
-            (*CAST(uint64_t*, what)) = ntohll(*CAST(uint64_t*, what));
-        break;
-
-        case 2: // 16 bits
-            (*CAST(uint16_t*, what)) = ntohs(*CAST(uint16_t*, what));
-        break;
+        // case 4: // 32 bits
+        //     (*CAST(uint32_t*, what)) = ntohl(*CAST(uint32_t*, what));
+        // break;
+        //
+        // case 8: // 64 bits
+        //     (*CAST(uint64_t*, what)) = ntohll(*CAST(uint64_t*, what));
+        // break;
+        //
+        // case 2: // 16 bits
+        //     (*CAST(uint16_t*, what)) = ntohs(*CAST(uint16_t*, what));
+        // break;
 
         default:
             if(get_endianness() == S_LITTLE_ENDIAN) {
