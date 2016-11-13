@@ -139,8 +139,6 @@ int mcpr_encode_varint(void *out, int32_t value) {
         if (value != 0) {
             temp |= 0x80; // 0x80 == 0b10000000
         }
-        //((uint8_t *) out)[i] = temp;
-        //CAST(uint8_t*, out)[i] = temp;
 
         #pragma GCC diagnostic push
         #pragma GCC diagnostic ignored "-Wpointer-arith"
@@ -543,7 +541,7 @@ static int minecraft_stringify_sha1(char *stringified_hash, const unsigned char 
     return 0;
 }
 
-int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int port) {
+int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int port, int timeout, const char *username) {
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wpointer-arith"
 
@@ -555,6 +553,27 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
         #endif
         return -1;
     }
+
+    // Set socket timeout.
+    struct timeval timeoutval;
+    timeoutval.tv_sec = timeout;
+    timeoutval.tv_usec = 0;
+    int setsockopt_status1 = setsockopt(tmpsockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeoutval, sizeof(timeoutval));
+    if(unlikely(setsockopt_status1 == -1)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not set socket receive timeout. (%s ?)", strerror(errno));
+        #endif
+        return -1;
+    }
+    int setsockopt_status2 = setsockopt(tmpsockfd, SOL_SOCKET, SO_SNDTIMEO, (char *) &timeoutval, sizeof(timeoutval));
+    if(unlikely(setsockopt_status2 == -1)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not set socket receive timeout. (%s ?)", strerror(errno));
+        #endif
+        return -1;
+    }
+
+
     sess->sockfd = tmpsockfd;
     sess->state = MCPR_STATE_HANDSHAKE;
 
@@ -562,7 +581,7 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     // Send Handshake state 2 packet.
     //
     {
-        uint8_t *buf = malloc(strlen(host) + 27);
+        uint8_t *buf = malloc_func(strlen(host) + 27);
         if(unlikely(buf == NULL)) return -1;
         size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
 
@@ -628,8 +647,6 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     // Send login start packet.
     //
     {
-        char *username = "tmp"; // TODO: We need username information.
-
         uint8_t *buf = malloc(strlen(username) + 15);
         if(unlikely(buf == NULL)) return -1;
         size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
@@ -914,14 +931,41 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     }
 
     SHA_CTX sha_ctx;
-    SHA1_Init(&sha_ctx);
+    if(unlikely(SHA1_Init(&sha_ctx) == 0)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not initialize Sha1 hash.");
+        #endif
+        return -1;
+    }
 
     if(server_id != '\0') { // Make sure the string isn't empty.
-        SHA1_Update(&sha_ctx, server_id, strlen(server_id));
+        if(unlikely(SHA1_Update(&sha_ctx, server_id, strlen(server_id)) == 0)) {
+            #ifdef MCPR_DO_LOGGING
+                nlog_error("Could not update Sha1 hash.");
+            #endif
+            return -1;
+        }
     }
-    SHA1_Update(&sha_ctx, shared_secret, shared_secret_len);
-    SHA1_Update(&sha_ctx, server_pubkey, server_pubkey_len);
-    SHA1_Final(client_auth_hash, &sha_ctx);
+    if(unlikely(SHA1_Update(&sha_ctx, shared_secret, shared_secret_len) == 0)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not update Sha1 hash.");
+        #endif
+        return -1;
+    }
+
+    if(unlikely(SHA1_Update(&sha_ctx, server_pubkey, server_pubkey_len) == 0)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not update Sha1 hash.");
+        #endif
+        return -1;
+    }
+
+    if(unlikely(SHA1_Final(client_auth_hash, &sha_ctx) == 0)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not finalize Sha1 hash.");
+        #endif
+        return -1;
+    }
 
 
     char *stringified_client_auth_hash = malloc_func(SHA_DIGEST_LENGTH * 2 + 2);
@@ -1023,12 +1067,22 @@ int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int p
     //unsigned char *key = shared_secret;
     //unsigned char *iv = shared_secret; // TODO why this weirdness in the example?
 
-    // Initialize this stuff.. TODO check for errors
+    // Initialize this stuff..
     EVP_CIPHER_CTX_init(&(sess->ctx_encrypt));
-    EVP_EncryptInit_ex(&(sess->ctx_encrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret); // Should engine be NULL?? I don't know
+    if(unlikely(EVP_EncryptInit_ex(&(sess->ctx_encrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret) == 0)) { // Should engine be NULL?? I don't know
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Error upon EVP_EncryptInit_ex().");
+        #endif
+        return -1;
+    }
 
     EVP_CIPHER_CTX_init(&(sess->ctx_decrypt));
-    EVP_DecryptInit_ex(&(sess->ctx_decrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret); // Should engine be NULL?? I don't know
+    if(unlikely(EVP_DecryptInit_ex(&(sess->ctx_decrypt), EVP_aes_128_cfb8(), NULL, shared_secret, shared_secret) == 0)) { // Should engine be NULL?? I don't know
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Error upon EVP_DecryptInit_ex().");
+        #endif
+        return -1;
+    }
 
     // TODO Finish the rest here..
 
