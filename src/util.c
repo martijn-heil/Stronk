@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdint.h>
+#include <time.h>
 
 #include "util.h"
 
@@ -107,3 +108,42 @@ void bswap(void *what, size_t n) {
 //   }
 //   return memcpy(dest, p, size_used);
 // }
+
+void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop)
+{
+    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+        result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+    } else {
+        result->tv_sec = stop->tv_sec - start->tv_sec;
+        result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    }
+
+    return;
+}
+
+void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2)
+{
+    result->tv_sec = t2->tv_sec + t1->tv_sec;
+    result->tv_nsec = t2->tv_nsec + t1->tv_nsec;
+
+    if (result->tv_nsec >= 1000000000) {
+        result->tv_nsec -= 1000000000;
+        result->tv_sec++;
+    }
+}
+
+void timespec_addraw(struct timespec *result, const struct timespec *t, long sec, long nsec)
+{
+    result->tv_sec = sec + t->tv_sec;
+    result->tv_nsec = nsec + t->tv_nsec;
+
+    if (result->tv_nsec >= 1000000000) {
+        result->tv_nsec -= 1000000000;
+        result->tv_sec++;
+    }
+}
+
+bool timespec_cmp_g(const struct timespec *t1, const struct timespec *t2) {
+    return (t1->tv_sec > t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec > t2->tv_nsec));
+}

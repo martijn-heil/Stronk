@@ -17,6 +17,7 @@
 #include "stronk.h"
 #include "util.h"
 #include "mcpr.h"
+#include "server.h"
 
 threadpool thpool;
 zlog_category_t *zc;
@@ -125,6 +126,8 @@ int main(void) {
         nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));
         return EXIT_FAILURE;
     }
+
+    server_start();
 
     cleanup();
     return EXIT_SUCCESS;
