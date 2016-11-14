@@ -19,7 +19,22 @@
 
 #define MCPR_PROTOCOL_VERSION 210
 
+static const size_t MCPR_BOOL_SIZE      = 1;
+static const size_t MCPR_BYTE_SIZE      = 1;
+static const size_t MCPR_UBYTE_SIZE     = 1;
+static const size_t MCPR_SHORT_SIZE     = 2;
+static const size_t MCPR_USHORT_SIZE    = 2;
+static const size_t MCPR_INT_SIZE       = 4;
+static const size_t MCPR_LONG_SIZE      = 8;
+static const size_t MCPR_FLOAT_SIZE     = 4;
+static const size_t MCPR_DOUBLE_SIZE    = 8;
+static const size_t MCPR_UUID_SIZE      = 16;
+static const size_t MCPR_POSITION_SIZE  = 8;
+
+static const size_t MCPR_VARINT_SIZE_MAX  =  5;
+static const size_t MCPR_VARLONG_SIZE_MAX = 10;
 #define MCPR_STR_MAX 2147483652
+
 
 struct mcpr_position {
     int x;
@@ -87,36 +102,144 @@ int mcpr_encode_uuid            (void *out, uuid_t in);
 //int mcpr_encode_entity_metadata (void *out, const struct mcpr_entity_metadata *in);
 
 
+/*
+ * Will decode a raw sequence of bytes of length len from in.
+ *
+ * Decodes len bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
+int mcpr_decode_raw             (void *out, const void *in, size_t len);
 
-
+/*
+ * Will decode a boolean from in.
+ * Decodes 1 byte.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_bool            (bool *out, const void *in);
+
+/*
+ * Will decode a single byte from in.
+ * Decodes 1 byte.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_byte            (int8_t *out, const void *in);
+
+/*
+ * Will decode a single unsigned byte from in.
+ * Decodes 1 byte.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_ubyte           (uint8_t *out, const void *in);
+
+/*
+ * Will decode a short (2 bytes) from in.
+ * Decodes 2 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_short           (int16_t *out, const void *in);
+
+/*
+ * Will decode an unsigned short from in.
+ * Decodes 2 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_ushort          (uint16_t *out, const void *in);
+
+/*
+ * Will decode a 32 bit integer from in.
+ * Decodes 4 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_int             (int32_t *out, const void *in);
+
+/*
+ * Will decode a long from in.
+ * Decodes 8 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_long            (int64_t *out, const void *in);
+
+/*
+ * Will decode a float from in.
+ * Decodes 4 bytes.
+  * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_float           (float *out, const void *in);
+
+/*
+ * Will decode a double from in.
+ * Decoes 8 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_double          (double *out, const void *in);
-int mcpr_decode_string          (char *out, const void *in, int32_t len); // Will write a NUL terminated UTF-8 string to the buffer. Beware buffer overflows! Make sure that out is big enough! Len may be 0
-int mcpr_decode_chat            (json_t **out, const void *in); // Will write a NUL terminated UTF-8 string to the buffer. Beware buffer overflows! Make sure that out is big enough!
+
+/*
+ * Will write a NUL terminated UTF-8 string of length len bytes to out. Make sure that out is big enough!
+ * Len may not be <= 0.
+ * Decodes len bytes.
+ * Returns the amount of bytes written, or < 0 upon error.
+ */
+int mcpr_decode_string          (char *out, const void *in, int32_t len);
+
+/*
+ * Will decode chat from in.
+ *
+ */
+int mcpr_decode_chat            (json_t **out, const void *in);
+
+/*
+ * Will decode a Minecraft VarInt from in. Will read no further than maxlen.
+ * Note that Minecraft VarInts differ from Protocol Buffer VarInts
+ *
+ * Decodes 1..5 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_varint          (int32_t *out, const void *in, size_t maxlen);
+
+/*
+ * Will decode a Minecraft VarLong from in. Will read no further than maxlen.
+ * Note that Minecraft VarLongs differ from Protocol Buffer VarLongs
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_varlong         (int64_t *out, const void *in, size_t maxlen);
 int mcpr_deocde_chunk_section   (const void *in);
+
+/*
+ * Will decode a position from in.
+ *
+ * Decodes 8 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_position        (struct mcpr_position *out, const void *in);
-int mcpr_decode_angle           (uint8_t *out, const void *in); // Angles start at 0 all the way to 255.
+
+/*
+ * Will decode an angle from in.
+ *
+ * Decodes 1 byte.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
+int mcpr_decode_angle           (uint8_t *out, const void *in);
+
+/*
+ * Deoces an UUID from in.
+ *
+ * Decodes 16 bytes.
+ * Returns the amount of bytes read, or < 0 upon error.
+ */
 int mcpr_decode_uuid            (uuid_t out, const void *in);
-//int mcpr_decode_entity_metadata (struct mcpr_entity_metadata *out, const void *in);
 
 
-int mcpr_compress(void **out, void *in); // will malloc *out for you. Don't forget to free it.
-int mcpr_decompress(void **out, void *in); // will malloc *out for you. Don't forget to free it.
+/*
+ * Will malloc *out for you. Don't forget to free it.
+ */
+int mcpr_compress(void **out, void *in);
+
+/*
+ * Will malloc *out for you. Don't forget to free it.
+ */
+int mcpr_decompress(void **out, void *in); //
 
 
-// LOW LEVEL API ABOVE, HIGH LEVEL API BELOW. --------------------------------------------------------------------------------------------------------------------------
-// In the high level API, performance is not as important, ease of use is a greater concern.
-// The mcpr_packet structure, for example, is a little wasteful with memory.
-//
 enum mcpr_state {
     MCPR_STATE_HANDSHAKE = 0,
     MCPR_STATE_STATUS = 1,
@@ -135,17 +258,30 @@ struct mcpr_server_sess {
 struct mcpr_client_sess {
     int sockfd;
     enum mcpr_state state;
+    bool use_compression;
+    unsigned int compression_treshold; // Not guaranteed to be initialized if compression is set to false.
 
+    bool use_encryption;
     EVP_CIPHER_CTX ctx_encrypt;
     EVP_CIPHER_CTX ctx_decrypt;
+    unsigned int encryption_block_size;
 };
 
-int mcpr_encrypt(EVP_CIPHER_CTX ctx_encrypt, void *data, size_t len);
-int mcpr_encrypt(EVP_CIPHER_CTX ctx_decrypt, void *data, size_t len);
+/*
+ * out should be at least of size (len + mcpr_client_sess->encryption_block_size - 1)
+ */
+int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len);
+
+/*
+ * out should be at least of size (len + mcpr_client_sess->encryption_block_size)
+ */
+int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
 
 
 //struct mcpr_server_sess mcpr_init_server_sess(const char *host, int port);
-int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int port, int socktimeout, const char *username);
+
+// is_localhost is only temporarily.. will be removed before this library goes into real usage.
+int mcpr_init_client_sess(struct mcpr_client_sess *sess, const char *host, int port, int socktimeout, const char *username, bool is_localhost);
 
 
 
