@@ -4,6 +4,7 @@ CMakeScripts
 Makefile
 cmake_install.cmake
 install_manifest.txt
+.gcc-flags.json
 
 # Change this to your program's executable
 Stronk.exe
