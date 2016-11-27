@@ -82,6 +82,7 @@ int mcpr_init_client(struct mcpr_client *client, const char *host, int port, int
     client->conn.is_online_mode = false; // Will be updated later to the appropiate value.
     client->conn.use_encryption = use_encryption;
     client->conn.state = MCPR_STATE_HANDSHAKE;
+    client->conn.type = MCPR_CONNECTION_TYPE_SERVERBOUND;
     client->username = // TODO Get ingame username via Mojang API.
     client->account_name = account_name;
 
