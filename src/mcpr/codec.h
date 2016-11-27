@@ -1,23 +1,17 @@
-#ifndef MCPR_H
-#define MCPR_H
+#ifndef MCPR_CODEC_H
+#define MCPR_CODEC_H
 
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-#include <arpa/inet.h>
 #include <uuid/uuid.h>
 
 #include <jansson/jansson.h>
-#include <nbt/nbt.h>
+#include <safe_math.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
-
-/*
-    Minecraft Protocol (http://wiki.vg/Protocol)
-    MCPR = MineCraft PRotocol.
-*/
-
-#define MCPR_PROTOCOL_VERSION 210
+#include <openssl/sha.h>
+#include <curl/curl.h>
 
 static const size_t MCPR_BOOL_SIZE      = 1;
 static const size_t MCPR_BYTE_SIZE      = 1;
@@ -41,19 +35,6 @@ struct mcpr_position {
     int y;
     int z;
 };
-
-// TODO this isnt used much currently
-// -1 is used for remaining error caes.
-#define MCPR_ERR_ARITH_OVERFLOW 2
-#define MCPR_ERR_MALLOC_FAILURE 3
-#define MCPR_ERR_ARITH          4
-
-char *mcpr_err_to_str(int status); // result return value NOT be free'd or modified, the return value is a NUL terminated string!
-
-
-void mcpr_set_malloc_func(void *(*new_malloc_func)(size_t size));
-void mcpr_set_free_func(void (*new_free_func)(void *ptr));
-void mcpr_set_reallloc_func(void *(*new_realloc_func)(void *ptr, size_t size));
 
 
 // Encoding/decoding functions return the amount of bytes written for encode, and amount of
@@ -93,7 +74,7 @@ int mcpr_encode_chat    (void *out, const json_t *in);
 
 int mcpr_encode_varint          (void *out, int32_t i);
 int mcpr_encode_varlong         (void *out, int64_t i);
-int mcpr_encode_chunk_section   ();
+int mcpr_encode_chunk_section   (); // TODO
 int mcpr_encode_position        (void *out, const struct mcpr_position *in);
 int mcpr_encode_angle           (void *out, uint8_t angle); // Angles start at 0 all the way to 255.
 int mcpr_encode_uuid            (void *out, uuid_t in);
@@ -224,84 +205,6 @@ int mcpr_decode_angle           (uint8_t *out, const void *in);
  * Returns the amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_uuid            (uuid_t out, const void *in);
-
-
-/*
- * Will malloc *out for you. Don't forget to free it.
- */
-int mcpr_compress(void **out, void *in);
-
-/*
- * Will malloc *out for you. Don't forget to free it.
- */
-int mcpr_decompress(void **out, void *in); //
-
-
-enum mcpr_state {
-    MCPR_STATE_HANDSHAKE = 0,
-    MCPR_STATE_STATUS = 1,
-    MCPR_STATE_LOGIN = 2,
-    MCPR_STATE_PLAY = 3
-};
-
-struct mcpr_connection {
-    int sockfd;
-    enum mcpr_state state;
-    bool use_compression;
-    unsigned int compression_treshold; // Not guaranteed to be initialized if compression is set to false.
-
-    bool use_encryption;
-    EVP_CIPHER_CTX ctx_encrypt;  // Not guaranteed to be initialized if use_encryption is set to false
-    EVP_CIPHER_CTX ctx_decrypt;  // Not guaranteed to be initialized if use_encryption is set to false
-    unsigned int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
-};
-
-struct mcpr_packet {
-    uint8_t id;
-    void *data;
-    size_t data_len;
-};
-
-struct mcpr_client_player {
-    struct mcpr_connection conn;
-};
-
-
-struct mcpr_server {
-    struct mcpr_client_player **client_players;
-};
-
-struct mcpr_client {
-    struct mcpr_connection conn;
-
-
-    char *client_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    size_t client_token_len; // It's NUL terminated anyway, but you can use this to prevent wasting performance with strlen.
-    char *access_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    size_t access_token_len; // It's NUL terminated anyway, but you can use this to prevent wasting performance with strlen.
-    const char *username;
-    const char *account_name; // either email or username.
-};
-
-/*
- * out should be at least of size (len + mcpr_client->encryption_block_size - 1)
- */
-int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len);
-
-/*
- * out should be at least of size (len + mcpr_client->encryption_block_size)
- */
-int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
-
-
-//struct mcpr_server_sess mcpr_init_server_sess(const char *host, int port);
-
-// use_encryption is only temporarily.. will be removed before this library goes into real usage.
-int mcpr_init_client(struct mcpr_client *sess, const char *host, int port, int timeout, const char *account_name, bool use_encryption);
-
-
-int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt);
-struct mcpr_packet *mcpr_read_packet(struct mcpr_connection *conn); // returns NULL on error. returned packet should be free'd using the free function specified with mcpr_set_free_func()
 
 
 #endif

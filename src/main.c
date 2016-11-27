@@ -16,7 +16,7 @@
 
 #include "stronk.h"
 #include "util.h"
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 #include "server.h"
 
 threadpool thpool;
