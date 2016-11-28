@@ -1,3 +1,31 @@
+/*
+    MIT License
+
+    Copyright (c) 2016 Martijn Heil
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+
+
+
+    mcpr.c - Minecraft Protocol functions
+*/
+
 #ifndef MCPR_H
 #define MCPR_H
 
@@ -24,14 +52,24 @@
 
 
 /*
- * Will malloc *out for you. Don't forget to free it.
+ * out should be at least the size of max_out_size
+ * max_out_size, obviously, has to be known by the caller, these functions do not handle that.
+ *
+ * Returns the new size of out or -1 upon error.
  */
-int mcpr_compress(void **out, void *in);
+int mcpr_uncompress(void *out, const void *in, size_t max_out_size, size_t in_size);
 
 /*
- * Will malloc *out for you. Don't forget to free it.
+ * Out should be at least the size of mcr_compress_bounds(n)
+ *
+ * Returns the new size of out or -1 upon error.
  */
-int mcpr_decompress(void **out, void *in); //
+int mcpr_compress(void *out, const void *in, size_t n);
+
+/*
+ * Will return the maximum compressed size for len amount of bytes.
+ */
+size_t mcpr_compress_bounds(size_t len);
 
 
 enum mcpr_state {
@@ -57,7 +95,7 @@ struct mcpr_connection {
     EVP_CIPHER_CTX ctx_decrypt;  // Not guaranteed to be initialized if use_encryption is set to false
     unsigned int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
 
-    const enum mcpr_connection_type type;
+    enum mcpr_connection_type type;
     bool is_online_mode;
 };
 
@@ -105,7 +143,17 @@ int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t
 int mcpr_init_client(struct mcpr_client *sess, const char *host, int port, int timeout, const char *account_name, bool use_encryption);
 
 
-int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt);
+int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression);
+
 struct mcpr_packet *mcpr_read_packet(struct mcpr_connection *conn); // returns NULL on error. returned packet should be free'd using the free function specified with mcpr_set_free_func()
+
+/*
+ * Writes the contents of data to the connection.
+ * Does encryption if encryption is enabled for the specified connection.
+ * Returns the amount of bytes written or < 0 upon error.
+ */
+int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t len);
+
+
 
 #endif

@@ -24,9 +24,12 @@ zlog_category_t *zc;
 
 
 /*
-    System requirements:
+    System & architecture requirements:
+
     C11 (including variable length arrays)
     POSIX
+
+    2's complement integers.
 */
 
 // returns 0 if unable to detect.
