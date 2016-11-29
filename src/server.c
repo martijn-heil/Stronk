@@ -60,7 +60,7 @@ void server_start() {
             server_crash();
         }
 
-        if(timespec_cmp_g(&should_stop_at, &stop)) {
+        if(timespec_cmp(&should_stop_at, &stop) == GREATER) {
             struct timespec diff;
             timespec_diff(&diff, &stop, &should_stop_at);
             nanosleep(&diff, NULL); // TODO error checking.

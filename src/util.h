@@ -53,10 +53,18 @@ void bswap(void *what, size_t n);
 
 // char* itostr(char *dest, size_t size, int a, int base);
 
+enum comparison_result {
+    GREATER,
+    LESS,
+    EQUAL,
+
+    ERROR // Shouldnt happen really
+};
+
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop);
 void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2);
 void timespec_addraw(struct timespec *result, const struct timespec *t1, long sec, long nsec);
-bool timespec_cmp_g(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
+enum comparison_result timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
 
 
 enum endianness { // S_* to avoid naming conflicts
