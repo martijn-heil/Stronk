@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include <arpa/inet.h>
+#include <unistd.h>
 
 #ifdef __GNUC__
     #define DO_PRAGMA(x) _Pragma (#x)
@@ -13,11 +14,21 @@
 #endif
 
 #ifdef __GNUC__
-    #define likely(x)       __builtin_expect(!!(x), 1)
-    #define unlikely(x)     __builtin_expect(!!(x), 0)
+    #ifndef likely
+        #define likely(x)       __builtin_expect(!!(x), 1)
+    #endif
+
+    #ifndef unlikely
+        #define unlikely(x)     __builtin_expect(!!(x), 0)
+    #endif
 #else
-    #define likely(x) (x)
-    #define unlikely(x) (x)
+    #ifndef likely
+        #define likely(x) (x)
+    #endif
+
+    #ifndef unlikely
+        #define unlikely(x) (x)
+    #endif
 #endif
 
 #ifdef __GNUC__
@@ -66,8 +77,30 @@ void timespec_add(struct timespec *result, const struct timespec *t1, const stru
 void timespec_addraw(struct timespec *result, const struct timespec *t1, long sec, long nsec);
 enum comparison_result timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
 
+// Returns <0 upon error.
+#ifndef HAVE_SECURE_RANDOM
+#define HAVE_SECURE_RANDOM
+static int secure_random(void *buf, size_t len) {
+    int urandomfd = open("/dev/urandom", O_RDONLY);
+    if(urandomfd == -1) {
+        return -1;
+    }
 
-enum endianness { // S_* to avoid naming conflicts
+    ssize_t urandomread = read(urandomfd, buf, len);
+    if(urandomread == -1) {
+        return -1;
+    }
+    if(urandomread != len) {
+        return -1;
+    }
+
+    int urandomclose = close(urandomfd);
+
+    return len;
+}
+#endif
+
+enum endianness {
     S_BIG_ENDIAN,
     S_LITTLE_ENDIAN
 };

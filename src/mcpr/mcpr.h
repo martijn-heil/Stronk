@@ -42,6 +42,8 @@
 #include <openssl/x509.h>
 
 #include "codec.h"
+#include "client.h"
+#include "mojang_api.h"
 
 /*
     Minecraft Protocol (http://wiki.vg/Protocol)
@@ -114,17 +116,6 @@ struct mcpr_server {
     struct mcpr_client_player **client_players;
 };
 
-struct mcpr_client {
-    struct mcpr_connection conn;
-
-
-    char *client_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    size_t client_token_len; // It's NUL terminated anyway, but you can use this to prevent wasting performance with strlen.
-    char *access_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    size_t access_token_len; // It's NUL terminated anyway, but you can use this to prevent wasting performance with strlen.
-    const char *username;
-    const char *account_name; // either email or username.
-};
 
 /*
  * out should be at least of size (len + mcpr_client->encryption_block_size - 1)
@@ -135,12 +126,6 @@ int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t
  * out should be at least of size (len + mcpr_client->encryption_block_size)
  */
 int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
-
-
-//struct mcpr_server_sess mcpr_init_server_sess(const char *host, int port);
-
-// use_encryption is only temporarily.. will be removed before this library goes into real usage.
-int mcpr_init_client(struct mcpr_client *sess, const char *host, int port, int timeout, const char *account_name, bool use_encryption);
 
 
 int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression);

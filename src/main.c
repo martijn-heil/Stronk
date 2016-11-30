@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <zlog.h>
+#include <jansson/jansson.h>
 
 #include "stronk.h"
 #include "util.h"
@@ -27,10 +28,34 @@ zlog_category_t *zc;
     System & architecture requirements:
 
     C11 (including variable length arrays)
-    POSIX
+    POSIX (mainly the C library though)
 
     2's complement integers.
+    char and unsigned char should be exactly 8 bits wide.
+
+    endianness has to be either little endian or big endian, no middle endian.
 */
+
+// Used for jansson, as it is mainly used for sensitive things.
+static void *secure_malloc(size_t size)
+{
+    /* Store the memory area size in the beginning of the block */
+    void *ptr = malloc(size + 8);
+    *((size_t *)ptr) = size;
+    return ptr + 8;
+}
+
+// Used for jansson, as it is mainly used for sensitive things.
+static void secure_free(void *ptr)
+{
+    size_t size;
+
+    ptr -= 8;
+    size = *((size_t *)ptr);
+
+    memset(ptr, 0, size + 8);
+    free(ptr);
+}
 
 // returns 0 if unable to detect.
 int count_cores(void) {
@@ -129,6 +154,9 @@ int main(void) {
         nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));
         return EXIT_FAILURE;
     }
+
+    nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
+    json_set_alloc_funcs(secure_malloc, secure_free);
 
     server_start();
 

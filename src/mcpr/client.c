@@ -47,6 +47,7 @@
 #include <curl/curl.h>
 
 #include "mcpr.h"
+#include "client.h"
 #include "../util.h"
 
 #ifdef MCPR_DO_LOGGING
@@ -56,26 +57,152 @@
 
 
 // Private helper functions
-static int      init_socket                                 (int *returned_sockfd, const char *host, int port);
-static int      minecraft_stringify_sha1                    (char *stringified_hash, const unsigned char *hash1);
-static size_t   mcpr_curl_write_callback                    (void *contents, size_t size, size_t nmemb, void *arg);
-static int      send_server_hash_to_mojang                  (char *restrict server_id, unsigned char *restrict shared_secret, size_t shared_secret_len, int8_t server_pubkey[], size_t server_pubkey_len);
-static int      do_authentication                           (struct mcpr_client *client);
-static int      handle_compression_and_login_success        (struct mcpr_client *client);
-static int      handle_encryption                           (struct mcpr_client *client);
-static int      send_login_state_2_packet                   (struct mcpr_client *client, int port, const char *host);
-static int      send_login_start_packet                     (struct mcpr_client *client);
-struct          mcpr_curl_buffer;
+static int                  init_socket                                 (int *returned_sockfd, const char *host, int port);
+static int                  minecraft_stringify_sha1                    (char *stringified_hash, const unsigned char *hash1);
+static size_t               mcpr_curl_write_callback                    (void *contents, size_t size, size_t nmemb, void *arg);
+static int                  send_server_hash_to_mojang                  (char *restrict server_id, unsigned char *restrict shared_secret, size_t shared_secret_len, int8_t server_pubkey[], size_t server_pubkey_len);
+static int                  handle_compression_and_login_success        (struct mcpr_client *client);
+static int                  handle_encryption                           (struct mcpr_client *client);
+static int                  send_login_state_2_packet                   (struct mcpr_client *client, int port, const char *host);
+static int                  send_login_start_packet                     (struct mcpr_client *client);
+struct mcpr_auth_response  *json_to_auth_response                        (json_t *json); // Returns NULL on error or a malloc'ed mcpr_auth_response, which should be free'd
+struct                      mcpr_curl_buffer;
 
 
+void mcpr_client_destroy(struct mcpr_client *client) {
+    free(client->client_token);
+    free(client->access_token);
+    free(client->player_name;
+    free(client->account_name);
+    free(client);
+}
 
+struct mcpr_client *mcpr_client_create(const char *client_token, const char *access_token, char *account_name, bool online_mode) {
+    struct mcpr_client *client = malloc(sizeof(struct mcpr_client));
+    if(unlikely(client == NULL)) {
+        return NULL;
+    }
+
+    client->is_connected = false;
+    client->is_online_mode = online_mode;
+
+    client->client_token = malloc(strlen(client_token) * sizeof(char) + 1);
+    if(unlikely(client->client_token == NULL)) {
+        return NULL;
+    }
+    strcpy(client->client_token, client_token);
+
+    client->access_token = malloc(strlen(access_token) * sizeof(char) + 1);
+    if(unlikely(client->access_token == NULL)) {
+        free(client->client_token);
+        return NULL;
+    }
+    strcpy(client->access_token, access_token);
+
+    client->account_name = malloc(strlen(account_name) * sizeof(char) + 1);
+    if(unlikely(client->account_name == NULL)) {
+        free(client->access_token);
+        free(client->client_token);
+        return NULL;
+    }
+}
+
+/*
+ * buf should be at least the size of token_len
+ */
+int mcpr_client_generate_token(char *buf, size_t token_len) {
+    size_t binary_token_len = token_len * 2 * sizeof(char);
+    uint8_t binary_token[binary_token_len];
+
+    int urandomfd = open("/dev/urandom", O_RDONLY);
+    if(urandomfd == -1) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not open /dev/urandom (%s ?)", strerror(errno));
+        #endif
+        return -1;
+    }
+
+    ssize_t urandomread = read(urandomfd, binary_token, binary_token_len);
+    if(urandomread == -1) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not read from /dev/urandom (%s ?)", strerror(errno));
+        #endif
+        return -1;
+    }
+    if(urandomread != binary_token_len) {
+        return -1;
+    }
+
+    int urandomclose = close(urandomfd);
+    #ifdef MCPR_DO_LOGGING
+        if(urandomclose == -1) {
+            nlog_warning("Could not close /dev/urandom (%s ?)", strerror(errno));
+        }
+    #endif
+
+    for(int i = 0; i < binary_token_len, i += 2) {
+        sprintf(buf + i, "%02X", binary_token[i]);
+    }
+
+    return 0;
+}
+
+
+struct mcpr_auth_response *mcpr_client_authenticate(const char *account_name, const char *password, const char *client_token, bool request_user) {
+    char *post_data = malloc(107 * sizeof(char) + 1 + string_client_token_len + strlen(account_name) + strlen(password));
+    if(unlikely(post_data == NULL)) {
+        return NULL;
+    }                                                                                                                              // TODO implement request_user with variable above
+    sprintf(post_data, "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},\"username\":\"%s\",\"password\":\"%s\",\"clientToken\":\"%s\",\"requestUser\":false}", account_name, password, client_token);
+
+
+    CURL *curl = curl_easy_init();
+    if(unlikely(curl == NULL)) {
+        #ifdef MCPR_DO_LOGGING
+            nlog_error("Could not initialize CURL.");
+        #endif
+        free(post_data);
+        return NULL;
+    }
+
+    struct mcpr_curl_buffer curl_buf;
+    curl_buf.content = malloc(1);
+    if(curl_buf.content == NULL) {
+        return NULL;
+    }
+
+    curl_global_init(CURL_GLOBAL_ALL);
+    curl_easy_setopt(curl, CURLOPT_URL, "https://authserver.mojang.com/authenticate");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "MCPR/1.0");
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mcpr_curl_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_buf);
+    curl_easy_cleanup(curl);
+    curl_global_cleanup();
+    free(post_data);
+
+    // TODO error checking & read response in curl_buf
+
+    json_error_t json_error;
+    json_t *response = json_loads(curl_buf.content, 0, &json_error);
+    if(response == NULL) {
+        return NULL;
+    }
+
+    struct *mcpr_auth_response res = json_to_auth_response(response);
+    if(unlikely(res == NULL)) {
+        return NULL;
+    }
+    free(curl_buf.content);
+    return res;
+}
 
 /*
  * Initializes and connects a client.
  *
  * timeout for sending/receiving from/to the socket in SECONDS.
  */
-int mcpr_init_client(struct mcpr_client *client, const char *host, int port, int timeout, const char *account_name, bool use_encryption) {
+int mcpr_init_client(struct mcpr_client *client, const char *host, int port, unsigned int sock_timeout) {
     int tmpsockfd;
     int status = init_socket(&tmpsockfd, host, port);
     if(unlikely(status < 0)) {
@@ -104,15 +231,15 @@ int mcpr_init_client(struct mcpr_client *client, const char *host, int port, int
         return -1;
     }
 
-
     client->conn.sockfd = tmpsockfd;
     client->conn.use_compression = false; // Will be updated later to the appropiate value.
     client->conn.is_online_mode = false; // Will be updated later to the appropiate value.
-    client->conn.use_encryption = use_encryption;
     client->conn.state = MCPR_STATE_HANDSHAKE;
     client->conn.type = MCPR_CONNECTION_TYPE_SERVERBOUND;
     client->username = // TODO Get ingame username via Mojang API.
-    client->account_name = account_name;
+
+    client->account_name = malloc(strlen(account_name) + 1 * sizeof(char));
+    strcpy(client->account_name, account_name);
 
 
     // Send Handshake state 2 packet.
@@ -1048,4 +1175,9 @@ static int handle_compression_and_login_success(struct mcpr_client *client) {
     }
 
     return 0;
+}
+
+
+struct mcpr_auth_response *json_to_auth_response(json_t *json) {
+    // TODO
 }
