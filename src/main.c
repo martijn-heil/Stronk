@@ -29,6 +29,8 @@ zlog_category_t *zc;
 
     C11 (including variable length arrays)
     POSIX (mainly the C library though)
+    Pthreads must be available.
+    Preferrably GCC, but other compilers should work too.
 
     2's complement integers.
     char and unsigned char should be exactly 8 bits wide.
@@ -118,7 +120,6 @@ void cleanup(void) {
 }
 
 int main(void) {
-    nlog_info("Test nlog %i", 1);
     int zlog_status = zlog_init("/etc/zlog.conf");
     if(zlog_status) {
         fprintf(stderr, "Could not initialize zlog with /etc/zlog.conf (%s ?)\n", strerror(errno));
@@ -127,7 +128,7 @@ int main(void) {
 
     zc = zlog_get_category("stronk");
     if(!zc) {
-        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf");
+        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
         return EXIT_FAILURE;
     }
 
@@ -162,25 +163,4 @@ int main(void) {
 
     cleanup();
     return EXIT_SUCCESS;
-    // char *test = u8"♥";
-    // puts(test);
-    // printf("%zu\n", strlen(test));
-    //
-    // pthread_t thread1;
-    // int  iret1;
-    //
-    // /* Create independent threads each of which will execute function */
-    //
-    // iret1 = pthread_create(&thread1, NULL, doFancyStuffs, NULL);
-    // if(iret1)
-    // {
-    //     fprintf(stderr,"Error - pthread_create() return code: %d\n",iret1);
-    //     exit(EXIT_FAILURE);
-    // }
-    //
-    // /* Wait till threads are complete before main continues. Unless we  */
-    // /* wait we run the risk of executing an exit which will terminate   */
-    // /* the process and all threads before the threads have completed.   */
-    //
-    // pthread_join(thread1, NULL);
 }

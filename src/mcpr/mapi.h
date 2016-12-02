@@ -31,6 +31,10 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include <c11threads.h>
+
+extern thread_local unsigned int mapi_errno = 0;
+
 
 struct mapi_auth_response {
     char *access_token; // Should be free'd
@@ -80,7 +84,6 @@ struct mapi_refresh_response {
 };
 void mapi_refresh_response_destroy(struct mapi_refresh_response *response);
 
-
 enum mapi_agent {
     MAPI_AGENT_MINECRAFT;
     MAPI_AGENT_SCROLLS;
@@ -94,6 +97,19 @@ enum mapi_agent {
  * account_name can be either an email adress or player name for unmigrated accounts.
  * client_token may be NULL.
  * Returns NULL upon error.
+ *
+ * If an error occurs, mapi_errno will be set to either one of the values below. Please take note that error conditions are not 100% guaranteed to be accurate.
+ *
+ * 0: Unknown error occured, this could be anything, including but not limited to the errors listed below.
+ * 1: Invalid credentials. Account migrated, use e-mail as username.
+ * 2: Invalid credentials.
+ * 3: Remote host could not be resolved.
+ * 4: Could not connect to remote host.
+ * 5: Out of memory, errno is not guaranteed to be set.
+ * 6: Malloc failure, errno will be set.
+ * 7: Request timeout.
+ * 8: Could not send data to authentication server.
+ * 9: Error receiving data from the authentication server.
  */
 struct mapi_auth_response *mapi_auth_authenticate(enum mapi_agent, int version, const char *account_name, const char *password, const char *client_token, bool request_user);
 
@@ -121,11 +137,10 @@ int mapi_auth_invalidate(const char *access_token, const char *client_token);
 
 /*
  * Convenient function for generating a cryptographically secure random binary client token.
- * Note that you can interpet this random data as text ofcourse, it will be very random though :P
  * buf should be at least the size of token_len
  * Returns <0 upon error.
  * token_len should be divisible by 2.
  */
-int mapi_generate_client_token(void *buf, size_t token_len);
+int mapi_generate_client_token(char *buf, size_t token_len);
 
 #endif

@@ -586,6 +586,7 @@ static int do_authentication(struct mcpr_client *client) {
     sprintf(post_data, "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},\"username\":\"%s\",\"password\":\"%s\",\"clientToken\":\"%s\",\"requestUser\":false}", account_name, password, client->client_token);
 
 
+    curl_global_init(CURL_GLOBAL_ALL);
     CURL *curl = curl_easy_init();
     if(unlikely(curl == NULL)) {
         #ifdef MCPR_DO_LOGGING
@@ -601,7 +602,6 @@ static int do_authentication(struct mcpr_client *client) {
         return -1;
     }
 
-    curl_global_init(CURL_GLOBAL_ALL);
     curl_easy_setopt(curl, CURLOPT_URL, "https://authserver.mojang.com/authenticate");
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "MCPR/1.0");

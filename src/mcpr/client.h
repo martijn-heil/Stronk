@@ -53,7 +53,7 @@ void mcpr_client_destroy(struct mcpr_client *client);
  * This function just a convenient way of allocating a mcpr_client structure.
  * Will return NULL upon error, or a malloc'ed mcpr_client struct.
  */
-struct mcpr_client *mcpr_client_create(const char *client_token, const char *access_token, char *account_name, bool online_mode);
+struct mcpr_client *mcpr_client_create(const char *client_token, const char *access_token, const char *account_name, bool online_mode);
 
 /*
  * Generates a cryptographically secure client token string of length token_len.

@@ -15,17 +15,17 @@
 
 
 bool shouldShutdown = false;
-static long ticktime = 50000000; // Delay in nanoseconds.
+static long ticktime = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
 int tmp = 0;
 
 
 void server_shutdown() {
     nlog_info("Shutting down server..");
+    shouldShutdown = true;
 }
 
 void server_crash() {
     server_shutdown();
-    exit(EXIT_FAILURE);
 }
 
 
@@ -60,7 +60,7 @@ void server_start() {
             server_crash();
         }
 
-        if(timespec_cmp(&should_stop_at, &stop) == GREATER) {
+        if(timespec_cmp(&should_stop_at, &stop) > 0) {
             struct timespec diff;
             timespec_diff(&diff, &stop, &should_stop_at);
             nanosleep(&diff, NULL); // TODO error checking.

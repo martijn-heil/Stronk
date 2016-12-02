@@ -64,18 +64,17 @@ void bswap(void *what, size_t n);
 
 // char* itostr(char *dest, size_t size, int a, int base);
 
-enum comparison_result {
-    GREATER,
-    LESS,
-    EQUAL,
-
-    ERROR // Shouldnt happen really
-};
-
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop);
 void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2);
 void timespec_addraw(struct timespec *result, const struct timespec *t1, long sec, long nsec);
-enum comparison_result timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
+
+/*
+ * Return value:
+ * Less than zero if t1 is found to be less than t2.
+ * zero if t1 is found to be equal to t2.
+ * More than zero if t1 is found to be greater than t2.
+ */
+int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
 
 // Returns <0 upon error.
 #ifndef HAVE_SECURE_RANDOM

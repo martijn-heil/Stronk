@@ -263,5 +263,4 @@ int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t 
 
         return write_status;
     }
-
 }

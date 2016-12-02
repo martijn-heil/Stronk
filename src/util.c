@@ -144,14 +144,14 @@ void timespec_addraw(struct timespec *result, const struct timespec *t, long sec
     }
 }
 
-enum comparison_result timespec_cmp(const struct timespec *t1, const struct timespec *t2) {
+int timespec_cmp(const struct timespec *t1, const struct timespec *t2) {
     if(t1->tv_sec > t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec > t2->tv_nsec)) {
-        return GREATER;
+        return 1;
     } else if(t1->tv_sec == t2->tv_sec && t1->tv_nsec == t2->tv_nsec) {
-        return EQUAL;
+        return 0;
     } else if(t1->tv_sec < t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec < t2->tv_nsec)) {
-        return LESS;
+        return -1;
     }
 
-    return LESS; // This shouldn't actually ever be reached.. But else the compiler will complain.
+    return -1; // This shouldn't actually ever be reached.. But else the compiler will complain.
 }
