@@ -6,7 +6,7 @@ project(Stronk)
 # -DHAVE_LIBUUID For libuuid
 # -DHAVE_APPLE for Apple.
 # -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"' -std=c11 -pedantic -ggdb -ftrapv -pipe -Wall -Wextra -Wno-unused-function -D_POSIX_C_SOURCE -DUSE_GCC_UNION_CAST -DHAVE_LIBUUID -DMCPR_DO_LOGGING -DNANOSLEEP_HACKY_FIX -Wl,--no-as-needed -lssl -lcrypto -lz -lpthread -luuid -lzlog -lcurl -le4c")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"' -std=c11 -pedantic -ggdb -ftrapv -pipe -Wall -Wextra -Wno-unused-function -D_POSIX_C_SOURCE -DUSE_GCC_UNION_CAST -DHAVE_LIBUUID -DMCPR_DO_LOGGING -DNANOSLEEP_HACKY_FIX -Wl,--no-as-needed -lssl -lcrypto -lz -lpthread -luuid -lzlog -lcurl")
 
 include_directories(
     lib/
