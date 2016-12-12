@@ -1,16 +1,13 @@
 #ifndef world_H
 #define world_H
 
-
-struct world {
-
-};
+typedef void * world;
 
 
 
-void world_dotick(struct world *world);
-void world_generate_chunk(struct world *world, int chunkX, int chunkZ);
+void world_do_tick(world *world);
+void world_generate_chunk(world *world, int chunkX, int chunkZ);
 
-struct world *world_getworlds();
+struct world *world_get_worlds();
 
 #endif

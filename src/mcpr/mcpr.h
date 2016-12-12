@@ -41,10 +41,6 @@
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 
-#include "codec.h"
-#include "client.h"
-#include "mojang_api.h"
-
 /*
     Minecraft Protocol (http://wiki.vg/Protocol)
     MCPR = MineCraft PRotocol.
@@ -53,23 +49,29 @@
 #define MCPR_PROTOCOL_VERSION 315
 
 
-/*
- * out should be at least the size of max_out_size
- * max_out_size, obviously, has to be known by the caller, these functions do not handle that.
+/**
+ * Compress data for use in the Minecraft protocol.
  *
- * Returns the new size of out or -1 upon error.
+ * @param [out] out Output buffer, should be at least the size of max_out_size. May not be NULL.
+ * @param [in] in Input buffer, should be at least the size of in_size.
+ * @param in_size Amount of bytes to read from in.
+ * @param max_out_size Maximum amount of bytes to write to out.
+ *
+ * @returns The new size of out or -1 upon error.
  */
-int mcpr_uncompress(void *out, const void *in, size_t max_out_size, size_t in_size);
+ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t in_size);
 
-/*
+/**
  * Out should be at least the size of mcr_compress_bounds(n)
  *
  * Returns the new size of out or -1 upon error.
  */
-int mcpr_compress(void *out, const void *in, size_t n);
+ssize_t mcpr_compress(void *out, const void *in, size_t n);
 
-/*
- * Will return the maximum compressed size for len amount of bytes.
+/**
+ * Calculate maximum compressed size for len amount of bytes.
+ *
+ * @returns The maximum compressed size for len amount of bytes.
  */
 size_t mcpr_compress_bounds(size_t len);
 
@@ -86,58 +88,33 @@ enum mcpr_connection_type {
     MCPR_CONNECTION_TYPE_CLIENTBOUND
 };
 
-struct mcpr_connection {
-    int sockfd;
-    enum mcpr_state state;
-    bool use_compression;
-    unsigned int compression_treshold; // Not guaranteed to be initialized if compression is set to false.
-
-    bool use_encryption;
-    EVP_CIPHER_CTX ctx_encrypt;  // Not guaranteed to be initialized if use_encryption is set to false
-    EVP_CIPHER_CTX ctx_decrypt;  // Not guaranteed to be initialized if use_encryption is set to false
-    unsigned int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
-
-    enum mcpr_connection_type type;
-    bool is_online_mode;
-};
-
 struct mcpr_packet {
     uint8_t id;
     void *data;
     size_t data_len;
 };
 
-struct mcpr_client_player {
-    struct mcpr_connection conn;
-};
 
-
-struct mcpr_server {
-    struct mcpr_client_player **client_players;
-};
-
-
-/*
- * out should be at least of size (len + mcpr_client->encryption_block_size - 1)
+/**
+ * Encrypt data for use in the Minecraft protocol.
+ *
+ * @param [out] out Output buffer, should be at least the size of (len + mcpr_client->encryption_block_size -1), may not be NULL.
+ * @param [in] data Raw binary data to encrypt, should be at least the size of len.
+ * @param [in] ctx_encrypt ctx_encrypt from the mcpr_client struct.
+ *
+ * @returns Negative integer upon error.
  */
 int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len);
 
-/*
- * out should be at least of size (len + mcpr_client->encryption_block_size)
+/**
+ * Decrypt data for use in the Minecraft protocol.
+ *
+ * @param [out] out Output buffer, should be at least size of (len + mcpr_client->encryption_block_size), may not be NULL.
+ * @param [in] data Input buffer, should be at least the size of len, may not be NULL.
+ *
+ * @returns Negative integer upon error.
  */
 int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
-
-
-int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression);
-
-struct mcpr_packet *mcpr_read_packet(struct mcpr_connection *conn); // returns NULL on error. returned packet should be free'd using the free function specified with mcpr_set_free_func()
-
-/*
- * Writes the contents of data to the connection.
- * Does encryption if encryption is enabled for the specified connection.
- * Returns the amount of bytes written or < 0 upon error.
- */
-int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t len);
 
 
 

@@ -38,21 +38,24 @@
 #include "codec.h"
 #include "mcpr.h"
 #include "../util.h"
-#include "../stack.h"
 
 
 
 int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len) {
+    if(len > INT_MAX) { return -1; }
+
     int writtenlen;
-    if(unlikely(EVP_EncryptUpdate(&ctx_encrypt, (unsigned char *) out, &writtenlen, (unsigned char *) data, len) == 0)) {
+    if(unlikely(EVP_EncryptUpdate(&ctx_encrypt, (unsigned char *) out, &writtenlen, (unsigned char *) data, (int) len) == 0)) {
         return -1;
     }
     return writtenlen;
 }
 
 int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len) {
+    if(len > INT_MAX) { return -1; }
+
     int writtenlen;
-    if(unlikely(EVP_DecryptUpdate(&ctx_decrypt, (unsigned char *) out, &writtenlen, (unsigned char *) data, len) == 0)) {
+    if(unlikely(EVP_DecryptUpdate(&ctx_decrypt, (unsigned char *) out, &writtenlen, (unsigned char *) data, (int) len) == 0)) {
         return -1;
     }
     return writtenlen;
@@ -64,7 +67,7 @@ size_t mcpr_compress_bounds(size_t len) {
     return compressBound(len);
 }
 
-int mcpr_compress(void *out, const void *in, size_t n) {
+ssize_t mcpr_compress(void *out, const void *in, size_t n) {
     uLongf dest_len = compressBound(n);
     int result = compress((Bytef *) out, &dest_len, (Bytef *) in, n);
 
@@ -74,11 +77,12 @@ int mcpr_compress(void *out, const void *in, size_t n) {
     } else if(result == Z_BUF_ERROR) {
         return -1;
     } else {
-        return dest_len; // Compressed out size.
+        if(dest_len > INT_MAX) { return -1; }
+        return (int) dest_len; // Compressed out size.
     }
 }
 
-int mcpr_uncompress(void *out, const void *in, size_t max_out_size, size_t in_size) {
+ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t in_size) {
     uLongf dest_len = max_out_size;
     int result = uncompress((Bytef *) out, &dest_len, (Bytef *) in, in_size);
 
@@ -90,14 +94,15 @@ int mcpr_uncompress(void *out, const void *in, size_t max_out_size, size_t in_si
     } else if(result == Z_DATA_ERROR) {
         return -1;
     } else {
-        return dest_len;
+        if(dest_len > INT_MAX) { return -1; }
+        return (int) dest_len;
     }
 }
 
 
 
 
-int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression) {
+ssize_t mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression) {
     size_t buf_len;
 
 
@@ -129,9 +134,8 @@ int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, boo
             }
             bufpointer += bytes_written;
         } else {
-
             // Write data length
-            int bytes_written = mcpr_encode_varint(bufpointer, packet_id_required_len + pkt->data_len);
+            int bytes_written = mcpr_encode_varint(bufpointer, (int32_t) (packet_id_required_len + pkt->data_len));
             if(bytes_written < 0) {
                 return -1;
             }
@@ -159,7 +163,7 @@ int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, boo
 
             // Compress data & packet ID. TODO can source and destination overlap?.. It isn't mentioned in the Zlib manuals :/
             // The following assumes they can.
-            int compression_status = mcpr_compress(bufpointer, bufpointer, bytes_written_pktid + pkt->data_len);
+            ssize_t compression_status = mcpr_compress(bufpointer, bufpointer, bytes_written_pktid + pkt->data_len);
             if(compression_status == -1) {
                 return -1;
             }
@@ -168,26 +172,27 @@ int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, boo
         }
 
         // Calculate and prefix whole packet with packet length
-        int final_len = final_len = bufpointer - (buf + 5) + 1;
+        size_t final_len = bufpointer - (buf + 5) + 1;
         uint8_t pkt_len[MCPR_VARINT_SIZE_MAX];
-        int bytes_written_pktlen = mcpr_encode_varint(&pkt_len, final_len);
+        if(final_len > INT32_MAX) { return -1; }
+        int bytes_written_pktlen = mcpr_encode_varint(&pkt_len, (int32_t) final_len);
         if(bytes_written_pktlen < 0) {
             return -1;
         }
-        memcpy(buf + (5 - bytes_written_pktlen), &pkt_len, bytes_written_pktlen);
+        memcpy(buf + (5 - bytes_written_pktlen), &pkt_len, (size_t) bytes_written_pktlen);
 
 
         size_t total_length = bufpointer - (buf + (5 - bytes_written_pktlen));
 
         bufpointer = buf + (5 - bytes_written_pktlen);
 
-        int write_status = mcpr_write_raw(conn, bufpointer, total_length);
+        ssize_t write_status = mcpr_write_raw(conn, bufpointer, total_length);
         if(write_status < 0) {
             return -1;
         }
 
         free(buf);
-        return write_status;
+        return 0;
     } else {
         uint8_t *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_VARINT_SIZE_MAX + pkt->data_len);
         if(unlikely(buf == NULL)) {
@@ -211,23 +216,22 @@ int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, boo
 
         // Prefix it all with packet length.
         uint8_t tmppktlen[MCPR_VARINT_SIZE_MAX];
-        int bytes_written_2 = mcpr_encode_varint(&tmppktlen, total_length);
+        if(total_length > INT32_MAX) { return -1; }
+        int bytes_written_2 = mcpr_encode_varint(&tmppktlen, (int32_t) total_length);
         if(bytes_written_2 < 0) {
             return -1;
         }
-        memcpy(buf + (MCPR_VARINT_SIZE_MAX - bytes_written_2), &tmppktlen, bytes_written_2);
+        memcpy(buf + (MCPR_VARINT_SIZE_MAX - bytes_written_2), &tmppktlen, (size_t) bytes_written_2);
 
 
-        int write_status = mcpr_write_raw(conn, buf + (MCPR_VARINT_SIZE_MAX - bytes_written_2), total_length + bytes_written_2);
+        ssize_t write_status = mcpr_write_raw(conn, buf + (MCPR_VARINT_SIZE_MAX - bytes_written_2), total_length + bytes_written_2);
         if(unlikely(write_status < 0)) {
             return -1;
         }
 
         free(buf);
-        return write_status;
+        return 0;
     }
-
-    return 0;
 }
 
 /*
@@ -235,7 +239,7 @@ int mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, boo
  * Does encryption if encryption is enabled for the specified connection.
  * Returns the amount of bytes written or < 0 upon error.
  */
-int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t len) {
+ssize_t mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t len) {
 
     if(conn->use_encryption) {
         uint8_t *buf = malloc(len + conn->encryption_block_size - 1);
@@ -248,7 +252,7 @@ int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t 
             return -1;
         }
 
-        ssize_t write_status = write(conn->sockfd, buf, encrypt_status);
+        ssize_t write_status = write(conn->private_sockfd, buf, (size_t) encrypt_status);
         if(write_status == -1) {
             return -1;
         }
@@ -256,7 +260,7 @@ int mcpr_write_raw(const struct mcpr_connection *conn, const void *data, size_t 
 
         return write_status;
     } else {
-        ssize_t write_status = write(conn->sockfd, data, len);
+        ssize_t write_status = write(conn->private_sockfd, data, len);
         if(write_status == -1) {
             return -1;
         }

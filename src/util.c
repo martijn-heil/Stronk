@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <time.h>
 
+#include <sys/time.h>
+
 #include "util.h"
 
 enum endianness get_endianness() {
@@ -10,7 +12,7 @@ enum endianness get_endianness() {
     #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
         #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
             return S_LITTLE_ENDIAN;
-        #elif
+        #else
             return S_BIG_ENDIAN;
         #endif
     #endif
@@ -72,7 +74,7 @@ void ntoh(void *what, size_t n) {
 
 void bswap(void *what, size_t n) {
     uint8_t tmp[n];
-    memcpy(&tmp, what, n);
+    memcpy(&tmp[0], what, n);
 
     for(size_t i = 0; i < n; i++) {
         ((uint8_t *) what)[i] = tmp[n - 1 - i];
@@ -154,4 +156,18 @@ int timespec_cmp(const struct timespec *t1, const struct timespec *t2) {
     }
 
     return -1; // This shouldn't actually ever be reached.. But else the compiler will complain.
+}
+
+void millis_to_timespec(struct timespec *ts, unsigned long ms)
+{
+    ts->tv_sec = ms / 1000;
+    ts->tv_nsec = (ms % 1000) * 1000000;
+}
+
+void timespec_to_timeval(struct timeval *tv, const struct timespec *ts) {
+    // TODO implement
+}
+
+void timeval_to_timespec(struct timespec *ts, const struct timeval *tv) {
+    // TODO implement
 }

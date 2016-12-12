@@ -16,7 +16,6 @@
 
 bool shouldShutdown = false;
 static long ticktime = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
-int tmp = 0;
 
 
 void server_shutdown() {
@@ -35,37 +34,37 @@ void server_tick() {
 
 
 void server_start() {
-    nlog_info("Starting server..");
-
-    // Main thread loop.
-    while(!shouldShutdown) {
-        struct timespec start;
-        if(unlikely(!timespec_get(&start, TIME_UTC))) {
-            nlog_error("Could not get current time in main game loop!");
-            server_crash();
-        }
-
-
-        // Execute main game loop logic.
-        server_tick();
-
-
-
-        struct timespec should_stop_at;
-        timespec_addraw(&should_stop_at, &start, 0, ticktime);
-
-        struct timespec stop;
-        if(unlikely(!timespec_get(&stop, TIME_UTC))) {
-            nlog_error("Could not get current time in main game loop!");
-            server_crash();
-        }
-
-        if(timespec_cmp(&should_stop_at, &stop) > 0) {
-            struct timespec diff;
-            timespec_diff(&diff, &stop, &should_stop_at);
-            nanosleep(&diff, NULL); // TODO error checking.
-        }
-    }
-
-    server_shutdown();
+//    nlog_info("Starting server..");
+//
+//    // Main thread loop.
+//    while(!shouldShutdown) {
+//        struct timespec start; // TODO C11 timespec_get() isn't implemented anywhere but in glibc.
+//        if(unlikely(!timespec_get(&start, TIME_UTC))) {
+//            nlog_error("Could not get current time in main game loop!");
+//            server_crash();
+//        }
+//
+//
+//        // Execute main game loop logic.
+//        server_tick();
+//
+//
+//
+//        struct timespec should_stop_at;
+//        timespec_addraw(&should_stop_at, &start, 0, ticktime);
+//
+//        struct timespec stop;
+//        if(unlikely(!timespec_get(&stop, TIME_UTC))) {
+//            nlog_error("Could not get current time in main game loop!");
+//            server_crash();
+//        }
+//
+//        if(timespec_cmp(&should_stop_at, &stop) > 0) {
+//            struct timespec diff;
+//            timespec_diff(&diff, &stop, &should_stop_at);
+//            nanosleep(&diff, NULL); // TODO error checking.
+//        }
+//    }
+//
+//    server_shutdown();
 }

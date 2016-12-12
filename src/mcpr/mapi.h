@@ -31,15 +31,18 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <c11threads.h>
+#include <uuid/uuid.h>
 
-extern thread_local unsigned int mapi_errno = 0;
+unsigned int *mapi_get_errno();
+/**
+ * mapi_errno is guaranteed to be thread local.
+ */
+#define mapi_errno (*mapi_get_errno())
 
 
 struct mapi_auth_response {
     char *access_token; // Should be free'd
     char *client_token; // Should be free'd
-
 
     size_t available_profiles_amount;
     struct {
@@ -85,62 +88,118 @@ struct mapi_refresh_response {
 void mapi_refresh_response_destroy(struct mapi_refresh_response *response);
 
 enum mapi_agent {
-    MAPI_AGENT_MINECRAFT;
-    MAPI_AGENT_SCROLLS;
+    MAPI_AGENT_MINECRAFT,
+    MAPI_AGENT_SCROLLS,
 };
 
 
-/*
+/**
  * Authenticates a user using their password.
- * Endpoint: /authenticate
  *
- * account_name can be either an email adress or player name for unmigrated accounts.
- * client_token may be NULL.
- * Returns NULL upon error.
+ * Endpoint: /authenticate
+ * @see http://wiki.vg/Authentication#Authenticate
+ * @note This function does I/O, be aware that this could take some time.
+ *
+ * @param account_name Can be either an email address or player name for unmigrated accounts.
+ * @param client_token Client token, may be NULL.
+ * @returns The response from the authentication server, or NULL upon error.
+ *
  *
  * If an error occurs, mapi_errno will be set to either one of the values below. Please take note that error conditions are not 100% guaranteed to be accurate.
  *
- * 0: Unknown error occured, this could be anything, including but not limited to the errors listed below.
- * 1: Invalid credentials. Account migrated, use e-mail as username.
- * 2: Invalid credentials.
- * 3: Remote host could not be resolved.
- * 4: Could not connect to remote host.
- * 5: Out of memory, errno is not guaranteed to be set.
- * 6: Malloc failure, errno will be set.
- * 7: Request timeout.
- * 8: Could not send data to authentication server.
- * 9: Error receiving data from the authentication server.
+ * 0. Unknown error occurred, this could be anything, including but not limited to the errors listed below.
+ *
+ * 1. Invalid credentials. Account migrated, use e-mail as username.
+ *
+ * 2. Invalid credentials.
+ *
+ * 3. Remote host could not be resolved.
+ *
+ * 4. Could not connect to remote host.
+ *
+ * 5. Out of memory, errno is not guaranteed to be set.
+ *
+ * 6. Malloc failure, errno will be set.
+ *
+ * 7. Request timeout.
+ *
+ * 8. Could not send data to authentication server.
+ *
+ * 9. Error receiving data from the authentication server.
  */
-struct mapi_auth_response *mapi_auth_authenticate(enum mapi_agent, int version, const char *account_name, const char *password, const char *client_token, bool request_user);
+struct mapi_auth_response *mapi_auth_authenticate(enum mapi_agent, int version, const char *restrict account_name, const char *restrict password, const char *restrict client_token, bool request_user);
 
-/*
- * Refreshes a valid accessToken. It can be used to keep a user logged in between gaming sessions and is preferred over storing the user's password.
+/**
+ * Refreshes a valid access token.
+ * It can be used to keep a user logged in between gaming sessions and is preferred over storing the user's password.
+ *
  * Endpoint: /refresh
+ * @see http://wiki.vg/Authentication#Refresh
+ * @note This function does I/O, be aware that this could take some time.
+ *
+ * @param [in] access_token Access token, may not be NULL.
+ * @param [in] client_token Client token, may not be NULL.
+ * @param [in] request_user True if you want the user object in the response.
  *
  * Note that the provided access_token will be invalidated.
- * Returns NULL upon error.
+ * @returns The response from the authentication server, or NULL upon error.
  */
-struct mapi_refresh_response *mapi_auth_refresh(const char *access_token, const char *client_token, bool request_user);
+struct mapi_refresh_response *mapi_auth_refresh(const char *restrict access_token, const char *restrict client_token, bool request_user);
 
-/*
- * client_token may be NULL.
+/**
+ * Checks if an access token is usable for authentication with a Minecraft server.
  *
- * Returns <0 upon error, 0 if not valid, 1 if valid.
+ *
+ * Endpoint: /validate
+ * @see http://wiki.vg/Authentication#Validate
+ * @note This function does I/O, be aware that this could take some time.
+ *
+ * @param [in] access_token Access token, may not be NULL.
+ * @param [in] client_token Client token, may be NULL.
+ *
+ * @retval Negative integer upon error.
+ * @retval 0 if not valid.
+ * @retval 1 if valid.
  */
-int mapi_auth_validate(const char *access_token, const char *client_token);
+int mapi_auth_validate(const char *restrict access_token, const char *restrict client_token);
 
-/*
- * Returns <0 upon error.
+/**
+ * Invalidates accessTokens using a client/access token pair.
+ *
+ * Endpoint: /invalidate
+ * @see http://wiki.vg/Authentication#Invalidate
+ * @note This function does I/O, be aware that this could take some time.
+ *
+ * @param [in] access_token Access token. May not be NUlL.
+ * @param [in] client_token Client token. May not be NULL.
+ *
+ * @returns Negative integer upon error.
  */
-int mapi_auth_invalidate(const char *access_token, const char *client_token);
+int mapi_auth_invalidate(const char *restrict access_token, const char *restrict client_token);
 
 
-/*
- * Convenient function for generating a cryptographically secure random binary client token.
- * buf should be at least the size of token_len
- * Returns <0 upon error.
- * token_len should be divisible by 2.
+/**
+ * Convenient function for generating a cryptographically secure random client token.
+ * Will write an alphanumerical NULL-terminated ASCII string of token_len characters (plus 1 NULL byte) to buf.
+ *
+ * @param [in] token_len Token length, should be an even number.
+ * @param [out] buf Output buffer, should be at least the size of token_len + 1
+ *
+ * @returns Negative integer upon error.
  */
-int mapi_generate_client_token(char *buf, size_t token_len);
+int mapi_generate_client_token(char *restrict buf, size_t token_len);
+
+/**
+ * Get the UUID associated with a player name at this point in time.
+ *
+ * @note This function does I/O, be aware that this could take some time.
+ *
+ * @param player_name
+ * @returns Negative integer upon error. mapi_errno will be set to either one of the following values if an error occurs;
+ *
+ * 0: Unknown error occurred.
+ * 1: Player not found.
+ */
+int mapi_username_to_uuid(uuid_t output, const char *restrict player_name);
 
 #endif

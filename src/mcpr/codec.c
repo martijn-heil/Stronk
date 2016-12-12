@@ -42,7 +42,7 @@
 
 
 int mcpr_encode_bool(void *out, bool b) {
-    uint8_t tmp = (b ? 0x01 : 0x00);
+    uint8_t tmp = (uint8_t) (b ? 0x01 : 0x00);
     memcpy(out, &tmp, sizeof(uint8_t));
     return sizeof(uint8_t);
 }
@@ -100,10 +100,11 @@ int mcpr_encode_string(void *out, const char *utf8Str) {
         #ifdef MCPR_DO_LOGGING
             nlog_error("Could not allocate memory (%s ?)", strerror(errno));
         #endif
-        return -1;;
+        return -1;
     }
     strcpy(tmp, utf8Str);
-    size_t bytes_written = mcpr_encode_varint(out, len);
+    if(len > INT32_MAX) { return -1; }
+    int bytes_written = mcpr_encode_varint(out, (int32_t) len);
 
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wpointer-arith"
@@ -123,7 +124,7 @@ int mcpr_encode_chat(void *out, const json_t *root) {
         #endif
         return -1;
     }
-    size_t bytes_written = mcpr_encode_string(out, chat);
+    int bytes_written = mcpr_encode_string(out, chat);
     free(chat);
     return bytes_written;
 }
@@ -148,7 +149,7 @@ int mcpr_encode_varint(void *out, int32_t value) {
         i++;
     } while (value != 0);
 
-    return i;
+    return (int) i;
 }
 
 int mcpr_encode_varlong(void *out, int64_t value) {

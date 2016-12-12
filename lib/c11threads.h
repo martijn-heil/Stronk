@@ -9,13 +9,14 @@ Main project site: https://github.com/jtsiomb/c11threads
 */
 
 /* TODO: port to MacOSX: no timed mutexes under macosx...
+ * TODO port timed mutexes to Cygwin and Mac OS X ^
  * just delete that bit if you don't care about timed mutexes
  */
 
 #ifndef C11THREADS_H_
 #define C11THREADS_H_
 
-#if defined(__STDC_NO_THREADS__) || __STDC_VERSION__ < 201112L
+#if defined(__STDC_NO_THREADS__) || __STDC_VERSION__ < 201112L || defined(FORCE_C11_THREAD_EMULATION)
 
 #include <time.h>
 #include <errno.h>
@@ -38,7 +39,9 @@ typedef void (*tss_dtor_t)(void*);
 enum {
 	mtx_plain		= 0,
 	mtx_recursive	= 1,
-	mtx_timed		= 2,
+
+    // TODO port timed mutexes to Cygwin and Mac OS X
+	//mtx_timed		= 2,
 };
 
 enum {
@@ -141,9 +144,10 @@ static inline int mtx_init(mtx_t *mtx, int type)
 
 	pthread_mutexattr_init(&attr);
 
-	if(type & mtx_timed) {
-		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_TIMED_NP);
-	}
+// TODO port timed mutexes to Cygwin and Mac OS X
+//	if(type & mtx_timed) {
+//		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_TIMED_NP);
+//	}
 	if(type & mtx_recursive) {
 		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	}
@@ -176,15 +180,16 @@ static inline int mtx_trylock(mtx_t *mtx)
 	return res == 0 ? thrd_success : thrd_error;
 }
 
-static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
-{
-	int res;
-
-	if((res = pthread_mutex_timedlock(mtx, ts)) == ETIMEDOUT) {
-		return thrd_timedout;
-	}
-	return res == 0 ? thrd_success : thrd_error;
-}
+// TODO port timed mutexes to Cygwin and Mac OS X
+//static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
+//{
+//	int res;
+//
+//	if((res = pthread_mutex_timedlock(mtx, ts)) == ETIMEDOUT) {
+//		return thrd_timedout;
+//	}
+//	return res == 0 ? thrd_success : thrd_error;
+//}
 
 static inline int mtx_unlock(mtx_t *mtx)
 {

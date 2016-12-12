@@ -69,7 +69,9 @@ int count_cores(void) {
 
     // Cygwin, Linux, Solaris, AIX and Mac OS X >=10.4 (i.e. Tiger onwards)
     #if defined(__linux__) || defined(__sun) || defined(_AIX) || defined(__CYGWIN__) || (defined(__APPLE__) && defined(__MACH__))
-        return sysconf(_SC_NPROCESSORS_ONLN);
+        long num = sysconf(_SC_NPROCESSORS_ONLN);
+        if(num > INT_MAX) { abort(); }
+        return (int) num;
 
     // Windows (Win32)
     #elif defined(_WIN32)
@@ -120,6 +122,7 @@ void cleanup(void) {
 }
 
 int main(void) {
+    // TODO test safe_math.h functions..
     int zlog_status = zlog_init("/etc/zlog.conf");
     if(zlog_status) {
         fprintf(stderr, "Could not initialize zlog with /etc/zlog.conf (%s ?)\n", strerror(errno));
@@ -137,19 +140,19 @@ int main(void) {
 
 
     nlog_info("Setting up thread pool..");
-    int numcores = count_cores(); // Set up thread pool. -2 because we already have a main thread and a network thread.
-    if(numcores <= 0) {
-        numcores = 4;
+    int cpu_core_count = count_cores(); // Set up thread pool. -2 because we already have a main thread and a network thread.
+    if(cpu_core_count <= 0) {
+        cpu_core_count = 4;
         nlog_info("Could not detect amount of CPU cores, using 4 as a default.");
     } else {
-        nlog_info("Detected %i CPU cores", numcores);
+        nlog_info("Detected %i CPU cores", cpu_core_count);
     }
-    int numthreads = numcores - 2; // -2 because we already have two threads, a main one and a network thread.
-    if(numthreads <= 0) {
-        numthreads = 2; // If we simply don't have enough cores, use 2 worker threads.
+    int planned_thread_count = cpu_core_count - 2; // -2 because we already have two threads, a main one and a network thread.
+    if(planned_thread_count <= 0) {
+        planned_thread_count = 2; // If we simply don't have enough cores, use 2 worker threads.
     }
-    nlog_info("Creating thread pool with %i threads..", numthreads);
-    thpool = thpool_init(numthreads);
+    nlog_info("Creating thread pool with %i threads..", planned_thread_count);
+    thpool = thpool_init(planned_thread_count);
 
     if(thpool == NULL) {
         nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));

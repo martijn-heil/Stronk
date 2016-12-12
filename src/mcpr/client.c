@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include <arpa/inet.h>
 #include <uuid/uuid.h>
@@ -49,215 +50,162 @@
 #include "mcpr.h"
 #include "client.h"
 #include "../util.h"
+#include "mapi.h"
 
 #ifdef MCPR_DO_LOGGING
     #include "../stronk.h"
+#include "codec.h"
+
 #endif
 
+static struct _mcpr_client_connection {
+    enum mcpr_state state;
+    bool use_compression;
+    unsigned int compression_treshold; // Not guaranteed to be initialized if compression is set to false.
+
+    bool use_encryption;
+    EVP_CIPHER_CTX ctx_encrypt;  // Not guaranteed to be initialized if use_encryption is set to false
+    EVP_CIPHER_CTX ctx_decrypt;  // Not guaranteed to be initialized if use_encryption is set to false
+    int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
+
+    enum mcpr_connection_type type;
+    bool is_online_mode;
+
+    int sockfd;
+};
+
+static struct _mcpr_client {
+    bool is_connected;
+    struct _mcpr_client_connection conn; // Should be destroyed upon disconnection.
+
+
+    bool is_legacy;
+    bool is_online_mode;
+    char *client_token; // Should be free'd using the free function specified with mcpr_set_free_func()
+    char *access_token; // Should be free'd using the free function specified with mcpr_set_free_func()
+    char *player_name; // Should be free'd.
+    char *account_name; // Should be free'd.
+    uuid_t uuid;
+};
 
 
 // Private helper functions
-static int                  init_socket                                 (int *returned_sockfd, const char *host, int port);
+static int                  init_socket                                 (int *returned_sockfd, const char *host, short port);
 static int                  minecraft_stringify_sha1                    (char *stringified_hash, const unsigned char *hash1);
 static size_t               mcpr_curl_write_callback                    (void *contents, size_t size, size_t nmemb, void *arg);
 static int                  send_server_hash_to_mojang                  (char *restrict server_id, unsigned char *restrict shared_secret, size_t shared_secret_len, int8_t server_pubkey[], size_t server_pubkey_len);
-static int                  handle_compression_and_login_success        (struct mcpr_client *client);
-static int                  handle_encryption                           (struct mcpr_client *client);
-static int                  send_login_state_2_packet                   (struct mcpr_client *client, int port, const char *host);
-static int                  send_login_start_packet                     (struct mcpr_client *client);
+static int                  handle_compression_and_login_success        (struct _mcpr_client *client);
+static int                  handle_encryption                           (struct _mcpr_client *client);
+static int                  send_login_state_2_packet                   (struct _mcpr_client *client, int port, const char *host);
+static int                  send_login_start_packet                     (struct _mcpr_client *client);
 struct mcpr_auth_response  *json_to_auth_response                        (json_t *json); // Returns NULL on error or a malloc'ed mcpr_auth_response, which should be free'd
 struct                      mcpr_curl_buffer;
 
 
-void mcpr_client_destroy(struct mcpr_client *client) {
-    free(client->client_token);
-    free(client->access_token);
-    free(client->player_name;
-    free(client->account_name);
-    free(client);
+void mcpr_client_destroy(mcpr_client client) {
+    struct _mcpr_client *client2 = client;
+
+    free(client2->client_token);
+    free(client2->access_token);
+    free(client2->player_name);
+    free(client2->account_name);
+    free(client2);
 }
 
-struct mcpr_client *mcpr_client_create(const char *client_token, const char *access_token, char *account_name, bool online_mode) {
-    struct mcpr_client *client = malloc(sizeof(struct mcpr_client));
-    if(unlikely(client == NULL)) {
+mcpr_client mcpr_client_create(const char *client_token, const char *access_token, const char *account_name, const char *player_name, bool online_mode, bool legacy) {
+    struct _mcpr_client *client = malloc(sizeof(struct _mcpr_client));
+    if (unlikely(client == NULL)) {
         return NULL;
     }
 
     client->is_connected = false;
     client->is_online_mode = online_mode;
+    client->is_legacy = legacy;
 
-    client->client_token = malloc(strlen(client_token) * sizeof(char) + 1);
-    if(unlikely(client->client_token == NULL)) {
+
+    client->client_token = malloc(strlen(client_token) + 1);
+    if (unlikely(client->client_token == NULL)) {
         return NULL;
     }
     strcpy(client->client_token, client_token);
 
-    client->access_token = malloc(strlen(access_token) * sizeof(char) + 1);
-    if(unlikely(client->access_token == NULL)) {
+    client->player_name = malloc(strlen(player_name) + 1);
+    if (unlikely(client->player_name == NULL)) {
         free(client->client_token);
+        free(client);
         return NULL;
     }
-    strcpy(client->access_token, access_token);
 
-    client->account_name = malloc(strlen(account_name) * sizeof(char) + 1);
-    if(unlikely(client->account_name == NULL)) {
-        free(client->access_token);
-        free(client->client_token);
-        return NULL;
-    }
-}
-
-/*
- * buf should be at least the size of token_len
- */
-int mcpr_client_generate_token(char *buf, size_t token_len) {
-    size_t binary_token_len = token_len * 2 * sizeof(char);
-    uint8_t binary_token[binary_token_len];
-
-    int urandomfd = open("/dev/urandom", O_RDONLY);
-    if(urandomfd == -1) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not open /dev/urandom (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-
-    ssize_t urandomread = read(urandomfd, binary_token, binary_token_len);
-    if(urandomread == -1) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not read from /dev/urandom (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-    if(urandomread != binary_token_len) {
-        return -1;
-    }
-
-    int urandomclose = close(urandomfd);
-    #ifdef MCPR_DO_LOGGING
-        if(urandomclose == -1) {
-            nlog_warning("Could not close /dev/urandom (%s ?)", strerror(errno));
+    if (online_mode) {
+        client->access_token = malloc(strlen(access_token) + 1);
+        if (unlikely(client->access_token == NULL)) {
+            free(client->client_token);
+            free(client->player_name);
+            free(client);
+            return NULL;
         }
-    #endif
+        strcpy(client->access_token, access_token);
 
-    for(int i = 0; i < binary_token_len, i += 2) {
-        sprintf(buf + i, "%02X", binary_token[i]);
+        if(!legacy) {
+            client->account_name = malloc(strlen(account_name) + 1);
+            if (unlikely(client->account_name == NULL)) {
+                free(client->client_token);
+                free(client->player_name);
+                free(client->access_token);
+                free(client);
+                return NULL;
+            } else {
+                client->account_name = NULL;
+            }
+        }
+    } else {
+        client->access_token = NULL;
+        client->account_name = NULL;
     }
 
-    return 0;
+    return client;
 }
 
+int mcpr_client_connect(mcpr_client client1, const char *host, short port, unsigned int sock_timeout) {
+    struct _mcpr_client *client = client1;
 
-struct mcpr_auth_response *mcpr_client_authenticate(const char *account_name, const char *password, const char *client_token, bool request_user) {
-    char *post_data = malloc(107 * sizeof(char) + 1 + string_client_token_len + strlen(account_name) + strlen(password));
-    if(unlikely(post_data == NULL)) {
-        return NULL;
-    }                                                                                                                              // TODO implement request_user with variable above
-    sprintf(post_data, "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},\"username\":\"%s\",\"password\":\"%s\",\"clientToken\":\"%s\",\"requestUser\":false}", account_name, password, client_token);
-
-
-    CURL *curl = curl_easy_init();
-    if(unlikely(curl == NULL)) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not initialize CURL.");
-        #endif
-        free(post_data);
-        return NULL;
-    }
-
-    struct mcpr_curl_buffer curl_buf;
-    curl_buf.content = malloc(1);
-    if(curl_buf.content == NULL) {
-        return NULL;
-    }
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl_easy_setopt(curl, CURLOPT_URL, "https://authserver.mojang.com/authenticate");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "MCPR/1.0");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mcpr_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_buf);
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-    free(post_data);
-
-    // TODO error checking & read response in curl_buf
-
-    json_error_t json_error;
-    json_t *response = json_loads(curl_buf.content, 0, &json_error);
-    if(response == NULL) {
-        return NULL;
-    }
-
-    struct *mcpr_auth_response res = json_to_auth_response(response);
-    if(unlikely(res == NULL)) {
-        return NULL;
-    }
-    free(curl_buf.content);
-    return res;
-}
-
-/*
- * Initializes and connects a client.
- *
- * timeout for sending/receiving from/to the socket in SECONDS.
- */
-int mcpr_init_client(struct mcpr_client *client, const char *host, int port, unsigned int sock_timeout) {
-    int tmpsockfd;
-    int status = init_socket(&tmpsockfd, host, port);
-    if(unlikely(status < 0)) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not initialize socket. (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
+    int init_socket_status = init_socket(&(client->conn.sockfd), host, port);
+    if(init_socket_status < 0) { return -1; }
 
     // Set socket timeout.
     struct timeval timeoutval;
-    timeoutval.tv_sec = timeout;
+    timeoutval.tv_sec = sock_timeout;
     timeoutval.tv_usec = 0;
-    int setsockopt_status1 = setsockopt(tmpsockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeoutval, sizeof(timeoutval));
-    if(unlikely(setsockopt_status1 == -1)) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not set socket receive timeout. (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-    int setsockopt_status2 = setsockopt(tmpsockfd, SOL_SOCKET, SO_SNDTIMEO, (char *) &timeoutval, sizeof(timeoutval));
-    if(unlikely(setsockopt_status2 == -1)) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not set socket receive timeout. (%s ?)", strerror(errno));
-        #endif
+
+    int setsockopt_status1 = setsockopt(client->conn.sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeoutval, sizeof(timeoutval));
+    if(setsockopt_status1 == -1) {
+        close(client->conn.sockfd);
         return -1;
     }
 
-    client->conn.sockfd = tmpsockfd;
-    client->conn.use_compression = false; // Will be updated later to the appropiate value.
-    client->conn.is_online_mode = false; // Will be updated later to the appropiate value.
+    int setsockopt_status2 = setsockopt(client->conn.sockfd, SOL_SOCKET, SO_SNDTIMEO, (char *) &timeoutval, sizeof(timeoutval));
+    if(setsockopt_status2 == -1) {
+        close(client->conn.sockfd);
+        return -1;
+    }
+
+    client->is_connected = true;
+    client->conn.use_compression = false; // Will be updated later to the appropriate value.
+    client->conn.is_online_mode = false; // Will be updated later to the appropriate value.
     client->conn.state = MCPR_STATE_HANDSHAKE;
     client->conn.type = MCPR_CONNECTION_TYPE_SERVERBOUND;
-    client->username = // TODO Get ingame username via Mojang API.
-
-    client->account_name = malloc(strlen(account_name) + 1 * sizeof(char));
-    strcpy(client->account_name, account_name);
-
 
     // Send Handshake state 2 packet.
     if(unlikely(send_login_state_2_packet(client, port, host) < 0)) {
         return -1;
     }
 
-
     client->conn.state = MCPR_STATE_LOGIN;
-
 
     // Send login start packet.
     if(unlikely(send_login_start_packet(client) < 0)) {
         return -1;
     }
-
-
-
 
     // Check if server is in online mode or offline mode, based on if we receive a Encryption Request or not.
     // Thus this also checks if we use encryption or not.
@@ -309,6 +257,8 @@ int mcpr_init_client(struct mcpr_client *client, const char *host, int port, uns
 
 
     client->conn.state = MCPR_STATE_PLAY;
+
+
     return 0;
 }
 
@@ -337,7 +287,7 @@ int mcpr_init_client(struct mcpr_client *client, const char *host, int port, uns
 
 
 
-static int init_socket(int *returned_sockfd, const char *host, int port) {
+static int init_socket(int *returned_sockfd, const char *host, short port) {
     int sockfd;
     int portno = port;
     struct sockaddr_in serveraddr;
@@ -369,7 +319,9 @@ static int init_socket(int *returned_sockfd, const char *host, int port) {
     serveraddr.sin_family = AF_INET;
     //bcopy((char *) server->h_addr, (char *) &serveraddr.sin_addr.s_addr, server->h_length);
     memcpy(server->h_addr_list[0], &(serveraddr.sin_addr.s_addr), server->h_length);
-    serveraddr.sin_port = htons(portno);
+
+    if(port > INT16_MAX) { return -1; }
+    serveraddr.sin_port = htons((uint16_t) portno);
 
     /* connect: create a connection with the server */
     if (unlikely(connect(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0)) {
@@ -534,97 +486,7 @@ static int send_server_hash_to_mojang(char *restrict server_id, unsigned char *r
 }
 
 
-static int do_authentication(struct mcpr_client *client) {
-    char *account_name; // either email or username for unmigrated Mojang accounts.. TODO
-    char *password;
-    size_t binary_client_token_len = 16;
-    size_t string_client_token_len = binary_client_token_len * 2 * sizeof(char) + 1;
-    client->client_token_len = string_client_token_len;
-    client->client_token = malloc(string_client_token_len); // This doesn't have to be free'd in the scope of this function.
-
-    uint8_t binary_client_token_buf[binary_client_token_len];
-
-
-    int urandomfd = open("/dev/urandom", O_RDONLY);
-    if(urandomfd == -1) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not open /dev/urandom (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-
-    ssize_t urandomread = read(urandomfd, binary_client_token_buf, binary_client_token_len);
-    if(urandomread == -1) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not read from /dev/urandom (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-    if(urandomread != binary_client_token_len) {
-        return -1;
-    }
-
-    int urandomclose = close(urandomfd);
-    #ifdef MCPR_DO_LOGGING
-        if(urandomclose == -1) {
-            nlog_warning("Could not close /dev/urandom (%s ?)", strerror(errno));
-        }
-    #endif
-
-    sprintf(client->client_token, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
-    binary_client_token_buf[0], binary_client_token_buf[1], binary_client_token_buf[2],
-    binary_client_token_buf[3], binary_client_token_buf[4], binary_client_token_buf[5],
-    binary_client_token_buf[6], binary_client_token_buf[7], binary_client_token_buf[8],
-    binary_client_token_buf[9], binary_client_token_buf[10], binary_client_token_buf[11],
-    binary_client_token_buf[12], binary_client_token_buf[13], binary_client_token_buf[14], binary_client_token_buf[15]);
-
-
-    char *post_data = malloc(107 * sizeof(char) + 1 + string_client_token_len + strlen(account_name) + strlen(password));
-    if(unlikely(post_data == NULL)) {
-        return -1;
-    }
-    sprintf(post_data, "{\"agent\":{\"name\":\"Minecraft\",\"version\":1},\"username\":\"%s\",\"password\":\"%s\",\"clientToken\":\"%s\",\"requestUser\":false}", account_name, password, client->client_token);
-
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    CURL *curl = curl_easy_init();
-    if(unlikely(curl == NULL)) {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not initialize CURL.");
-        #endif
-        free(post_data);
-        return -1;
-    }
-
-    struct mcpr_curl_buffer curl_buf;
-    curl_buf.content = malloc(1);
-    if(curl_buf.content == NULL) {
-        return -1;
-    }
-
-    curl_easy_setopt(curl, CURLOPT_URL, "https://authserver.mojang.com/authenticate");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, post_data);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "MCPR/1.0");
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mcpr_curl_write_callback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_buf);
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-    free(post_data);
-
-    // TODO error checking & read response in curl_buf
-
-    json_error_t json_error;
-    json_t *response = json_loads(curl_buf.content, 0, &json_error);
-    if(response == NULL) {
-        return -1;
-    }
-
-    return 0;
-}
-
-
-
-static int handle_encryption(struct mcpr_client *client) {
+static int handle_encryption(struct _mcpr_client *client) {
     // We will get this data from the Encryption Request packet, we need it after that.
     int shared_secret_len = 16;
     unsigned char shared_secret[shared_secret_len];
@@ -768,58 +630,8 @@ static int handle_encryption(struct mcpr_client *client) {
 
         RSA *rsa = d2i_RSA_PUBKEY(NULL, (const unsigned char **) &pubkey, pubkeylen);
 
-
-        // Generate shared secret.
-        int urandom = open("/dev/urandom", O_RDONLY);
-        if(unlikely(urandom == -1)) {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Error opening /dev/urandom (%s ?)", strerror(errno));
-                RSA_free(rsa);
-                free(buf);
-                free(pubkey);
-                free(verify_token);
-                free(server_id);
-            #endif
-            return -1;
-        }
-
-        ssize_t urandom_read_status = read(urandom, shared_secret, 16);
-        if(unlikely(urandom_read_status == -1)) {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Error reading from /dev/urandom (%s ?)", strerror(errno));
-                RSA_free(rsa);
-                free(buf);
-                free(pubkey);
-                free(verify_token);
-                free(server_id);
-            #endif
-            return -1;
-        }
-
-        if(unlikely(urandom_read_status < 16)) { // This shouldn't happen, but let's keep this in here for now.
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Reading from /dev/urandom did read less than the required 16 bytes!");
-                RSA_free(rsa);
-                free(buf);
-                free(pubkey);
-                free(verify_token);
-                free(server_id);
-            #endif
-            return -1;
-        }
-
-        int urandom_close_status = close(urandom);
-        if(unlikely(urandom_close_status == -1)) {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Could not close /dev/urandom (%s ?)", strerror(errno));
-                RSA_free(rsa);
-                free(buf);
-                free(pubkey);
-                free(verify_token);
-                free(server_id);
-            #endif
-            return -1;
-        }
+        int secure_random_status = secure_random(&(shared_secret[0]), 16);
+        if(secure_random_status < 0) { return -1; }
 
 
         // Encrypt shared secret.
@@ -852,9 +664,6 @@ static int handle_encryption(struct mcpr_client *client) {
         server_pubkey = pubkey;
         server_pubkey_len = pubkeylen;
     }
-
-    // Authenticate with Mojang servers. TODO make it optional or disable for offline mode
-    do_authentication(client);
 
 
     // Generate and send server hash to Mojang servers.
@@ -955,7 +764,7 @@ static int handle_encryption(struct mcpr_client *client) {
 
 
 
-static int send_login_state_2_packet(struct mcpr_client *client, int port, const char *host) {
+static int send_login_state_2_packet(struct _mcpr_client *client, int port, const char *host) {
     uint8_t *buf = malloc(strlen(host) + 27);
     if(unlikely(buf == NULL)) return -1;
     size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
@@ -1018,8 +827,8 @@ static int send_login_state_2_packet(struct mcpr_client *client, int port, const
 
 
 
-static int send_login_start_packet(struct mcpr_client *client) {
-    uint8_t *buf = malloc(strlen(client->username) + 15);
+static int send_login_start_packet(struct _mcpr_client *client) {
+    uint8_t *buf = malloc(strlen(client->player_name) + 15);
     if(unlikely(buf == NULL)) return -1;
     size_t offset = 5; // Skip the first 5 bytes to leave room for the length varint.
 
@@ -1030,7 +839,7 @@ static int send_login_start_packet(struct mcpr_client *client) {
     offset += bytes_written_1;
 
     // Writes strlen(username) + 5 bytes at most.
-    int bytes_written_2 = mcpr_encode_string(buf + offset, client->username); // TODO: We need username information.
+    int bytes_written_2 = mcpr_encode_string(buf + offset, client->player_name); // TODO: We need username information.
     if(unlikely(bytes_written_2 < 0)) { free(buf); return -1; }
     offset += bytes_written_2;
 
@@ -1058,7 +867,7 @@ static int send_login_start_packet(struct mcpr_client *client) {
 
 
 
-static int handle_compression_and_login_success(struct mcpr_client *client) {
+static int handle_compression_and_login_success(struct _mcpr_client *client) {
     bool set_compression_received = false;
 
     for(int i = 0; i < 2; i++) {
@@ -1161,7 +970,8 @@ static int handle_compression_and_login_success(struct mcpr_client *client) {
 
             // Enable compression..
             if(treshold >= 0) {
-                client->conn.compression_treshold = treshold;
+                if(treshold > UINT_MAX) { return -1; }
+                client->conn.compression_treshold = (unsigned int) treshold;
                 client->conn.use_compression = true;
             } else {
                 client->conn.use_compression = false;
@@ -1175,9 +985,4 @@ static int handle_compression_and_login_success(struct mcpr_client *client) {
     }
 
     return 0;
-}
-
-
-struct mcpr_auth_response *json_to_auth_response(json_t *json) {
-    // TODO
 }

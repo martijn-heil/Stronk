@@ -31,44 +31,70 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include <uuid/uuid.h>
+
 #include "mcpr.h"
 
-struct mcpr_client {
-    bool is_connected;
-    struct mcpr_connection conn; // Should be destroyed upon disconnection.
+typedef void * mcpr_client;
 
-
-    bool is_online_mode;
-    char *client_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    char *access_token; // Should be free'd using the free function specified with mcpr_set_free_func()
-    char *player_name; // Should be free'd.
-    char *account_name; // Should be free'd.
-};
 /*
  * Frees the client's contents and the structure itself.
  */
-void mcpr_client_destroy(struct mcpr_client *client);
+void mcpr_client_destroy(mcpr_client client);
 
-/*
- * This function just a convenient way of allocating a mcpr_client structure.
- * Will return NULL upon error, or a malloc'ed mcpr_client struct.
+/**
+ * Create a client.
+ *
+ * @param [in] player_name Player name. Must not be any longer than (SIZE_MAX - 1) (not taking the NULL byte into account).
+ *
+ * @param [in] account_name Account name. Must not be any longer than (SIZE_MAX - 1) (not taking the NULL byte into account).
+ * May be NULL if online_mode is false. May be NULL if legacy is true
+ *
+ * @param [in] access_token Valid access token. Must not be any longer than (SIZE_MAX - 1) (not taking the NULL byte into account). May be NULL if online_mode is false.
+ *
+ * @param [in] client_token Client token. Must not be any longer than (SIZE_MAX - 1) (not taking the NULL byte into account).
+ *
+ * @param [in] online_mode True if
+ * @returns NULL upon error, or a malloc'ed mcpr_client struct.
  */
-struct mcpr_client *mcpr_client_create(const char *client_token, const char *access_token, const char *account_name, bool online_mode);
+mcpr_client mcpr_client_create(const char *client_token, const char *access_token, const char *account_name, const char *player_name, bool online_mode, bool legacy);
 
-/*
- * Generates a cryptographically secure client token string of length token_len.
- * buf should be at least the size of token_len
- */
-int mcpr_client_generate_token(char *buf, size_t token_len);
-
-/*
+/**
  * Connect a client to a server.
  *
- * Returns a negative integer upon error.
+ * @param [in] host Hostname of server.
+ * @param [in] port Port of server.
+ * @param [in] sock_timeout Timeout for individual socket reads/writes. Note that this is not an overall timeout for this function.
+ * @param [in, out] client Client to connect to a server.
+ * @returns A negative integer upon error.
  */
-int mcpr_client_connect(struct mcpr_client *client, const char *host, int port, unsigned int sock_timeout);
+int mcpr_client_connect(mcpr_client client, const char *host, short port, unsigned int sock_timeout);
 
 
-int mcpr_client_disconnect(struct mcpr_client *client);
+int mcpr_client_disconnect(mcpr_client client);
+
+
+bool mcpr_client_is_connected(mcpr_client client);
+
+bool mcpr_client_is_legacy(mcpr_client client);
+bool mcpr_client_is_online_mode(mcpr_client client);
+void mcpr_client_get_uuid(uuid_t out, mcpr_client client);
+
+
+ssize_t mcpr_client_write_packet(mcpr_client client, struct mcpr_packet *pkt, bool force_no_compression);
+
+/**
+ * Writes the contents of data to the connection.
+ * Does encryption if encryption is enabled for the specified connection.
+ *
+ * @param [in] conn The connection to write the raw data over, may not be NULL.
+ * @param [in] data The raw binary data to write over the connection. May not be NULL. Should be at least the size of len.
+ * @param [in] len The amount of bytes to write.
+ *
+ * @returns the amount of bytes written or a negative integer upon error.
+ */
+ssize_t mcpr_client_write_raw(mcpr_client client, const void *data, size_t len);
+
+struct mcpr_packet *mcpr_client_read_packet(mcpr_client client);
 
 #endif

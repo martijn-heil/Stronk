@@ -108,88 +108,122 @@ int mcpr_encode_angle           (void *out, uint8_t angle); // Angles start at 0
 int mcpr_encode_uuid            (void *out, uuid_t in);
 
 
-/*
+/**
  * Will decode a raw sequence of bytes of length len from in.
  *
- * Decodes len bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ * @param [out] out Output buffer. Should beat least the size of len.
+ * @param [in] in Input buffer. Should be at least the size of len.
+ * @param [in] len Amount of bytes to decode.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_raw             (void *out, const void *in, size_t len);
 
-/*
+/**
  * Will decode a boolean from in.
  * Decodes 1 byte.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 1 byte long.
+ * @returns The amount of bytes read, or a negative integer upon error.
  */
 int mcpr_decode_bool            (bool *out, const void *in);
 
-/*
+/**
  * Will decode a single byte from in.
  * Decodes 1 byte.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 1 byte long.
+ * @returns The amount of bytes read, or a negative integer upon error.
  */
 int mcpr_decode_byte            (int8_t *out, const void *in);
 
-/*
+/**
  * Will decode a single unsigned byte from in.
  * Decodes 1 byte.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 1 byte long.
+ * @returns The amount of bytes read, or a negative integer upon error.
  */
 int mcpr_decode_ubyte           (uint8_t *out, const void *in);
 
-/*
+/**
  * Will decode a short (2 bytes) from in.
  * Decodes 2 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 2 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_short           (int16_t *out, const void *in);
 
-/*
+/**
  * Will decode an unsigned short from in.
  * Decodes 2 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ *@param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 2 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_ushort          (uint16_t *out, const void *in);
 
-/*
+/**
  * Will decode a 32 bit integer from in.
  * Decodes 4 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] in Input buffer. Should be at least 4 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_int             (int32_t *out, const void *in);
 
-/*
+/**
  * Will decode a long from in.
  * Decodes 8 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] Output buffer.
+ * @param [in] Input buffer. Should be at least 8 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_long            (int64_t *out, const void *in);
 
-/*
+/**
  * Will decode a float from in.
  * Decodes 4 bytes.
-  * Returns the amount of bytes read, or < 0 upon error.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] Input buffer. Should be at least 4 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_float           (float *out, const void *in);
 
-/*
+/**
  * Will decode a double from in.
- * Decoes 8 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ * Decodes 8 bytes.
+ *
+ * @param [out] out Output buffer.
+ * @param [in] Input buffer. Should be at least 8 bytes long.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_double          (double *out, const void *in);
 
-/*
- * Will write a NUL terminated UTF-8 string of length len bytes to out. Make sure that out is big enough!
- * Len may not be <= 0.
+/**
+ * Will write a NUL terminated UTF-8 string of length len bytes to out.
  * Decodes len bytes.
- * Returns the amount of bytes written, or < 0 upon error.
+ *
+ * @param [out] out Output buffer. Should be at least (len + 1) bytes long.
+ * @param [in] in Input buffer. Should be at least len bytes long.
+ * @param [in] len Length of string to decode, may not be equal to or less than 0.
+ * @returns The amount of bytes written, or < 0 upon error.
  */
 int mcpr_decode_string          (char *out, const void *in, int32_t len);
 
-/*
+/**
  * Will decode chat from in.
  *
+ * @param [out] out Pointer will be updated to new Jansson reference, note that you should decrement
+ * the reference count if you are done with the object.
  */
 int mcpr_decode_chat            (json_t **out, const void *in);
 
