@@ -152,6 +152,29 @@ int mcpr_encode_varint(void *out, int32_t value) {
     return (int) i;
 }
 
+int mcpr_varint_bounds(int32_t value) {
+    size_t i = 0;
+    hton(&value, sizeof(value));
+
+    do {
+        uint8_t temp = (uint8_t)(value & 0x7F); // 0x7F == 0b01111111
+
+        value = ((uint32_t) value)>>7;
+        if (value != 0) {
+            temp |= 0x80; // 0x80 == 0b10000000
+        }
+
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wpointer-arith"
+            memcpy((out + i), &temp, sizeof(temp));
+        #pragma GCC diagnostic pop
+
+        i++;
+    } while (value != 0);
+
+    return (int) i;
+}
+
 int mcpr_encode_varlong(void *out, int64_t value) {
     size_t i = 0;
     hton(&value, sizeof(value));

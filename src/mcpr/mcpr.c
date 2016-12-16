@@ -100,6 +100,126 @@ ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t i
 }
 
 
+ssize_t mcpr_encode_packet(void restrict *out, const struct mcpr_packet restrict *pkt, bool use_compression, bool force_no_compression, bool use_encryption, int encryption_block_size, EVP_CIPHER_CTX restrict *ctx_encrypt) {
+    size_t required_size = 0;
+    required_size += MCPR_VARINT_SIZE_MAX; // Space for varint packet length.
+
+
+    if(use_compression) {
+        if(force_no_compression) {
+            required_size += mcpr_varint_bounds(0);         // Space for data length field.
+            required_size += mcpr_varint_bounds(pkt->id);   // Space for packet ID.
+            required_size += pkt->data_len;                 // Space for data.
+        } else {
+            required_size += mcpr_varint_bounds(mcpr_varint_bounds(pkt->id) + pkt->data_len) + mcpr_varint_bounds(pkt->id); // Space for Data length field.
+            required_size += mcpr_compress_bounds(mcpr_varint_bounds(pkt->id) + pkt->data_len);                             // Space for packet id and data.
+        }
+    } else {
+        required_size += mcpr_varint_bounds(pkt->id);
+        required_size += pkt->data_len;
+    }
+
+    if(use_encryption) {
+        required_size += encryption_block_size -1;
+    }
+
+    uint8_t *buf = malloc(required_size);
+    if(buf == NULL) { return -1; }
+    uint8_t *bufpointer = buf;
+
+    bufpointer += MCPR_VARINT_SIZE_MAX; // Reserve space for packet length which will be prefixed later.
+
+
+    if(use_compression) {
+        // Write data length.
+        if(force_no_compression) {
+            int bytes_written_1 = mcpr_encode_varint(0);
+            if(bytes_written_1 < 0) { return -1; }
+            bufpointer += bytes_written_1;
+        } else {
+            int bytes_written_2 = mcpr_encode_varint(bufpointer, mcpr_varint_bounds(pkt->id + pkt->data_len));
+            if(bytes_written_2 < 0) { return -1; }
+            bufpointer += bytes_written_2;
+        }
+    }
+
+
+    // Write packet ID and data.
+    if(use_compression) {
+        // Write packet ID.
+        size_t body_size = mcpr_varint_bounds(pkt->id) + pkt->data_len;
+        uint8_t *body = malloc(body_size);
+        if(body == NULL) { return -1; }
+        uint8_t *bodypointer = body;
+        int bytes_written_3 = mcpr_encode_varint(bodypointer, pkt->id);
+        if(bytes_written_3 < 0) { return -1; }
+        bodypointer += bytes_written_3;
+
+        // Write data.
+        memcpy(bodypointer, pkt->data, pkt->data_len);
+
+        // Compress body into main buffer.
+        ssize_t compression_result = mcpr_compress(bufpointer, body, body_size);
+        if(compression_result < 0) { return -1; }
+        bufpointer += compression_result;
+        free(body);
+    } else {
+        // Write packet ID.
+        int bytes_written_3 = mcpr_encode_varint(bufpointer, pkt->id);
+        if(bytes_written_3 < 0) { return -1; }
+        bufpointer += bytes_written_3;
+
+        // Write data.
+        memcpy(bufpointer, pkt->data, pkt->data_len);
+        bufpointer += pkt->data_len;
+    }
+
+
+    // Prefix it all with packet length.
+    int32_t packet_len = (bufpointer - 1) - (buf + 5)
+    uint8_t *packet_begin = buf + (5 - mcpr_varint_bounds(packet_len))
+    int bytes_written_4 = mcpr_encode_varint(packet_begin, packet_len);
+    if(bytes_written_4 < 0) { return -1; }
+
+    // Encrypt it all.
+    if(use_encryption) {
+        int encryption_status = mcpr_encrypt(out, packet_begin, ctx_encrypt, packet_len + bytes_written_4);
+        if(encryption_status < 0) { return -1; }
+        free(buf);
+        return (ssize_t) encryption_status;
+    } else {
+        memcpy(out, packet_begin, packet_len + bytes_written_4);
+        free(buf);
+        return (ssize_t) (packet_len + bytes_written_4);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ssize_t mcpr_write_packet(struct mcpr_connection *conn, struct mcpr_packet *pkt, bool force_no_compression) {

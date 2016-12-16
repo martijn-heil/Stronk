@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
+#include <sys/time.h>
 
 #ifdef __GNUC__
     #define DO_PRAGMA(x) _Pragma (#x)

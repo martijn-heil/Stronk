@@ -18,6 +18,13 @@ Main project site: https://github.com/jtsiomb/c11threads
 
 #if defined(__STDC_NO_THREADS__) || __STDC_VERSION__ < 201112L || defined(FORCE_C11_THREAD_EMULATION)
 
+#ifdef _GNU_SOURCE // Undefine it first.. else we get an annoying redefinition warning on GCC.
+    #undef _GNU_SOURCE
+#endif
+#define _GNU_SOURCE // Required for PTHREAD_MUTEX_RECURSIVE on Ubuntu.
+
+
+
 #include <time.h>
 #include <errno.h>
 #include <pthread.h>
@@ -95,7 +102,7 @@ static inline int thrd_join(thrd_t thr, int *res)
 		return thrd_error;
 	}
 	if(res) {
-		*res = (long)retval;
+		*res = (int) retval;
 	}
 	return thrd_success;
 }

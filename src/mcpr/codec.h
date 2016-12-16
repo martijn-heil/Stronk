@@ -88,15 +88,19 @@ int mcpr_encode_double  (void *out, double d);       // writes 8 bytes
  */
 int mcpr_encode_string  (void *out, const char *utf8Str);
 
-/*
-    out should at least be the size of (strlen(json_dumps(root, 0)) + 5).
-    Dont forget to free that returned string from json_dumps..
-
-    Note that this function is not guaranteed to write exactly (strlen(json_dumps(root, 0)) + 5) bytes,
-    it can write less bytes, check the return for how many bytes were exactly written.
-
-    returns the amount of bytes written.
-*/
+/**
+ *  Encode chat.
+ *
+ *   @param [out] out Output buffer. Should be at least the size of (strlen(json_dumps(root, 0)) + 5).
+ *   @param [in] in Input buffer.
+ *
+ *   @note This function is not guaranteed to write exactly (strlen(json_dumps(root, 0)) + 5) bytes,
+ *   it can write less bytes, check the return for how many bytes were exactly written.
+ *
+ *   @note Dont forget to free that returned string from json_dumps..
+ *
+ *   @returns the amount of bytes written.
+ */
 int mcpr_encode_chat    (void *out, const json_t *in);
 
 
@@ -235,6 +239,8 @@ int mcpr_decode_chat            (json_t **out, const void *in);
  * Returns the amount of bytes read, or < 0 upon error.
  */
 int mcpr_decode_varint          (int32_t *out, const void *in, size_t maxlen);
+
+int mcpr_varint_bounds          (int32_t value);
 
 /*
  * Will decode a Minecraft VarLong from in. Will read no further than maxlen.

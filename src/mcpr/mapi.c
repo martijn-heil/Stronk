@@ -206,7 +206,7 @@ struct mapi_authserver_error {
     char *cause; // May be NULL.
 };
 static struct mapi_authserver_error *json_to_authserver_error(json_t *json);
-static void mapi_authserver_error_destroy(struct mapi_authserver_errror *error);
+static void mapi_authserver_error_destroy(struct mapi_authserver_error *error);
 
 
 static thread_local unsigned int mapi_errno_value = 0;
@@ -626,7 +626,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
 }
 
 static size_t mapi_curl_write_callback(void *contents, size_t size, size_t nmemb, void *arg) {
-    struct mcpr_curl_buffer *buf = arg;
+    struct mapi_curl_buffer *buf = arg;
     size_t real_size = size * nmemb;
     buf->content = realloc(buf->content, buf->size + real_size + 1);
     if(buf->content == NULL) {
@@ -696,7 +696,7 @@ static struct mapi_authserver_error *json_to_authserver_error(json_t *json) {
     return error_struct;
 }
 
-static void mapi_authserver_error_destroy(struct mapi_authserver_errror *error) {
+static void mapi_authserver_error_destroy(struct mapi_authserver_error *error) {
     free(error->error);
     free(error->error_message);
     free(error->cause);

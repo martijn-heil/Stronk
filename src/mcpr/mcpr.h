@@ -49,6 +49,13 @@
 #define MCPR_PROTOCOL_VERSION 315
 
 
+unsigned int *mcpr_get_errno();
+/**
+ * mapi_errno is guaranteed to be thread local.
+ */
+#define mcpr_errno (*mcpr_get_errno())
+
+
 /**
  * Compress data for use in the Minecraft protocol.
  *
@@ -116,6 +123,6 @@ int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t
  */
 int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
 
-
+ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compression, bool use_encryption);
 
 #endif
