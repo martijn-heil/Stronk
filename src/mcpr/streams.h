@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <unistd.h>
+
 #include <jansson/jansson.h>
 #include <uuid/uuid.h>
 
