@@ -6,7 +6,8 @@
 
 #include "util.h"
 
-enum endianness get_endianness() {
+enum endianness get_endianness()
+{
 
     // Non portable way, works with GCC. We keep it in here for optimization.
     #if defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__)
@@ -24,10 +25,12 @@ enum endianness get_endianness() {
     return (*(char *)&n == 1) ? S_LITTLE_ENDIAN : S_BIG_ENDIAN;
 }
 
-void hton(void *what, size_t n) {
+void hton(void *what, size_t n)
+{
     // This will most likely be optimized away when optimizations are turned on.
     // normal hton/ntoh functions are slightly faster than our custom one.
-    switch(n) {
+    switch(n)
+    {
         // case 4: // 32 bits
         //     (*CAST(uint32_t*, what)) = htonl(*CAST(uint32_t*, what));
         // break;
@@ -41,17 +44,20 @@ void hton(void *what, size_t n) {
         // break;
 
         default:
-            if(get_endianness() == S_LITTLE_ENDIAN) {
+            if(get_endianness() == S_LITTLE_ENDIAN)
+            {
                 bswap(what, n);
             }
         break;
     }
 }
 
-void ntoh(void *what, size_t n) {
+void ntoh(void *what, size_t n)
+{
     // This will most likely be optimized away when optimizations are turned on.
     // normal hton/ntoh functions are slightly faster than our custom one.
-    switch(n) {
+    switch(n)
+    {
         // case 4: // 32 bits
         //     (*CAST(uint32_t*, what)) = ntohl(*CAST(uint32_t*, what));
         // break;
@@ -65,18 +71,21 @@ void ntoh(void *what, size_t n) {
         // break;
 
         default:
-            if(get_endianness() == S_LITTLE_ENDIAN) {
+            if(get_endianness() == S_LITTLE_ENDIAN)
+            {
                 bswap(what, n);
             }
         break;
     }
 }
 
-void bswap(void *what, size_t n) {
+void bswap(void *what, size_t n)
+{
     uint8_t tmp[n];
     memcpy(&tmp[0], what, n);
 
-    for(size_t i = 0; i < n; i++) {
+    for(size_t i = 0; i < n; i++)
+    {
         ((uint8_t *) what)[i] = tmp[n - 1 - i];
     }
 }
@@ -113,10 +122,13 @@ void bswap(void *what, size_t n) {
 
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop)
 {
-    if ((stop->tv_nsec - start->tv_nsec) < 0) {
+    if ((stop->tv_nsec - start->tv_nsec) < 0)
+    {
         result->tv_sec = stop->tv_sec - start->tv_sec - 1;
         result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
-    } else {
+    }
+    else
+    {
         result->tv_sec = stop->tv_sec - start->tv_sec;
         result->tv_nsec = stop->tv_nsec - start->tv_nsec;
     }
@@ -129,7 +141,8 @@ void timespec_add(struct timespec *result, const struct timespec *t1, const stru
     result->tv_sec = t2->tv_sec + t1->tv_sec;
     result->tv_nsec = t2->tv_nsec + t1->tv_nsec;
 
-    if (result->tv_nsec >= 1000000000) {
+    if (result->tv_nsec >= 1000000000)
+    {
         result->tv_nsec -= 1000000000;
         result->tv_sec++;
     }
@@ -140,18 +153,24 @@ void timespec_addraw(struct timespec *result, const struct timespec *t, long sec
     result->tv_sec = sec + t->tv_sec;
     result->tv_nsec = nsec + t->tv_nsec;
 
-    if (result->tv_nsec >= 1000000000) {
+    if (result->tv_nsec >= 1000000000)
+    {
         result->tv_nsec -= 1000000000;
         result->tv_sec++;
     }
 }
 
 int timespec_cmp(const struct timespec *t1, const struct timespec *t2) {
-    if(t1->tv_sec > t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec > t2->tv_nsec)) {
+    if(t1->tv_sec > t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec > t2->tv_nsec))
+    {
         return 1;
-    } else if(t1->tv_sec == t2->tv_sec && t1->tv_nsec == t2->tv_nsec) {
+    }
+    else if(t1->tv_sec == t2->tv_sec && t1->tv_nsec == t2->tv_nsec)
+    {
         return 0;
-    } else if(t1->tv_sec < t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec < t2->tv_nsec)) {
+    }
+    else if(t1->tv_sec < t2->tv_sec || (t1->tv_sec == t2->tv_sec && t1->tv_nsec < t2->tv_nsec))
+    {
         return -1;
     }
 
@@ -164,10 +183,12 @@ void millis_to_timespec(struct timespec *ts, unsigned long ms)
     ts->tv_nsec = (ms % 1000) * 1000000;
 }
 
-void timespec_to_timeval(struct timeval *tv, const struct timespec *ts) {
+void timespec_to_timeval(struct timeval *tv, const struct timespec *ts)
+{
     // TODO implement
 }
 
-void timeval_to_timespec(struct timespec *ts, const struct timeval *tv) {
+void timeval_to_timespec(struct timespec *ts, const struct timeval *tv)
+{
     // TODO implement
 }
