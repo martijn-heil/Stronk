@@ -60,7 +60,8 @@ static void secure_free(void *ptr)
 }
 
 // returns 0 if unable to detect.
-int count_cores(void) {
+int count_cores(void)
+{
     // See http://stackoverflow.com/questions/150355/programmatically-find-the-number-of-cores-on-a-machine
 
     // ----------------------WARNING--------------------
@@ -124,13 +125,15 @@ void cleanup(void) {
 int main(void) {
     // TODO test safe_math.h functions..
     int zlog_status = zlog_init("/etc/zlog.conf");
-    if(zlog_status) {
+    if(zlog_status)
+    {
         fprintf(stderr, "Could not initialize zlog with /etc/zlog.conf (%s ?)\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
     zc = zlog_get_category("stronk");
-    if(!zc) {
+    if(!zc)
+    {
         fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
         return EXIT_FAILURE;
     }
@@ -141,20 +144,23 @@ int main(void) {
 
     nlog_info("Setting up thread pool..");
     int cpu_core_count = count_cores(); // Set up thread pool. -2 because we already have a main thread and a network thread.
-    if(cpu_core_count <= 0) {
+    if(cpu_core_count <= 0)
+    {
         cpu_core_count = 4;
         nlog_info("Could not detect amount of CPU cores, using 4 as a default.");
     } else {
         nlog_info("Detected %i CPU cores", cpu_core_count);
     }
     int planned_thread_count = cpu_core_count - 2; // -2 because we already have two threads, a main one and a network thread.
-    if(planned_thread_count <= 0) {
+    if(planned_thread_count <= 0)
+    {
         planned_thread_count = 2; // If we simply don't have enough cores, use 2 worker threads.
     }
     nlog_info("Creating thread pool with %i threads..", planned_thread_count);
     thpool = thpool_init(planned_thread_count);
 
-    if(thpool == NULL) {
+    if(thpool == NULL)
+    {
         nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));
         return EXIT_FAILURE;
     }
