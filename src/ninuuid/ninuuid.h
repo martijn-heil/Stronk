@@ -1,7 +1,8 @@
 #ifndef NINUUID_H
 #define NINUUID_H
 
-struct ninuuid {
+struct ninuuid
+{
     unsigned char bytes[16];
 };
 
