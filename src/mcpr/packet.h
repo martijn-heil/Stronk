@@ -117,7 +117,167 @@ struct mcpr_packet {
             
             union // play - clientbound
             {
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_uuid uuid;
+                    enum mcpr_object type;
+                    double x;
+                    double y;
+                    double z;
+                    uint8_t pitch;
+                    uint8_t yaw;
+                    int32_t data;
+                    int16_t velocity_x;
+                    int16_t velocity_y;
+                    int16_t velocity_z;
+                } spawn_object;
                 
+                struct
+                {
+                    int32_t entity_id;
+                    double x;
+                    double y;
+                    double z;
+                    int16_t count;
+                } spawn_experience_orb;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    int8_t type;
+                    double x;
+                    double y;
+                    double z;
+                } spawn_global_entity;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_uuid entity_uuid;
+                    enum mcpr_mob type;
+                    double x;
+                    double y;
+                    double z;
+                    int8_t yaw;
+                    int8_t pitch;
+                    int8_t head_pitch;
+                    int16_t velocity_x;
+                    int16_t velocity_y;
+                    int16_t velocity_z;
+                    struct mcpr_entity_metadata metadata;
+                } spawn_mob;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_uuid entity_uuid;
+                    enum mcpr_painting;
+                    struct mcpr_position position;
+                    int8_t direction; 
+                } spawn_painting;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_uuid player_uuid;
+                    double x;
+                    double y;
+                    double z;
+                    int8_t yaw;
+                    int8_t pitch;
+                    struct mcpr_entity_metadata metadata;
+                } spawn_player;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    enum mcpr_animation animation;
+                } animation;
+                
+                struct
+                {
+                    int32_t count;
+                    struct mcpr_statistic *statistics;
+                } statistics;
+                
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_position location;
+                    int8_t destroy_stage;
+                } block_break_animation;
+                
+                struct
+                {
+                    struct mcpr_position location;
+                    enum mcpr_update_block_entity_action action;
+                    nbt_t nbt;
+                } update_block_entity;
+                
+                struct
+                {
+                    struct mcpr_position location;
+                    enum mcpr_block_action action_param;
+                    enum mcpr_block block_type;
+                } block_action;
+                
+                struct
+                {
+                    struct mcpr_position location;
+                    int32_t block_id;
+                } block_change;
+                
+                struct
+                {
+                    struct mcpr_uuid uuid;
+                    enum mcpr_boss_bar_action action;
+                    
+                    union {
+                        struct
+                        {
+                            json_t title;
+                            float health;
+                            enum mcpr_boss_bar_color color;
+                            enum mcpr_boss_bar_division division;
+                            struct
+                            {
+                                bool darken_sky;
+                                bool dragon_bar;
+                            } flags;
+                        } action_add;
+                        
+                        struct
+                        {
+                              
+                        } action_remove;
+                        
+                        struct
+                        {
+                            float health;
+                        } action_update_health;
+                        
+                        struct
+                        {
+                            json_t title;
+                        } action_update_title;
+                        
+                        struct
+                        {
+                            enum mcpr_boss_bar_color color;
+                            enum mcpr_boss_bar_division division;
+                        } action_update_style;
+                        
+                        struct
+                        {
+                            struct
+                            {
+                                bool darken_sky;
+                                bool dragon_bar;
+                            } flags;
+                        } action_update_flags;
+                    };
+                } boss_bar;
             } clientbound;
         } play;
     } data;
