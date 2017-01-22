@@ -62,26 +62,30 @@
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
 
-FILE *mcpr_open_packet(struct mcpr_packet *pkt) {
+FILE *mcpr_open_packet(struct mcpr_packet *pkt)
+{
     return fmemopen(pkt->data, pkt->data_len, "r");
 }
 
 
-ssize_t mcpr_read_byte      (int8_t *out, FILE *in) {
+ssize_t mcpr_read_byte      (int8_t *out, FILE *in)
+{
     char c = getc(in);
     if (c == EOF) return -1;
     *out = c;
     return sizeof(int8_t);
 }
 
-ssize_t mcpr_read_ubyte     (uint8_t *out, FILE *in) {
+ssize_t mcpr_read_ubyte     (uint8_t *out, FILE *in)
+{
     unsigned char c = getc(in);
     if (c == EOF) return -1;
     *out = c;
     return sizeof(uint8_t);
 }
 
-ssize_t mcpr_read_short     (int16_t *out, FILE *in) {
+ssize_t mcpr_read_short     (int16_t *out, FILE *in)
+{
     int16_t tmp;
     size_t status = fread(&tmp, sizeof(int16_t), 1, in);
     if (status != 1) return -1;
@@ -89,7 +93,8 @@ ssize_t mcpr_read_short     (int16_t *out, FILE *in) {
     return sizeof(int16_t);
 }
 
-ssize_t mcpr_read_ushort    (uint16_t *out, FILE *in) {
+ssize_t mcpr_read_ushort    (uint16_t *out, FILE *in)
+{
     uint16_t tmp;
     size_t status = fread(&tmp, sizeof(uint16_t), 1, in);
     if (status != 1) return -1;
@@ -97,7 +102,8 @@ ssize_t mcpr_read_ushort    (uint16_t *out, FILE *in) {
     return sizeof(uint16_t);
 }
 
-ssize_t mcpr_read_int       (int32_t *out, FILE *in) {
+ssize_t mcpr_read_int       (int32_t *out, FILE *in)
+{
     int32_t tmp;
     size_t status = fread(&tmp, sizeof(int32_t), 1, in);
     if (status != 1) return -1;
@@ -105,7 +111,8 @@ ssize_t mcpr_read_int       (int32_t *out, FILE *in) {
     return sizeof(int32_t);
 }
 
-ssize_t mcpr_read_long      (int64_t *out, FILE *in) {
+ssize_t mcpr_read_long      (int64_t *out, FILE *in)
+{
     int64_t tmp;
     size_t status = fread(&tmp, sizeof(int64_t), 1, in);
     if (status != 1) return -1;
@@ -113,15 +120,18 @@ ssize_t mcpr_read_long      (int64_t *out, FILE *in) {
     return sizeof(int64_t);
 }
 
-ssize_t mcpr_read_float     (float *out, FILE *in) {
+ssize_t mcpr_read_float     (float *out, FILE *in)
+{
     // TODO
 }
 
-ssize_t mcpr_read_double    (double *out, FILE *in) {
+ssize_t mcpr_read_double    (double *out, FILE *in)
+{
     // TODO
 }
 
-ssize_t mcpr_read_string    (char *out, FILE *in) {
+ssize_t mcpr_read_string    (char *out, FILE *in)
+{
     int32_t len;
     ssize_t bytes_read_1 = mcpr_read_varint(&len, in);
     if (bytes_read_1 < 0) return -1;
@@ -132,24 +142,30 @@ ssize_t mcpr_read_string    (char *out, FILE *in) {
     return bytes_read_1 + bytes_read_2;
 }
 
-ssize_t mcpr_read_chat      (json_t **out, FILE *in) {
+ssize_t mcpr_read_chat      (json_t **out, FILE *in)
+{
     // TODO
 }
 
-ssize_t mcpr_read_varint    (int32_t *out, FILE *in) {
+ssize_t mcpr_read_varint    (int32_t *out, FILE *in)
+{
     unsigned int num_read = 0;
     int32_t result = 0;
     uint8_t read;
-    do {
+    do
+    {
         read = getc(in);
         if (tmp == EOF) return -1;
         int value = (read & 0x7F); // 0x7F == 0b01111111
         result |= (value << (7 * num_read));
 
         num_read++;
-        if (unlikely(num_read > 5)) {
+        if (unlikely(num_read > 5))
+        {
             return -1;
-        } else if (unlikely((num_read - 1) >= max_len)) {
+        }
+        else if (unlikely((num_read - 1) >= max_len))
+        {
             return -1;
         }
     } while ((read & 0x80) != 0); // 0x80 == 0b10000000
@@ -159,11 +175,13 @@ ssize_t mcpr_read_varint    (int32_t *out, FILE *in) {
     return num_read;
 }
 
-ssize_t mcpr_read_varlong   (int64_t *out, FILE *in) {
+ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
+{
     unsigned int num_read = 0;
     int64_t result = 0;
     uint8_t read;
-    do {
+    do
+    {
         read = getc(in);
         if (read == EOF) return -1;
 
@@ -171,12 +189,15 @@ ssize_t mcpr_read_varlong   (int64_t *out, FILE *in) {
         result |= (value << (7 * num_read));
 
         num_read++;
-        if (unlikely(num_read > 10)) {
+        if (unlikely(num_read > 10))
+        {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("VarLong is longer than 10 bytes!");
             #endif
             return -1;
-        } else if (unlikely((num_read - 1) >= max_len)) {
+        } 
+        else if (unlikely((num_read - 1) >= max_len))
+        {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Max length (%zu) exceeded whilst decoding VarLong", max_len);
             #endif
@@ -188,7 +209,8 @@ ssize_t mcpr_read_varlong   (int64_t *out, FILE *in) {
     return num_read;
 }
 
-ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in) {
+ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in) 
+{
     int64_t iin;
     if(fread(&iin, sizeof(int64_t), 1, in) != 1) return -1;
     ntoh(&iin, sizeof(int64_t));
@@ -204,14 +226,16 @@ ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in) {
 }
 
 
-ssize_t mcpr_read_angle     (int8_t *out, FILE *in) {
+ssize_t mcpr_read_angle     (int8_t *out, FILE *in) 
+{
     char tmp = getc(in);
     if (tmp == EOF) return -1;
     *out = tmp;
     return 1;
 }
 
-ssize_t mcpr_read_uuid      (uuid_t out, FILE *in) {
+ssize_t mcpr_read_uuid      (uuid_t out, FILE *in) 
+{
 
     // This is kinda hacky.. uuid_t is USUALLY a typedef'd unsigned char raw[16]
     // If there is an implementation which does not define uuid_t as unsigned char raw[16] we have a bit of an issue here.
@@ -222,35 +246,41 @@ ssize_t mcpr_read_uuid      (uuid_t out, FILE *in) {
 }
 
 
-ssize_t mcpr_write_byte     (FILE *out, int8_t in) {
+ssize_t mcpr_write_byte     (FILE *out, int8_t in) 
+{
     if (fwrite(&in, 1, 1, out) != 1) return -1;
     return 1;
 }
 
-ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in) {
+ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in) 
+{
     if (fwrite(&in, 1, 1, out) != 1) return -1;
     return 1;
 }
 
-ssize_t mcpr_write_short    (FILE *out, int16_t in) {
+ssize_t mcpr_write_short    (FILE *out, int16_t in) 
+{
     in = htons(in);
     if (fwrite(&in, sizeof(int16_t), 1, out) != 1) return -1;
     return sizeof(int16_t);
 }
 
-ssize_t mcpr_write_ushort   (FILE *out, uint16_t in) {
+ssize_t mcpr_write_ushort   (FILE *out, uint16_t in) 
+{
     in = htons(in);
     if (fwrite(&in, sizeof(uint16_t), 1, out) != 1) return -1;
     return sizeof(uint16_t);
 }
 
-ssize_t mcpr_write_int      (FILE *out, int32_t in) {
+ssize_t mcpr_write_int      (FILE *out, int32_t in) 
+{
     in = htonl(in);
     if (fwrite(&in, sizeof(int32_t), 1, out) != 1) return -1;
     return sizeof(int32_t);
 }
 
-ssize_t mcpr_write_long     (FILE *out, int64_t in) {
+ssize_t mcpr_write_long     (FILE *out, int64_t in) 
+{
     in = htonll(in);
     if (fwrite(&in, sizeof(int64_t), 1, out) != 1) return -1;
     return sizeof(int64_t);
@@ -285,9 +315,12 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
             result |= (value << (7 * num_read));
 
             num_read++;
-            if (unlikely(num_read > 5)) {
+            if (unlikely(num_read > 5))
+            {
                 return -1;
-            } else if (unlikely((num_read - 1) >= max_len)) {
+            }
+            else if (unlikely((num_read - 1) >= max_len))
+            {
                 return -1;
             }
         } while ((read & 0x80) != 0); // 0x80 == 0b10000000
@@ -308,7 +341,8 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
 
     size_t decrypted_packet_len;
     uint8_t *decrypted_packet;
-    if (use_encryption) {
+    if (use_encryption)
+    {
         safe_add(&decrypted_packet_len, (size_t) pkt_len, (size_t) encryption_block_size)
         decrypted_packet = malloc(decrypted_raw_packet_len);
         if (decrypted_raw_packet == NULL) { free(raw_packet); return NULL; }
@@ -317,7 +351,9 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
         if (bytes_written < 0) { free(raw_packet); free(decrypted_packet); return NULL; }
         decrypted_packet_len = (size_t) bytes_written;
         free(raw_packet);
-    } else {
+    } 
+    else
+    {
         decrypted_packet = raw_packet;
         decrypted_packet_len = (size_t) pkt_len;
     }
@@ -329,6 +365,7 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
     return pkt;
 }
 
-ssize_t mcpr_write_packet(FILE *out, struct mcpr_packet *pkt, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt) {
+ssize_t mcpr_write_packet(FILE *out, struct mcpr_packet *pkt, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt)
+{
 
 }
