@@ -335,7 +335,9 @@ static int init_socket(int *returned_sockfd, const char *host, short port) {
     return 0;
 }
 
-static int minecraft_stringify_sha1(char *stringified_hash, const unsigned char *hash1) {
+static int minecraft_stringify_sha1(char *stringified_hash, const void *hash2) {
+    const unsigned char *hash1 = (const unsigned char *) hash2;
+
     unsigned char uhash[SHA_DIGEST_LENGTH];
     for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
         uhash[i] = hash1[i];

@@ -59,24 +59,24 @@ static const size_t MCPR_VARLONG_SIZE_MAX = 10;
 
 
 struct mcpr_position {
-    int x;
-    int y;
-    int z;
+    long long int x;
+    long long int y;
+    long long int z;
 };
 
 
 // Encoding/decoding functions return the amount of bytes written for encode, and amount of
 // bytes read for decode. On error; they return -1
 
-int mcpr_encode_bool    (void *out, bool b);         // writes 1 byte
-int mcpr_encode_byte    (void *out, int8_t byte);    // writes 1 byte
-int mcpr_encode_ubyte   (void *out, uint8_t byte);   // writes 1 byte
-int mcpr_encode_short   (void *out, int16_t i);      // writes 2 bytes
-int mcpr_encode_ushort  (void *out, uint16_t i);     // writes 2 bytes
-int mcpr_encode_int     (void *out, int32_t i);      // writes 4 bytes
-int mcpr_encode_long    (void *out, int64_t i);      // writes 8 bytes
-int mcpr_encode_float   (void *out, float f);        // writes 4 bytes
-int mcpr_encode_double  (void *out, double d);       // writes 8 bytes
+ssize_t mcpr_encode_bool    (void *out, bool b);         // writes 1 byte
+ssize_t mcpr_encode_byte    (void *out, int8_t byte);    // writes 1 byte
+ssize_t mcpr_encode_ubyte   (void *out, uint8_t byte);   // writes 1 byte
+ssize_t mcpr_encode_short   (void *out, int16_t i);      // writes 2 bytes
+ssize_t mcpr_encode_ushort  (void *out, uint16_t i);     // writes 2 bytes
+ssize_t mcpr_encode_int     (void *out, int32_t i);      // writes 4 bytes
+ssize_t mcpr_encode_long    (void *out, int64_t i);      // writes 8 bytes
+ssize_t mcpr_encode_float   (void *out, float f);        // writes 4 bytes
+ssize_t mcpr_encode_double  (void *out, double d);       // writes 8 bytes
 
 
  /*
@@ -86,7 +86,7 @@ int mcpr_encode_double  (void *out, double d);       // writes 8 bytes
 
     returns the amount of bytes written.
  */
-int mcpr_encode_string  (void *out, const char *utf8Str);
+ssize_t mcpr_encode_string  (void *out, const char *utf8Str);
 
 /**
  *  Encode chat.
@@ -101,15 +101,15 @@ int mcpr_encode_string  (void *out, const char *utf8Str);
  *
  *   @returns the amount of bytes written.
  */
-int mcpr_encode_chat    (void *out, const json_t *in);
+ssize_t mcpr_encode_chat    (void *out, const json_t *in);
 
 
-int mcpr_encode_varint          (void *out, int32_t i);
-int mcpr_encode_varlong         (void *out, int64_t i);
-int mcpr_encode_chunk_section   (); // TODO
-int mcpr_encode_position        (void *out, const struct mcpr_position *in);
-int mcpr_encode_angle           (void *out, uint8_t angle); // Angles start at 0 all the way to 255.
-int mcpr_encode_uuid            (void *out, uuid_t in);
+ssize_t mcpr_encode_varint          (void *out, int32_t i);
+ssize_t mcpr_encode_varlong         (void *out, int64_t i);
+ssize_t mcpr_encode_chunk_section   (); // TODO
+ssize_t mcpr_encode_position        (void *out, const struct mcpr_position *in);
+ssize_t mcpr_encode_angle           (void *out, uint8_t angle); // Angles start at 0 all the way to 255.
+ssize_t mcpr_encode_uuid            (void *out, uuid_t in);
 
 
 /**
@@ -120,7 +120,7 @@ int mcpr_encode_uuid            (void *out, uuid_t in);
  * @param [in] len Amount of bytes to decode.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_raw             (void *out, const void *in, size_t len);
+ssize_t mcpr_decode_raw             (void *out, const void *in, size_t len);
 
 /**
  * Will decode a boolean from in.
@@ -130,7 +130,7 @@ int mcpr_decode_raw             (void *out, const void *in, size_t len);
  * @param [in] in Input buffer. Should be at least 1 byte long.
  * @returns The amount of bytes read, or a negative integer upon error.
  */
-int mcpr_decode_bool            (bool *out, const void *in);
+ssize_t mcpr_decode_bool            (bool *out, const void *in);
 
 /**
  * Will decode a single byte from in.
@@ -140,7 +140,7 @@ int mcpr_decode_bool            (bool *out, const void *in);
  * @param [in] in Input buffer. Should be at least 1 byte long.
  * @returns The amount of bytes read, or a negative integer upon error.
  */
-int mcpr_decode_byte            (int8_t *out, const void *in);
+ssize_t mcpr_decode_byte            (int8_t *out, const void *in);
 
 /**
  * Will decode a single unsigned byte from in.
@@ -150,7 +150,7 @@ int mcpr_decode_byte            (int8_t *out, const void *in);
  * @param [in] in Input buffer. Should be at least 1 byte long.
  * @returns The amount of bytes read, or a negative integer upon error.
  */
-int mcpr_decode_ubyte           (uint8_t *out, const void *in);
+ssize_t mcpr_decode_ubyte           (uint8_t *out, const void *in);
 
 /**
  * Will decode a short (2 bytes) from in.
@@ -160,7 +160,7 @@ int mcpr_decode_ubyte           (uint8_t *out, const void *in);
  * @param [in] in Input buffer. Should be at least 2 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_short           (int16_t *out, const void *in);
+ssize_t mcpr_decode_short           (int16_t *out, const void *in);
 
 /**
  * Will decode an unsigned short from in.
@@ -170,7 +170,7 @@ int mcpr_decode_short           (int16_t *out, const void *in);
  * @param [in] in Input buffer. Should be at least 2 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_ushort          (uint16_t *out, const void *in);
+ssize_t mcpr_decode_ushort          (uint16_t *out, const void *in);
 
 /**
  * Will decode a 32 bit integer from in.
@@ -180,7 +180,7 @@ int mcpr_decode_ushort          (uint16_t *out, const void *in);
  * @param [in] in Input buffer. Should be at least 4 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_int             (int32_t *out, const void *in);
+ssize_t mcpr_decode_int             (int32_t *out, const void *in);
 
 /**
  * Will decode a long from in.
@@ -190,7 +190,7 @@ int mcpr_decode_int             (int32_t *out, const void *in);
  * @param [in] Input buffer. Should be at least 8 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_long            (int64_t *out, const void *in);
+ssize_t mcpr_decode_long            (int64_t *out, const void *in);
 
 /**
  * Will decode a float from in.
@@ -200,7 +200,7 @@ int mcpr_decode_long            (int64_t *out, const void *in);
  * @param [in] Input buffer. Should be at least 4 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_float           (float *out, const void *in);
+ssize_t mcpr_decode_float           (float *out, const void *in);
 
 /**
  * Will decode a double from in.
@@ -210,7 +210,7 @@ int mcpr_decode_float           (float *out, const void *in);
  * @param [in] Input buffer. Should be at least 8 bytes long.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_double          (double *out, const void *in);
+ssize_t mcpr_decode_double          (double *out, const void *in);
 
 /**
  * Will write a NUL terminated UTF-8 string of length len bytes to out.
@@ -221,58 +221,61 @@ int mcpr_decode_double          (double *out, const void *in);
  * @param [in] len Length of string to decode, may not be equal to or less than 0.
  * @returns The amount of bytes written, or < 0 upon error.
  */
-int mcpr_decode_string          (char *out, const void *in, int32_t len);
+ssize_t mcpr_decode_string          (char *out, const void *in, int32_t len);
 
 /**
  * Will decode chat from in.
  *
  * @param [out] out Pointer will be updated to new Jansson reference, note that you should decrement
  * the reference count if you are done with the object.
+ * @param [in] in Input buffer, should not be NULL.
+ *
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_chat            (json_t **out, const void *in);
+ssize_t mcpr_decode_chat            (json_t **out, const void *in);
 
 /*
  * Will decode a Minecraft VarInt from in. Will read no further than maxlen.
  * Note that Minecraft VarInts differ from Protocol Buffer VarInts
  *
  * Decodes 1 to 5 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_varint          (int32_t *out, const void *in, size_t maxlen);
+ssize_t mcpr_decode_varint          (int32_t *out, const void *in, size_t maxlen);
 
-int mcpr_varint_bounds          (int32_t value);
+ssize_t mcpr_varint_bounds          (int32_t value);
 
 /*
  * Will decode a Minecraft VarLong from in. Will read no further than maxlen.
  * Note that Minecraft VarLongs differ from Protocol Buffer VarLongs
- * Returns the amount of bytes read, or < 0 upon error.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_varlong         (int64_t *out, const void *in, size_t maxlen);
+ssize_t mcpr_decode_varlong         (int64_t *out, const void *in, size_t maxlen);
 //int mcpr_decode_chunk_section   (const void *in);
 
 /*
  * Will decode a position from in.
  *
  * Decodes 8 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_position        (struct mcpr_position *out, const void *in);
+ssize_t mcpr_decode_position        (struct mcpr_position *out, const void *in);
 
 /*
  * Will decode an angle from in.
  *
  * Decodes 1 byte.
- * Returns the amount of bytes read, or < 0 upon error.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_angle           (uint8_t *out, const void *in);
+ssize_t mcpr_decode_angle           (uint8_t *out, const void *in);
 
 /*
  * Deoces an UUID from in.
  *
  * Decodes 16 bytes.
- * Returns the amount of bytes read, or < 0 upon error.
+ * @returns The amount of bytes read, or < 0 upon error.
  */
-int mcpr_decode_uuid            (uuid_t out, const void *in);
+ssize_t mcpr_decode_uuid            (uuid_t out, const void *in);
 
 
 #endif

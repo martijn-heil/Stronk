@@ -177,6 +177,8 @@ static void mapi_uuid_compress_string(char *restrict output, const char *restric
     output[29] = input[33];
     output[30] = input[34];
     output[31] = input[35];
+
+    output[32] = '\0';
 }
 
 enum mapi_http_method {

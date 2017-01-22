@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #include <arpa/inet.h>
 #include <uuid/uuid.h>
@@ -66,14 +67,14 @@ unsigned int *mcpr_get_errno();
  *
  * @returns The new size of out or -1 upon error.
  */
-ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t in_size);
+ssize_t mcpr_decompress(void restrict* out, const void restrict *in, size_t max_out_size, size_t in_size);
 
 /**
  * Out should be at least the size of mcr_compress_bounds(n)
  *
  * Returns the new size of out or -1 upon error.
  */
-ssize_t mcpr_compress(void *out, const void *in, size_t n);
+ssize_t mcpr_compress(void restrict* out, const void restrict* in, size_t n);
 
 /**
  * Calculate maximum compressed size for len amount of bytes.
@@ -101,28 +102,9 @@ struct mcpr_packet {
     size_t data_len;
 };
 
+ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compression);
 
-/**
- * Encrypt data for use in the Minecraft protocol.
- *
- * @param [out] out Output buffer, should be at least the size of (len + mcpr_client->encryption_block_size -1), may not be NULL.
- * @param [in] data Raw binary data to encrypt, should be at least the size of len.
- * @param [in] ctx_encrypt ctx_encrypt from the mcpr_client struct.
- *
- * @returns Negative integer upon error.
- */
-int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len);
-
-/**
- * Decrypt data for use in the Minecraft protocol.
- *
- * @param [out] out Output buffer, should be at least size of (len + mcpr_client->encryption_block_size), may not be NULL.
- * @param [in] data Input buffer, should be at least the size of len, may not be NULL.
- *
- * @returns Negative integer upon error.
- */
-int mcpr_decrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_decrypt, size_t len);
-
-ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compression, bool use_encryption);
+// Does not process packet length field.
+struct mcpr_packet *mcpr_decode_packet(void *in, size_t packet_len, bool use_compression, bool force_no_compression);
 
 #endif
