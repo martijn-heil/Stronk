@@ -112,7 +112,8 @@ int count_cores(void)
     #endif
 }
 
-void cleanup(void) {
+void cleanup(void)
+{
     nlog_info("Cleaning up..");
 
     nlog_info("Destroying thread pool..");
@@ -122,7 +123,8 @@ void cleanup(void) {
     zlog_fini();
 }
 
-int main(void) {
+int main(void)
+{
     // TODO test safe_math.h functions..
     int zlog_status = zlog_init("/etc/zlog.conf");
     if(zlog_status)
