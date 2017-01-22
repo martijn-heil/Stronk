@@ -12,29 +12,38 @@
 
 struct mcpr_packet {
     int8_t id;
-    union {
-        struct { // handshake
-            union { // handshake - serverbound
-                struct {
-                int32_t protocol_version;
-                char *server_address;
-                uint16_t server_port;
-                enum mcpr_state next_state;
+    union
+    {
+        struct // handshake
+        { 
+            union // handshake - serverbound
+            { 
+                struct
+                {
+                    int32_t protocol_version;
+                    char *server_address;
+                    uint16_t server_port;
+                    enum mcpr_state next_state;
                 } handshake;
             } serverbound;
             
-            union { // handshake - clientbound
+            union // handshake - clientbound
+            { 
                 
             } clientbound;
         } handshake;
         
-        struct { // login
-            union { // login - serverbound
-                struct {
-                char *name;
+        struct // login
+        {
+            union // login - serverbound
+            {
+                struct
+                {
+                    char *name;
                 } login_start;
 
-                struct {
+                struct
+                {
                     int32_t shared_secret_length;
                     void *shared_secret;
                     int32_t verify_token_length;
@@ -42,12 +51,15 @@ struct mcpr_packet {
                 } encryption_response;
             } serverbound;
             
-            union { // login - clientbound
-                struct {
+            union // login - clientbound
+            { 
+                struct
+                {
                     struct mcpr_chat_message reason;
                 } disconnect;
 
-                struct {
+                struct
+                {
                     char *server_id;
                     int32_t public_key_length;
                     void *public_key;
@@ -55,45 +67,56 @@ struct mcpr_packet {
                     void *verify_token;
                 } encryption_request;
 
-                struct {
+                struct
+                {
                     struct mcpr_uuid uuid;
                     char *username;
                 } login_success;
 
-                struct {
+                struct
+                {
                     int32_t threshold;
                 } set_compression;
             } clientbound;
         } login;
         
-        struct { // status
-            union { // status - serverbound
-                struct {
+        struct // status
+        { 
+            union // status - serverbound
+            { 
+                struct
+                {
 
                 } request;
 
-                struct {
+                struct
+                {
                     int64_t payload;
                 } ping;
             } serverbound;
             
-            union { // status - clientbound
-                struct {
+            union // status - clientbound
+            { 
+                struct
+                {
                 int64_t payload; 
                 } pong;
 
-                struct {
+                struct
+                {
                     json_t json_response;
                 } response;
             } clientbound;
         } status;
         
         struct { // play
-            union { // play - serverbound
+            union // play - serverbound
+            {
                 
             } serverbound;
             
-            union { // play - clientbound
+            union // play - clientbound
+            {
                 
             } clientbound;
         } play;
