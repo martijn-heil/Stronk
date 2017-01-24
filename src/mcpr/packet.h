@@ -10,6 +10,75 @@
 
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
 
+enum mcpr_resource_pack_result
+{
+    MCPR_RESOURCE_PACK_RESULT_SUCCESS,
+    MCPR_RESOURCE_PACK_RESULT_DECLINED,
+    MCPR_RESOURCE_PACK_RESULT_FAILED,
+    MCPR_RESOURCE_PACK_RESULT_ACCEPTED
+};
+
+enum mcpr_entity_action
+{
+    MCPR_ENTITY_ACTION_START_SNEAKING,
+    MCPR_ENTITY_ACTION_STOP_SNEAKING,
+    MCPR_ENTITY_ACTION_LEAVE_BED,
+    MCPR_ENTITY_ACTION_START_SPRINTING,
+    MCPR_ENTITY_ACTION_STOP_SPRINTING,
+    MCPR_ENTITY_ACTION_START_HORSE_JUMP,
+    MCPR_ENTITY_ACTION_STOP_HORSE_JUMP,
+    MCPR_ENTITY_ACTION_OPEN_HORSE_INVENTORY,
+    MCPR_ENTITY_ACTION_START_ELYTRA_FLYING
+};
+
+enum mcpr_player_digging_status
+{
+    MCPR_PLAYER_DIGGING_STATUS_STARTED,
+    MCPR_PLAYER_DIGGING_STATUS_CANCELLED,
+    MCPR_PLAYER_DIGGING_STATUS_FINISHED,
+    MCPR_PLAYER_DIGGING_STATUS_DROP_ITEM_STACK,
+    MCPR_PLAYER_DIGGING_STATUS_DROP_ITEM,
+    MCPR_PLAYER_DIGGING_STATUS_SHOOT_ARROW_FINISH_EATING,
+    MCPR_PLAYER_DIGGING_STATUS_SWAP_ITEM_IN_HAND
+};
+
+enum mcpr_block_face
+{
+    MCPR_BLOCK_FACE_TOP,
+    MCPR_BLOCK_FACE_BOTTOM,
+    MCPR_BLOCK_FACE_NORTH,
+    MCPR_BLOCK_FACE_SOUTH,
+    MCPR_BLOCK_FACE_WEST,
+    MCPR_BLOCK_FACE_EAST,
+    MCPR_BLOCK_FACE_SPECIAL
+};
+
+enum mcpr_side_based_hand
+{
+    MCPR_HAND_RIGHT,
+    MCPR_HAND_LEFT
+};
+
+enum mcpr_hand
+{
+    MCPR_HAND_MAIN,
+    MCPR_HAND_OFFHAND,
+};
+
+enum mcpr_chat_mode
+{
+    MCPR_CHAT_MODE_ENABLED,
+    MCPR_CHAT_MODE_COMMANDS_ONLY,
+    MCPR_CHAT_MODE_HIDDEN
+};
+
+enum mcpr_client_status_action
+{
+    MCPR_CLIENT_STATUS_ACTION_PERFORM_RESPAWN,
+    MCPR_CLIENT_STATUS_ACTION_REQUEST_STATS,
+    MCPR_CLIENT_STATUS_ACTION_OPEN_INVENTORY
+};
+
 enum mcpr_entity_property_modifier_operation
 {
     MCPR_ENTITY_PROPERTY_MODIFIER_OPERATION_ADD_SUBTRACT,
@@ -415,10 +484,210 @@ struct mcpr_packet
             } clientbound;
         } status;
 
-        struct { // play
+        struct
+        { // play
             union // play - serverbound
             {
+                struct
+                {
+                    int32_t teleport_id;
+                } teleport_confirm;
 
+                struct
+                {
+                    char *text;
+                    bool assume_command;
+                    bool has_position;
+                    struct mcpr_position looked_at_block; // Optional, only if has_position is true.
+                } tab_complete;
+
+                struct
+                {
+                    char *message;
+                } chat_message;
+
+                struct
+                {
+                    enum mcpr_client_status_action action;
+                } client_status;
+
+                struct
+                {
+                    char *locale;
+                    int8_t view_distance;
+                    enum mcpr_chat_mode chat_mode;
+                    bool chat_colors;
+
+                    struct
+                    {
+                        bool cape_enabled;
+                        bool jacket_enabled;
+                        bool left_sleeve_enabled, right_sleeve_enabled;
+                        bool left_pants_enabled, right_pants_enabled;
+                        bool hat_enabled;
+                    } displayed_skin_parts;
+
+                    enum mcpr_side_based_hand main_hand;
+                } client_settings;
+
+                struct
+                {
+                    int8_t window_id;
+                    int16_t action_number;
+                    bool accepted;
+                } confirm_transaction;
+
+                struct
+                {
+                    int8_t window_id;
+                    int8_t enchantment;
+                } enchant_item;
+
+                struct
+                {
+                    uint8_t window_id;
+                    int16_t slot;
+                    int8_t button;
+                    int16_t action_number;
+                    int32_t mode;
+                    struct mcpr_slot clicked_item;
+                } click_window;
+
+                struct
+                {
+                    uint8_t window_id;
+                } close_window;
+
+                struct
+                {
+                    char *channel;
+                    size_t data_length;
+                    void *data;
+                } plugin_message;
+
+                struct
+                {
+                    int32_t target;
+                    enum mcpr_use_entity_type type;
+                    float target_x, target_y, target_z; // Optional, only if type is MCPR_USE_ENTITY_TYPE_INTERACT_AT
+                    enum mcpr_hand hand; // Optional, only if type is MCPR_USE_ENTITY_TYPE_INTERACT_AT
+                } use_entity;
+
+                struct
+                {
+                    int32_t keep_alive_id;
+                } keep_alive;
+
+                struct
+                {
+                    double x, feet_y, z;
+                    bool on_ground;
+                } player_position;
+
+                struct
+                {
+                    double x, feet_y, z;
+                    float yaw, pitch;
+                    bool on_ground;
+                } player_position_and_look;
+
+                struct
+                {
+                    float yaw, pitch;
+                    bool on_ground;
+                } player_look;
+
+                struct
+                {
+                    bool on_ground;
+                } player;
+
+                struct
+                {
+                    double x, y ,z;
+                    float yaw, pitch;
+                } vehicle_move;
+
+                struct
+                {
+                    bool right_paddle_turning, left_paddle_turning;
+                } steer_boat;
+
+                struct
+                {
+                    bool invulnerable;
+                    bool can_fly;
+                    bool is_flying;
+                    bool is_creative;
+                    float flying_speed;
+                    float walking_speed;
+                } player_abilities;
+
+                struct
+                {
+                    enum mcpr_player_digging_status status;
+                    struct mcpr_position block_position;
+                    enum mcpr_block_face face;
+                } player_digging;
+
+                struct
+                {
+                    int32_t entity_id;
+                    enum mcpr_entity_action action;
+                    int32_t jump_boost;
+                } entity_action;
+
+                struct
+                {
+                    float sideways, forward;
+                    bool jump;
+                    bool unmount;
+                } steer_vehicle;
+
+                struct
+                {
+                    enum mcpr_resource_pack_result result;
+                } resource_pack_status;
+
+                struct
+                {
+                    int16_t slot;
+                } held_item_change;
+
+                struct
+                {
+                    int16_t slot;
+                    struct mcpr_slot clicked_item;
+                } creative_inventory_action;
+
+                struct
+                {
+                    struct mcpr_position sign_location;
+                    char *line_1, line_2, line_3, line_4;
+                } update_sign;
+
+                struct
+                {
+                    enum mcpr_hand hand;
+                } animation;
+
+                struct
+                {
+                    struct  mcpr_uuid target_player;
+                } spectate;
+
+                struct
+                {
+                    struct mcpr_position block_position;
+                    enum mcpr_block_face face;
+                    enum mcpr_hand hand;
+                    float cursor_position_x, cursor_position_y, cursor_position_z;
+                } player_block_placement;
+
+                struct
+                {
+                    enum mcpr_hand hand;
+                } use_item;
             } serverbound;
 
             union // play - clientbound
