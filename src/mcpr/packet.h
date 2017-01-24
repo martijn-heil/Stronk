@@ -8,7 +8,100 @@
 
 #include "mcpr.h"
 
-#define PACKET_HANDSHAKE_SERVERBOUND_HANDSHAKE 0x00;
+#define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
+
+enum mcpr_entity_property_modifier_operation
+{
+    MCPR_ENTITY_PROPERTY_MODIFIER_OPERATION_ADD_SUBTRACT,
+    MCPR_ENTITY_PROPERTY_MODIFIER_OPERATION_ADD_SUBTRACT_PERCENT,
+    MCPR_ENTITY_PROPERTY_MODIFIER_OPERATION_MULTIPLY_PERCENT
+};
+
+struct mcpr_entity_property_modifier
+{
+    struct mcpr_uuid uuid;
+    double amount;
+    enum mcpr_entity_property_modifier_operation operation;
+};
+
+struct mcpr_entity_property
+{
+    enum mcpr_entity_property_key key;
+    double value;
+    int32_t number_of_modifiers;
+    struct mcpr_entity_property_modifier *modifiers;
+};
+
+enum mcpr_sound_category
+{
+    MCPR_SOUND_CATEGORY_MASTER,
+    MCPR_SOUND_CATEGORY_MUSIC,
+    MCPR_SOUND_CATEGORY_RECORD,
+    MCPR_SOUND_CATEGORY_WEATHER,
+    MCPR_SOUND_CATEGORY_BLOCK,
+    MCPR_SOUND_CATEGORY_HOSTILE,
+    MCPR_SOUND_CATEGORY_NEUTRAL,
+    MCPR_SOUND_CATEGORY_PLAYER,
+    MCPR_SOUND_CATEGORY_AMBIENT,
+    MCPR_SOUND_CATEGORY_VOICE
+};
+
+enum mcpr_title_action
+{
+    MCPR_TITLE_ACTION_SET_TITLE,
+    MCPR_TITLE_ACTION_SET_SUBTITLE,
+    MCPR_TITLE_ACTION_SET_ACTION_BAR,
+    MCPR_TITLE_ACTION_SET_TIMES_AND_DISPLAY,
+    MCPR_TITLE_ACTION_HIDE,
+    MCPR_TITLE_ACTION_RESET
+};
+
+enum mcpr_update_score_action
+{
+    MCPR_UPDATE_SCORE_ACTION_REMOVE,
+    MCPR_UPDATE_SCORE_ACTION_UPDATE
+};
+
+enum mcpr_teams_action
+{
+    MCPR_TEAMS_ACTION_CREATE,
+    MCPR_TEAMS_ACTION_UPDATE_INFO,
+    MCPR_TEAMS_ACTION_ADD_PLAYERS,
+    MCPR_TEAMS_ACTION_REMOVE_PLAYERS
+};
+
+enum mcpr_scoreboard_objective_mode
+{
+    MCPR_SCOREBOARD_OBJECTIVE_MODE_CREATE,
+    MCPR_SCOREBOARD_OBJECTIVE_MODE_REMOVE,
+    MCPR_SCOREBOARD_OBJECTIVE_MODE_UPDATE
+};
+
+enum mcpr_scoreboard_position
+{
+    MCPR_SCOREBOARD_POSITION_LIST,
+    MCPR_SCOREBOARD_POSITION_SIDEBAR,
+    MCPR_SCOREBOARD_POSITION_BELOW_NAME
+};
+
+enum mcpr_world_border_action
+{
+    MCPR_WORLD_BORDER_ACTION_SET_SIZE,
+    MCPR_WORLD_BORDER_ACTION_LERP_SIZE,
+    MCPR_WORLD_BORDER_ACTION_SET_CENTER,
+    MCPR_WORLD_BORDER_ACTION_INITIALIZE,
+    MCPR_WORLD_BORDER_ACTION_SET_WARNING_TIME,
+    MCPR_WORLD_BORDER_ACTION_SET_WARNING_BLOCKS,
+};
+
+
+enum mcpr_gamemode
+{
+    MCPR_GAMEMODE_SURVIVAL,
+    MCPR_GAMEMODE_CREATIVE,
+    MCPR_GAMEMODE_ADVENTURE,
+    MCPR_GAMEMODE_SPECTATOR,
+};
 
 enum mcpr_level
 {
@@ -17,6 +110,51 @@ enum mcpr_level
     MCPR_LEVEL_LARGE_BIOMES,
     MCPR_LEVEL_AMPLIFIED,
     MCPR_LEVEL_DEFAULT_1_1
+};
+
+enum mcpr_player_list_item_action
+{
+    MCPR_PLAYER_LIST_ITEM_ACTION_ADD_PLAYER,
+    MCPR_PLAYER_LIST_ITEM_ACTION_UPDATE_GAMEMODE,
+    MCPR_PLAYER_LIST_ITEM_ACTION_UPDATE_LATENCY,
+    MCPR_PLAYER_LIST_ITEM_ACTION_UPDATE_DISPLAY_NAME,
+    MCPR_PLAYER_LIST_ITEM_ACTION_REMOVE_PLAYER
+};
+
+struct mcpr_player_list_item_property
+{
+    char *name;
+    char *value;
+    bool is_signed;
+    char *signature; // Optional, only if is_signed is true
+};
+
+struct mcpr_player_list_item_player
+{
+    struct mcpr_uuid uuid;
+
+    struct
+    {
+        char *name;
+        int32_t number_of_properties;
+        struct mcpr_player_list_item_property *properties;
+    } action_add_player;
+
+    struct
+    {
+        enum mcpr_gamemode gamemode;
+    } action_update_gamemode;
+
+    struct
+    {
+        int32_t ping;
+    } action_update_latency;
+
+    struct
+    {
+        bool has_display_name;
+        json_t display_name; // Optional, only if has_display_name is true.
+    } action_update_display_name;
 };
 
 enum mcpr_effect
@@ -146,9 +284,7 @@ struct mcpr_multi_block_change
 
 struct mcpr_explosion_record
 {
-    int8_t x;
-    int8_t y;
-    int8_t z;
+    int8_t x, y, z;
 };
 
 enum mcpr_map_icon
@@ -169,8 +305,7 @@ struct mcpr_map_icon
 {
     uint8_t direction;
     enum mcpr_map_icon type;
-    int8_t x;
-    int8_t z;
+    int8_t x, z;
 };
 
 enum mcpr_combat_event
@@ -293,9 +428,7 @@ struct mcpr_packet
                     int32_t entity_id;
                     struct mcpr_uuid uuid;
                     enum mcpr_object type;
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                     uint8_t pitch;
                     uint8_t yaw;
                     int32_t data;
@@ -307,9 +440,7 @@ struct mcpr_packet
                 struct
                 {
                     int32_t entity_id;
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                     int16_t count;
                 } spawn_experience_orb;
 
@@ -317,9 +448,7 @@ struct mcpr_packet
                 {
                     int32_t entity_id;
                     int8_t type;
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                 } spawn_global_entity;
 
                 struct
@@ -327,15 +456,11 @@ struct mcpr_packet
                     int32_t entity_id;
                     struct mcpr_uuid entity_uuid;
                     enum mcpr_mob type;
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                     int8_t yaw;
                     int8_t pitch;
                     int8_t head_pitch;
-                    int16_t velocity_x;
-                    int16_t velocity_y;
-                    int16_t velocity_z;
+                    int16_t velocity_x, velocity_y, velocity_z;
                     struct mcpr_entity_metadata metadata;
                 } spawn_mob;
 
@@ -352,9 +477,7 @@ struct mcpr_packet
                 {
                     int32_t entity_id;
                     struct mcpr_uuid player_uuid;
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                     int8_t yaw;
                     int8_t pitch;
                     struct mcpr_entity_metadata metadata;
@@ -383,7 +506,7 @@ struct mcpr_packet
                 {
                     struct mcpr_position location;
                     enum mcpr_update_block_entity_action action;
-                    nbt_t nbt;
+                    nbt_t *nbt;
                 } update_block_entity;
 
                 struct
@@ -407,7 +530,7 @@ struct mcpr_packet
                     union {
                         struct
                         {
-                            json_t title;
+                            json_t *title;
                             float health;
                             enum mcpr_boss_bar_color color;
                             enum mcpr_boss_bar_division division;
@@ -430,7 +553,7 @@ struct mcpr_packet
 
                         struct
                         {
-                            json_t title;
+                            json_t *title;
                         } action_update_title;
 
                         struct
@@ -463,14 +586,13 @@ struct mcpr_packet
 
                 struct
                 {
-                    json_t json_data;
+                    json_t *json_data;
                     enum mcpr_chat_position;
                 } chat_message;
 
                 struct
                 {
-                    int32_t chunk_x;
-                    int32_t chunk_z;
+                    int32_t chunk_x, chunk_z;
                     int32_t record_count;
                     struct mcpr_multi_block_change_record *records;
                 } multi_block_change;
@@ -534,16 +656,14 @@ struct mcpr_packet
                 {
                     enum mcpr_sound sound;
                     enum mcpr_sound_category sound_category;
-                    int32_t effect_position_x;
-                    int32_t effect_position_y;
-                    int32_t effect_position_z;
+                    int32_t effect_position_x, effect_position_y, effect_position_z;
                     float volume;
                     float pitch;
                 } named_sound_effect;
 
                 struct
                 {
-                    json_t reason;
+                    json_t *reason;
                 } disconnect;
 
                 struct
@@ -554,21 +674,16 @@ struct mcpr_packet
 
                 struct
                 {
-                    float x;
-                    float y;
-                    float z;
+                    float x, y, z;
                     float radius;
                     int32_t record_count;
                     struct mcpr_explosion_record *records;
-                    float player_motion_x;
-                    float player_motion_y;
-                    float player_motion_z;
+                    float player_motion_x, player_motion_y, player_motion_z;
                 } explosion;
 
                 struct
                 {
-                    int32_t chunk_x;
-                    int32_t chunk_z;
+                    int32_t chunk_x, chunk_z;
                 } unload_chunk;
 
                 struct
@@ -584,8 +699,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    int32_t chunk_x;
-                    int32_t chunk_z;
+                    int32_t chunk_x, chunk_z;
                     bool ground_up_continuous;
                     int32_t primary_bit_mask;
                     int32_t size;
@@ -604,12 +718,8 @@ struct mcpr_packet
                 {
                     enum mcpr_particle particle;
                     bool long_distance;
-                    float x;
-                    float y;
-                    float z;
-                    float offset_x;
-                    float offset_y;
-                    float offset_z;
+                    float x, y, z;
+                    float offset_x, offset_y, offset_z;
                     float particle_data;
                     int32_t particle_count;
                     int32_t *data; // array of int32_t's
@@ -678,9 +788,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    double x;
-                    double y;
-                    double z;
+                    double x, y, z;
                     float yaw;
                     float pitch;
                 } vehicle_move;
@@ -703,20 +811,330 @@ struct mcpr_packet
                 struct
                 {
                     enum mcpr_combat_event event;
-                    union {
-                        struct {
+                    union
+                    {
+                        struct
+                        {
                             int32_t duration;
                             int32_t entity_id;
                         } event_end_combat;
 
-                        struct {
+                        struct
+                        {
                             int32_t player_id;
                             int32_t entity_id;
                             json_t message;
                         } event_entity_dead;
                     };
-
                 } combat_event;
+
+                struct
+                {
+                    enum mcpr_player_list_item_action action;
+                    int32_t number_of_players;
+                    struct mcpr_player_list_item_player *players;
+                } player_list_item;
+
+                struct
+                {
+                    double x, y, z;
+                    float yaw, pitch;
+                    bool x_is_relative;
+                    bool y_is_relative;
+                    bool z_is_relative;
+                    bool yaw_is_relative;
+                    bool pitch_is_relative;
+                } player_position_and_look;
+
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_position location;
+                } use_bed;
+
+                struct
+                {
+                    int32_t count;
+                    int32_t *entity_ids; // Array of entity IDs, with count elements.
+                } destroy_entities;
+
+                struct
+                {
+                    int32_t entity_id;
+                    enum mcpr_potion_effect effect;
+                } remove_entity_effect;
+
+                struct
+                {
+                    char *url;
+                    char *hash;
+                } resource_pack_send;
+
+                struct
+                {
+                    enum mcpr_dimension dimension;
+                    enum mcpr_difficulty difficulty;
+                    enum mcpr_gamemode gamemode;
+                    enum mcpr_level level_type;
+                } respawn;
+
+                struct
+                {
+                    int32_t entity_id;
+                    int8_t head_yaw;
+                } entity_head_look;
+
+                struct
+                {
+                    enum mcpr_world_border_action action;
+
+                    union {
+                        struct
+                        {
+                            double diameter;
+                        } action_set_size;
+
+                        struct
+                        {
+                            double old_diameter;
+                            double new_diameter;
+                            int64_t speed;
+                        } action_lerp_size;
+
+                        struct
+                        {
+                            double x, z;
+                        } action_set_center;
+
+                        struct
+                        {
+                            double x, z;
+                            double old_diameter;
+                            double new_diameter;
+                            int64_t speed;
+                            int32_t portal_teleport_boundary;
+                            int32_t warning_time;
+                            int32_t warning_blocks;
+                        } action_initialize;
+
+                        struct
+                        {
+                            int32_t warning_time;
+                        } action_set_warning_time;
+
+                        struct
+                        {
+                            int32_t warning_blocks;
+                        } action_set_warning_blocks;
+                    };
+                } world_border;
+
+                struct
+                {
+                    int32_t camera_id;
+                } camera;
+
+                struct
+                {
+                    int8_t slot;
+                } held_item_change;
+
+                struct
+                {
+                    enum mcpr_scoreboard_position position;
+                    char *score_name;
+                } display_scoreboard;
+
+                struct
+                {
+                    int32_t entity_id;
+                    struct mcpr_entity_metadata metadata;
+                } entity_metadata;
+
+                struct
+                {
+                    int32_t attached_entity_id;
+                    int32_t holding_entity_id;
+                } attach_entity;
+
+                struct
+                {
+                    int32_t entity_id;
+                    int16_t velocity_x, velocity_y, velocity_z;
+                } entity_velocity;
+
+                struct
+                {
+                    int32_t entity_id;
+                    enum mcpr_equipment_slot slot;
+                    struct mcpr_slot slot;
+                } entity_equipment;
+
+                struct
+                {
+                    float experience_bar;
+                    int32_t level;
+                    int32_t total_experience;
+                } set_experience;
+
+                struct
+                {
+                    float health;
+                    int32_t food;
+                    float food_saturation;
+                } update_health;
+
+                struct
+                {
+                    char *objective_name;
+                    enum mcpr_scoreboard_objective_mode mode;
+                    char *objective_value; // Optional, only if mode is MCPR_SCOREBOARD_OBJECTIVE_MODE_CREATE or MCPR_SCOREBOARD_OBJECTIVE_MODE_MCPR_SCOREBOARD_OBJECTIVE_MODE_UPDATE.
+                    char *type; // Optional, only if mode is MCPR_SCOREBOARD_OBJECTIVE_MODE_CREATE or MCPR_SCOREBOARD_OBJECTIVE_MODE_MCPR_SCOREBOARD_OBJECTIVE_MODE_UPDATE.
+                } scoreboard_objective;
+
+                struct
+                {
+                    int32_t entity_id;
+                    int32_t passenger_count;
+                    int32_t *passengers;
+                } set_passengers;
+
+                struct
+                {
+                    char *team_name;
+                    enum mcpr_teams_action action;
+
+                    union
+                    {
+                        struct
+                        {
+                            char *team_display_name, *team_prefix, *team_suffix;
+                            bool allow_friendly_fire;
+                            bool can_see_teamed_invisibles;
+                            char *name_tag_visibility;
+                            char *collision_rule;
+                            int8_t color;
+                            int32_t player_count;
+                            char **players; // array of strings
+                        } action_create
+
+                        struct
+                        {
+                            char *team_display_name, *team_prefix, *team_suffix;
+                            bool allow_friendly_fire;
+                            bool can_see_teamed_invisibles;
+                            char *name_tag_visibility;
+                            char *collision_rule;
+                            int8_t color;
+                        } action_update_info;
+
+                        struct
+                        {
+                            int32_t player_count;
+                            char **players;
+                        } action_add_players;
+
+                        struct
+                        {
+                            int32_t player_count;
+                            char **players;
+                        } action_remove_players;
+                    };
+                } teams;
+
+                struct
+                {
+                    char *score_name;
+                    enum mcpr_update_score_action action;
+                    char *objective_name;
+                    int32_t value; // Optional, only when action is not MCPR_UPDATE_SCORE_ACTION_REMOVE
+                } update_score;
+
+                struct
+                {
+                    struct mcpr_position location;
+                } spawn_position;
+
+                struct
+                {
+                    int64_t world_age;
+                    int64_t time_of_day;
+                } time_update;
+
+                struct
+                {
+                    enum mcpr_title_action action;
+
+                    union
+                    {
+                        struct
+                        {
+                            json_t *title_text;
+                        } action_set_title;
+
+                        struct
+                        {
+                            json_t *subtitle_text;
+                        } action_set_subtitle;
+
+                        struct
+                        {
+                            json_t *action_bar_text;
+                        } action_set_action_bar;
+
+                        struct
+                        {
+                            int32_t fade_in;
+                            int32_t stay;
+                            int32_t fade_out;
+                        } action_set_times_and_display;
+                    };
+                } title;
+
+                struct
+                {
+                    int32_t sound_id; // TODO enum
+                    enum mcpr_sound_category category;
+                    int32_t effect_position_x, effect_position_y, effect_position_z;
+                    float volume, pitch;
+                } sound_effect;
+
+                struct
+                {
+                    json_t *header, *footer; // Or NULL to empty.
+                } player_list_header_and_footer;
+
+                struct
+                {
+                    int32_t collected_entity_id;
+                    int32_t collector_entity_id;
+                    int32_t pickup_item_count;
+                } collect_item;
+
+                struct
+                {
+                    int32_t entity_id;
+                    double x, y, z;
+                    int8_t angle, yaw;
+                    bool on_ground;
+                } entity_teleport;
+
+                struct
+                {
+                    int32_t entity_id;
+                    int32_t number_of_properties;
+                    struct mcpr_entity_property *properties;
+                } entity_properties;
+
+                struct
+                {
+                    int32_t entity_id;
+                    enum mcpr_potion_effect effect;
+                    int8_t amplifier;
+                    int32_t duration;
+                    bool is_ambient;
+                    bool show_particles;
+                } entity_effect;
             } clientbound;
         } play;
     } data;
