@@ -132,14 +132,20 @@ ssize_t mcpr_read_double    (double *out, FILE *in)
 
 ssize_t mcpr_read_string    (char *out, FILE *in)
 {
+    flockfile(in);
     int32_t len;
     ssize_t bytes_read_1 = mcpr_read_varint(&len, in);
-    if (bytes_read_1 < 0) return -1;
+    if (bytes_read_1 < 0) goto err;
 
     size_t bytes_read_2 = fread(out, len, 1, in);
-    if(bytes_read_2 != 1) return -1;
+    if(bytes_read_2 != 1) goto err;
+    funlockfile(in);
 
     return bytes_read_1 + bytes_read_2;
+
+    err:
+        funlockfile(in);
+        return -1;
 }
 
 ssize_t mcpr_read_chat      (json_t **out, FILE *in)
@@ -152,27 +158,34 @@ ssize_t mcpr_read_varint    (int32_t *out, FILE *in)
     unsigned int num_read = 0;
     int32_t result = 0;
     uint8_t read;
+
+    flockfile(in);
     do
     {
         read = getc(in);
-        if (tmp == EOF) return -1;
+        if (tmp == EOF) goto err;
         int value = (read & 0x7F); // 0x7F == 0b01111111
         result |= (value << (7 * num_read));
 
         num_read++;
         if (unlikely(num_read > 5))
         {
-            return -1;
+            goto err;
         }
         else if (unlikely((num_read - 1) >= max_len))
         {
-            return -1;
+            goto err;
         }
     } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+    funlockfile(in);
 
     ntoh(&result, sizeof(result));
     *out = result;
     return num_read;
+
+    err:
+        funlockfile(in);
+        return -1;
 }
 
 ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
@@ -180,6 +193,8 @@ ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
     unsigned int num_read = 0;
     int64_t result = 0;
     uint8_t read;
+
+    flockfile(in);
     do
     {
         read = getc(in);
@@ -195,7 +210,7 @@ ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
                 nlog_error("VarLong is longer than 10 bytes!");
             #endif
             return -1;
-        } 
+        }
         else if (unlikely((num_read - 1) >= max_len))
         {
             #ifdef MCPR_DO_LOGGING
@@ -204,12 +219,13 @@ ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
             return -1;
         }
     } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+    funlockfile(in);
 
     *out = result;
     return num_read;
 }
 
-ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in) 
+ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in)
 {
     int64_t iin;
     if(fread(&iin, sizeof(int64_t), 1, in) != 1) return -1;
@@ -226,7 +242,7 @@ ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in)
 }
 
 
-ssize_t mcpr_read_angle     (int8_t *out, FILE *in) 
+ssize_t mcpr_read_angle     (int8_t *out, FILE *in)
 {
     char tmp = getc(in);
     if (tmp == EOF) return -1;
@@ -234,7 +250,7 @@ ssize_t mcpr_read_angle     (int8_t *out, FILE *in)
     return 1;
 }
 
-ssize_t mcpr_read_uuid      (uuid_t out, FILE *in) 
+ssize_t mcpr_read_uuid      (uuid_t out, FILE *in)
 {
 
     // This is kinda hacky.. uuid_t is USUALLY a typedef'd unsigned char raw[16]
@@ -246,40 +262,40 @@ ssize_t mcpr_read_uuid      (uuid_t out, FILE *in)
 }
 
 
-ssize_t mcpr_write_byte     (FILE *out, int8_t in) 
+ssize_t mcpr_write_byte     (FILE *out, int8_t in)
 {
     if (fwrite(&in, 1, 1, out) != 1) return -1;
     return 1;
 }
 
-ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in) 
+ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in)
 {
     if (fwrite(&in, 1, 1, out) != 1) return -1;
     return 1;
 }
 
-ssize_t mcpr_write_short    (FILE *out, int16_t in) 
+ssize_t mcpr_write_short    (FILE *out, int16_t in)
 {
     in = htons(in);
     if (fwrite(&in, sizeof(int16_t), 1, out) != 1) return -1;
     return sizeof(int16_t);
 }
 
-ssize_t mcpr_write_ushort   (FILE *out, uint16_t in) 
+ssize_t mcpr_write_ushort   (FILE *out, uint16_t in)
 {
     in = htons(in);
     if (fwrite(&in, sizeof(uint16_t), 1, out) != 1) return -1;
     return sizeof(uint16_t);
 }
 
-ssize_t mcpr_write_int      (FILE *out, int32_t in) 
+ssize_t mcpr_write_int      (FILE *out, int32_t in)
 {
     in = htonl(in);
     if (fwrite(&in, sizeof(int32_t), 1, out) != 1) return -1;
     return sizeof(int32_t);
 }
 
-ssize_t mcpr_write_long     (FILE *out, int64_t in) 
+ssize_t mcpr_write_long     (FILE *out, int64_t in)
 {
     in = htonll(in);
     if (fwrite(&in, sizeof(int64_t), 1, out) != 1) return -1;
@@ -298,6 +314,7 @@ ssize_t mcpr_write_uuid     (FILE *out, uuid_t in);
 
 // TODO handle legacy server list ping
 struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt); {
+    flockfile(in);
 
     // Read packet length.
     // TODO encryption
@@ -337,7 +354,7 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
     uint8_t *raw_packet = malloc((size_t) pkt_len);
     if (raw_packet == NULL) return NULL;
     if (fread(raw_packet, pkt_len, 1, in) != 1) { free(raw_packet); return NULL; }
-
+    funlockfile(in);
 
     size_t decrypted_packet_len;
     uint8_t *decrypted_packet;
@@ -351,7 +368,7 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
         if (bytes_written < 0) { free(raw_packet); free(decrypted_packet); return NULL; }
         decrypted_packet_len = (size_t) bytes_written;
         free(raw_packet);
-    } 
+    }
     else
     {
         decrypted_packet = raw_packet;
