@@ -105,12 +105,6 @@ static void setup_server_socket(void)
         exit(EXIT_FAILURE);
     }
 
-    if(fcntl(server_socket, F_SETFL, O_ASYNC) == -1)
-    {
-        nlog_fatal("Could not set O_ASYNC flag for server socket. (%s)", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
     // Ignore broken pipe signals, has to do with sockets.
     struct sigaction new_actn, old_actn;
     new_actn.sa_handler = SIG_IGN;
@@ -186,6 +180,10 @@ static void accept_incoming_connections(void)
             {
                 break;
             }
+            else if(errno == ECONNABORTED)
+            {
+                nlog_debug("An incoming connection was aborted.");
+            }
             else
             {
                 nlog_error("Could not accept incoming connection. (%s)", strerror(errno));
@@ -196,13 +194,6 @@ static void accept_incoming_connections(void)
         if(fcntl(newfd, F_SETFL, O_NONBLOCK) == -1)
         {
             nlog_fatal("Could not set O_NONBLOCK flag for incoming connection. (%s)", strerror(errno));
-            if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
-            continue;
-        }
-
-        if(fcntl(newfd, F_SETFL, O_ASYNC) == -1)
-        {
-            nlog_fatal("Could not set O_ASYNC flag for incoming connection. (%s)", strerror(errno));
             if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
             continue;
         }
