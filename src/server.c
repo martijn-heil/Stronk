@@ -199,6 +199,7 @@ static void accept_incoming_connections(void)
         {
             nlog_error("Could not create file pointer from file descriptor. (%s)", strerror(errno));
             if(close(newfd) == -1) nlog_error("Could not clean up socket after error. (%s)", strerror(errno));
+            free(conn);
             continue;
         }
 
