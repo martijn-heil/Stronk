@@ -110,6 +110,13 @@ static void setup_server_socket(void)
         nlog_fatal("Could not set O_ASYNC flag for server socket. (%s)", strerror(errno));
         exit(EXIT_FAILURE);
     }
+
+    // Ignore broken pipe signals, has to do with sockets.
+    struct sigaction new_actn, old_actn;
+    new_actn.sa_handler = SIG_IGN;
+    sigemptyset (&new_actn.sa_mask);
+    new_actn.sa_flags = 0;
+    sigaction (SIGPIPE, &new_actn, &old_actn);
 }
 
 void server_start(void)
