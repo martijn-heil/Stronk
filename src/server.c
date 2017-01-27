@@ -16,6 +16,9 @@
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
 
+#include <mcpr/mcpr.h>
+#include <mcpr/abstract_packet.h>
+
 #include "server.h"
 #include "stronk.h"
 #include "util.h"
