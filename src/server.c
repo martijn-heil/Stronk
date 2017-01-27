@@ -107,7 +107,7 @@ static void setup_server_socket(void)
 
     if(fcntl(server_socket, F_SETFL, O_ASYNC) == -1)
     {
-        nlog_fatal("Could not set O_NONBLOCK flag for server socket. (%s)", strerror(errno));
+        nlog_fatal("Could not set O_ASYNC flag for server socket. (%s)", strerror(errno));
         exit(EXIT_FAILURE);
     }
 }
