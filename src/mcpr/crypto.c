@@ -1,3 +1,9 @@
+#include <stdlib.h>
+
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/sha.h>
+
 #include "crypto.h"
 
 int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len) {
