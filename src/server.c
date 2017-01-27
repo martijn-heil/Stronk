@@ -11,6 +11,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
