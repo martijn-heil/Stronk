@@ -29,6 +29,7 @@
 
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <jansson/jansson.h>
 #include <uuid/uuid.h>
@@ -265,12 +266,14 @@ ssize_t mcpr_read_uuid      (uuid_t out, FILE *in)
 ssize_t mcpr_write_byte     (FILE *out, int8_t in)
 {
     if (fwrite(&in, 1, 1, out) != 1) return -1;
+    fflush(out);
     return 1;
 }
 
 ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in)
 {
     if (fwrite(&in, 1, 1, out) != 1) return -1;
+    fflush(out);
     return 1;
 }
 
@@ -278,6 +281,7 @@ ssize_t mcpr_write_short    (FILE *out, int16_t in)
 {
     in = htons(in);
     if (fwrite(&in, sizeof(int16_t), 1, out) != 1) return -1;
+    fflush(out);
     return sizeof(int16_t);
 }
 
@@ -285,6 +289,7 @@ ssize_t mcpr_write_ushort   (FILE *out, uint16_t in)
 {
     in = htons(in);
     if (fwrite(&in, sizeof(uint16_t), 1, out) != 1) return -1;
+    fflush(out);
     return sizeof(uint16_t);
 }
 
@@ -292,6 +297,7 @@ ssize_t mcpr_write_int      (FILE *out, int32_t in)
 {
     in = htonl(in);
     if (fwrite(&in, sizeof(int32_t), 1, out) != 1) return -1;
+    fflush(out);
     return sizeof(int32_t);
 }
 
@@ -299,6 +305,7 @@ ssize_t mcpr_write_long     (FILE *out, int64_t in)
 {
     in = htonll(in);
     if (fwrite(&in, sizeof(int64_t), 1, out) != 1) return -1;
+    fflush(out);
     return sizeof(int64_t);
 }
 

@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/fcntl.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 
 #ifdef __GNUC__
     #define DO_PRAGMA(x) _Pragma (#x)
@@ -52,9 +53,17 @@
 #define CAST(type_to, type_from, x) (((union {type_from src; type dst;} *) &(x))->dst)
 
 
-
 #define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+
+
+#define hton16(x) htons(x)
+#define hton32(x) htonl(x)
+#define hton64(x) htonll(x)
+
+#define ntoh16(x) ntohs(x)
+#define ntoh32(x) ntohl(x)
+#define ntoh64(x) ntohll(x)
 
 
 void hton(void *what, size_t n);

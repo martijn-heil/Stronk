@@ -107,4 +107,6 @@ ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compress
 // Does not process packet length field.
 struct mcpr_packet *mcpr_decode_packet(void *in, size_t packet_len, bool use_compression, bool force_no_compression);
 
+char *mcpr_as_chat(const char *message_fmt, ...);
+
 #endif

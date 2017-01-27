@@ -6,9 +6,10 @@
 #include <ninuuid/ninuuid.h>
 
 struct player {
-    FILE* fd;
     struct ninuuid uuid;
     struct location location;
+
+    struct connection connection;
 };
 
 #endif

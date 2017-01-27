@@ -6,7 +6,12 @@
 #include <stdarg.h>
 #include <string.h>
 
-extern threadpool thpool;
+extern unsigned int main_threadpool_threadcount;
+extern threadpool main_threadpool;
+
+extern unsigned int async_threadpool_threadcount;
+extern threadpool async_threadpool;
+
 extern zlog_category_t *zc; // don't access this..
 
 #undef zlog_fatal

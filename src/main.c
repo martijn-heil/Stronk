@@ -20,7 +20,7 @@
 #include "mcpr/mcpr.h"
 #include "server.h"
 
-threadpool thpool;
+threadpool main_threadpool;
 zlog_category_t *zc;
 
 
@@ -117,7 +117,7 @@ void cleanup(void)
     nlog_info("Cleaning up..");
 
     nlog_info("Destroying thread pool..");
-    thpool_destroy(thpool);
+    thpool_destroy(main_threadpool);
 
     nlog_info("Closing zlog..");
     zlog_fini();
@@ -159,9 +159,9 @@ int main(void)
         planned_thread_count = 2; // If we simply don't have enough cores, use 2 worker threads.
     }
     nlog_info("Creating thread pool with %i threads..", planned_thread_count);
-    thpool = thpool_init(planned_thread_count);
+    main_threadpool = thpool_init(planned_thread_count);
 
-    if(thpool == NULL)
+    if(main_threadpool == NULL)
     {
         nlog_fatal("Failed to create thread pool. (%s)?", strerror(errno));
         return EXIT_FAILURE;

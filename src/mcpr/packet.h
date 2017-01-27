@@ -222,7 +222,7 @@ struct mcpr_player_list_item_player
     struct
     {
         bool has_display_name;
-        json_t display_name; // Optional, only if has_display_name is true.
+        char display_name; // Optional, only if has_display_name is true.
     } action_update_display_name;
 };
 
@@ -384,7 +384,7 @@ enum mcpr_combat_event
     MCPR_COMBAT_EVENT_ENTITY_DEAD
 };
 
-struct mcpr_packet
+struct mcpr_abstract_packet
 {
     int8_t id;
     union
@@ -479,7 +479,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    json_t json_response;
+                    char json_response;
                 } response;
             } clientbound;
         } status;
@@ -799,7 +799,7 @@ struct mcpr_packet
                     union {
                         struct
                         {
-                            json_t *title;
+                            char *title;
                             float health;
                             enum mcpr_boss_bar_color color;
                             enum mcpr_boss_bar_division division;
@@ -822,7 +822,7 @@ struct mcpr_packet
 
                         struct
                         {
-                            json_t *title;
+                            char *title;
                         } action_update_title;
 
                         struct
@@ -855,7 +855,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    json_t *json_data;
+                    char *json_data;
                     enum mcpr_chat_position;
                 } chat_message;
 
@@ -882,7 +882,7 @@ struct mcpr_packet
                 {
                     uint8_t window_id;
                     enum mcpr_window window_type;
-                    json_t window_title;
+                    char window_title;
                     uint8_t number_of_slots;
                     int32_t entity_id; // Optional, only sent if window type is "EntityHorse"
                 } open_window;
@@ -932,7 +932,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    json_t *reason;
+                    char *reason;
                 } disconnect;
 
                 struct
@@ -1092,7 +1092,7 @@ struct mcpr_packet
                         {
                             int32_t player_id;
                             int32_t entity_id;
-                            json_t message;
+                            char message;
                         } event_entity_dead;
                     };
                 } combat_event;
@@ -1338,17 +1338,17 @@ struct mcpr_packet
                     {
                         struct
                         {
-                            json_t *title_text;
+                            char *title_text;
                         } action_set_title;
 
                         struct
                         {
-                            json_t *subtitle_text;
+                            char *subtitle_text;
                         } action_set_subtitle;
 
                         struct
                         {
-                            json_t *action_bar_text;
+                            char *action_bar_text;
                         } action_set_action_bar;
 
                         struct
@@ -1370,7 +1370,7 @@ struct mcpr_packet
 
                 struct
                 {
-                    json_t *header, *footer; // Or NULL to empty.
+                    char *header, *footer; // Or NULL to empty.
                 } player_list_header_and_footer;
 
                 struct
@@ -1408,5 +1408,9 @@ struct mcpr_packet
         } play;
     } data;
 };
+
+struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
+void mcpr_free_abstract_packet(struct mcpr_abstract_packet);
+ssize_t mcpr_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
 
 #endif // MCPR_PACKET_H
