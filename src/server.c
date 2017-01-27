@@ -221,11 +221,7 @@ void init_thread_pooling(void)
     } else {
         nlog_info("Detected %i CPU cores", cpu_core_count);
     }
-    int planned_thread_count = cpu_core_count - 2; // -2 because we already have two threads, a main one and a network thread.
-    if(planned_thread_count <= 0)
-    {
-        planned_thread_count = 2; // If we simply don't have enough cores, use 2 worker threads.
-    }
+    int planned_thread_count = cpu_core_count;
     nlog_info("Creating thread pool with %i threads..", planned_thread_count);
     main_threadpool = thpool_init(planned_thread_count);
 
