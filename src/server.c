@@ -186,6 +186,20 @@ static void accept_incoming_connections(void)
             }
         }
 
+        if(fcntl(newfd, F_SETFL, O_NONBLOCK) == -1)
+        {
+            nlog_fatal("Could not set O_NONBLOCK flag for incoming connection. (%s)", strerror(errno));
+            if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
+            continue;
+        }
+
+        if(fcntl(newfd, F_SETFL, O_ASYNC) == -1)
+        {
+            nlog_fatal("Could not set O_ASYNC flag for incoming connection. (%s)", strerror(errno));
+            if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
+            continue;
+        }
+
         struct connection *conn = malloc(sizeof(struct connection));
         if(conn == NULL)
         {
@@ -194,31 +208,15 @@ static void accept_incoming_connections(void)
             continue;
         }
 
-        conn->fp = fdopen(newfd, "r+");
-        if(conn->fp == NULL)
-        {
-            nlog_error("Could not create file pointer from file descriptor. (%s)", strerror(errno));
-            if(close(newfd) == -1) nlog_error("Could not clean up socket after error. (%s)", strerror(errno));
-            free(conn);
-            continue;
-        }
-
+        conn->fd = newfd;
         conn->state = MCPR_STATE_HANDSHAKE;
         conn->use_compression = false;
         conn->use_encryption = false;
 
-        if(setvbuf(conn->fp, NULL, _IONBF, 0) != 0)
-        {
-            nlog_error("Could not disable buffering for file pointer. (%s ?)", strerror(errno));
-            if(fclose(conn->fp) == EOF) nlog_error("Could not clean up socket after error. (%s)", strerror(errno)); // closes the raw file descriptor too.
-            free(conn);
-            continue;
-        }
-
         if(slist_append(non_player_connections, conn) == NULL)
         {
             nlog_error("Could not add incoming connection to connection storage.");
-            if(fclose(conn->fp) == EOF) nlog_error("Could not clean up socket after error. (%s)", strerror(errno)); // closes the raw file descriptor too.
+            if(close(newfd) == -1) nlog_error("Could not clean up socket after error. (%s)", strerror(errno));
             free(conn);
             continue;
         }
@@ -242,7 +240,7 @@ static void serve_non_player_connection_batch(void *arg)
         }
 
         // TODO read packet.
-        struct mcpr_abstract_packet *pkt = mcpr_read_abstract_packet(conn->fp, conn->use_compression, conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
+        struct mcpr_abstract_packet *pkt = mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
 
         switch(conn->state)
         {
@@ -263,7 +261,7 @@ static void serve_non_player_connection_batch(void *arg)
                                 response.id = MCPR_PKT_LG_CB_DISCONNECT;
                                 response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Protocol version " PRId32 " is not supported.", protocol_version);
 
-                                ssize_t result = mcpr_write_abstract_packet(conn->fp, &response, conn->use_compression, false, conn->use_encryption,
+                                ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
                                     conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
 
                                 free(response.data.login.clientbound.disconnect.reason);

@@ -6,7 +6,7 @@
 
 struct connection
 {
-    FILE *fp;
+    int fd;
     bool use_encryption;
 
     enum mcpr_state state;
