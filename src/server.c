@@ -26,6 +26,14 @@
     extern int nanosleep (const struct timespec *__requested_time, struct timespec *__remaining);
 #endif
 
+// Function prototypes.
+static int make_socket (uint16_t port);
+static void setup_server_socket(void);
+static void accept_incoming_connections(void);
+static void serve_non_player_connection_batch(void *arg);
+static void serve_non_player_connections(void);
+
+
 static void server_tick(void);
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
 
@@ -37,7 +45,7 @@ static size_t non_player_connection_count = 0;
 static SListEntry *non_player_connections = NULL;
 
 
-void server_shutdown()
+void server_shutdown(void)
 {
     nlog_info("Shutting down server..");
 
@@ -75,7 +83,7 @@ static int make_socket (uint16_t port) {
     return sockfd
 }
 
-static void setup_server_socket()
+static void setup_server_socket(void)
 {
     int port = 25565;
 
@@ -274,7 +282,7 @@ static void serve_non_player_connection_batch(void *arg)
     free(arg);
 }
 
-static void serve_non_player_connections()
+static void serve_non_player_connections(void)
 {
     unsigned int conns_per_thread = non_player_connection_count / main_threadpool_threadcount;
     unsigned int rest = non_player_connection_count % main_threadpool_threadcount;
