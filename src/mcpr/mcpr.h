@@ -33,6 +33,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include <arpa/inet.h>
 #include <uuid/uuid.h>
@@ -47,14 +48,26 @@
     MCPR = MineCraft PRotocol.
 */
 
-#define MCPR_PROTOCOL_VERSION 315
+#define MCPR_PROTOCOL_VERSION 316
+#define MCPR_MINECRAFT_VERSION "1.11.2"
+
+#define MCPR_ERRNO_BASE = 2000
+
+/**
+    Received packet violated compression threshold rules.
+    Remote party should be disconnected when this error is encountered.
+ */
+#define MCPR_ECOMPRESSTHRESHOLD MCPR_ERRNO_BASE + 1
 
 
-unsigned int *mcpr_get_errno();
+int *mcpr_get_errno();
 /**
  * mapi_errno is guaranteed to be thread local.
+ *
  */
 #define mcpr_errno (*mcpr_get_errno())
+
+const char *mcpr_strerror(int mcpr_errno;);
 
 
 /**

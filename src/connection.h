@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 struct connection
 {
@@ -11,7 +12,7 @@ struct connection
 
     enum mcpr_state state;
     bool use_compression;
-    unsigned int compression_treshold; // Not guaranteed to be initialized if use_compression is set to false.
+    unsigned long compression_threshold; // Not guaranteed to be initialized if use_compression is set to false.
 
     bool use_encryption;
     EVP_CIPHER_CTX ctx_encrypt;  // Not guaranteed to be initialized if use_encryption is set to false

@@ -1,7 +1,12 @@
+#ifndef _GNU_SOURCE
+    #define _GNU_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 #include <errno.h>
 
@@ -12,18 +17,40 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <signal.h>
+#include <pthread.h>
 
 #include <zlog.h>
 #include <jansson/jansson.h>
+
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
+
 #include <mcpr/mcpr.h>
 #include <mcpr/abstract_packet.h>
+#include <mcpr/fdstreams.h>
 
 #include "server.h"
 #include "stronk.h"
 #include "util.h"
+
+/*
+    <quote>
+
+    In the GNU C Library, stdin, stdout, and stderr are normal variables which you can set just like any others. For example,
+    to redirect the standard output to a file, you could do:
+        fclose (stdout);
+        stdout = fopen ("standard-output-file", "w");
+
+    </quote>
+
+    Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
+*/
+#ifdef __GNU_LIBRARY__
+    #define STANDARD_STREAMS_ASSIGNABLE 1
+#else
+    #define STANDARD_STREAMS_ASSIGNABLE 0
+#endif
 
 // Why the hell isn't this nanosleep defined anyway in Ubuntu/WSL?
 // Oh well this hack works for now, even though it's terrible. TODO find out!
@@ -34,8 +61,8 @@
 // Function prototypes.
 static int make_socket (uint16_t port);
 static void accept_incoming_connections(void);
-static void serve_non_player_connection_batch(void *arg);
-static void serve_non_player_connections(void);
+static void serve_client_batch(void *arg);
+static void serve_clients(void);
 static void init_networking(void);
 void init_thread_pooling(void);
 void init_logging(void);
@@ -46,33 +73,30 @@ void cleanup(void);
 static void *secure_malloc(size_t size);
 static void secure_free(void *ptr);
 static int count_cores(void);
-
-
+static void disconnect_connection(struct connection *conn);
 static void server_tick(void);
+
+
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
-
 static int server_socket;
-
+static char *motd = "A bloody stronk server.";
+static unsigned int max_players;
 static HashTable *players; // hash table indexed by strings of compressed UUIDs
-
-static size_t non_player_connection_count = 0;
-static SListEntry *non_player_connections = NULL;
-
+static size_t client_count = 0;
+static pthread_mutex_t *clients_delete_lock;
+static SListEntry *clients = NULL; // Clients which do not have a player object associated with them.
 static bool logging_init = false;
 static bool thread_pooling_init = false;
 static bool networking_init = false;
-
 threadpool main_threadpool;
 zlog_category_t *zc;
+
+
 
 // returns 0 if unable to detect.
 static int count_cores(void)
 {
     // See http://stackoverflow.com/questions/150355/programmatically-find-the-number-of-cores-on-a-machine
-
-    // ----------------------WARNING--------------------
-    // If you change any of the preprocessor if statements below, also make sure the conditional #include's
-    // on top of the file are right.
 
     // Cygwin, Linux, Solaris, AIX and Mac OS X >=10.4 (i.e. Tiger onwards)
     #if defined(__linux__) || defined(__sun) || defined(_AIX) || defined(__CYGWIN__) || (defined(__APPLE__) && defined(__MACH__))
@@ -118,7 +142,7 @@ static int count_cores(void)
     #endif
 }
 
-// Used for jansson, as it is mainly used for sensitive things.
+// Used for jansson, as it is used alot for sensitive things.
 static void *secure_malloc(size_t size)
 {
     /* Store the memory area size in the beginning of the block */
@@ -127,7 +151,7 @@ static void *secure_malloc(size_t size)
     return ptr + 8;
 }
 
-// Used for jansson, as it is mainly used for sensitive things.
+// Used for jansson, as it is used alot for sensitive things.
 static void secure_free(void *ptr)
 {
     size_t size;
@@ -179,7 +203,7 @@ static int make_socket (uint16_t port) {
 
 static void init_networking(void)
 {
-    int port = 25565;
+    int port = 25565; // TODO configuration of port.
 
     nlog_info("Creating server socket on port %i..", port);
     server_socket = make_socket(port);
@@ -208,17 +232,19 @@ static void init_networking(void)
     networking_init = true;
 }
 
-void init_thread_pooling(void)
+static void init_thread_pooling(void)
 {
     nlog_info("Setting up thread pools..");
 
     nlog_info("Setting up thread pool..");
-    int cpu_core_count = count_cores(); // Set up thread pool. -2 because we already have a main thread and a network thread.
+    int cpu_core_count = count_cores(); // Set up thread pool.
     if(cpu_core_count <= 0)
     {
         cpu_core_count = 4;
         nlog_info("Could not detect amount of CPU cores, using 4 as a default.");
-    } else {
+    }
+    else
+    {
         nlog_info("Detected %i CPU cores", cpu_core_count);
     }
     int planned_thread_count = cpu_core_count;
@@ -235,7 +261,40 @@ void init_thread_pooling(void)
     thread_pooling_init = true;
 }
 
-void init_logging(void)
+#if STANDARD_STREAMS_ASSIGNABLE
+    static ssize_t new_stdout_write(void *cookie, char *buf, size_t size)
+    {
+        char *new_buf = malloc(size + 1);
+        if(new_buf == NULL) return 0;
+        memcpy(new_buf, buf, size);
+        new_buf[size] = '\0';
+
+        nlog_info(new_buf);
+        return size;
+    }
+
+    static ssize_t new_stderr_write(void *cookie, char *buf, size_t size)
+    {
+        char *new_buf = malloc(size + 1);
+        if(new_buf == NULL) return 0;
+        memcpy(new_buf, buf, size);
+
+        // Remove newline at the end, if there is one.
+        if(new_buf[size - 1] == '\n')
+        {
+            new_buf[size - 1] = '\0'
+        }
+        else
+        {
+            new_buf[size] = '\0';
+        }
+
+        nlog_error(new_buf);
+        return size;
+    }
+#endif
+
+static void init_logging(void)
 {
     int zlog_status = zlog_init("/etc/zlog.conf");
     if(zlog_status)
@@ -262,6 +321,44 @@ void init_logging(void)
         nlog_warn("Could not set application locale to make sure we use UTF-8.");
     }
 
+    #if STANDARD_STREAMS_ASSIGNABLE
+        nlog_info("Redirecting stderr and stdout to log..");
+
+        cookie_io_functions_t new_stdout_funcs;
+        new_stdout_funcs.write = new_stdout_write;
+        new_stdout_funcs.read = NULL;
+        new_stdout_funcs.seek = NULL;
+        new_stdout_funcs.close = NULL;
+        FILE *new_stdout = fopencookie(NULL, "a", new_stdout_funcs);
+        if(new_stdout == NULL)
+        {
+            nlog_error("Could not redirect stdout to log.");
+        }
+        if(setvbuf(new_stdout, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
+        {
+            nlog_error("Could not redirect stdout to log.");
+            fclose(new_stdout);
+        }
+        stdout = new_stdout;
+
+        cookie_io_functions_t new_stderr_funcs;
+        new_stderr_funcs.write = new_stderr_write;
+        new_stderr_funcs.read = NULL;
+        new_stderr_funcs.seek = NULL;
+        new_stderr_funcs.close = NULL;
+        FILE *new_stderr = fopencookie(NULL, "a", new_stderr_funcs);
+        if(new_stderr == NULL)
+        {
+            nlog_error("Could not redirect stderr to log.");
+        }
+        if(setvbuf(new_stderr, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
+        {
+            nlog_error("Could not redirect stderr to log.");
+            fclose(new_stderr);
+        }
+        stderr = new_stderr;
+    #endif
+
     logging_init = true;
 }
 
@@ -279,6 +376,7 @@ void cleanup_thread_pooling(void)
 
 void cleanup_networking(void)
 {
+    nlog_info("Cleaning up networking..");
     // TODO
 }
 
@@ -298,6 +396,18 @@ void server_start(void)
        cleanup();
        exit(EXIT_FAILURE);
    }
+
+   if(pthread_mutex_init(clients_delete_lock, NULL) != 0)
+   {
+       nlog_fatal("Could not initialize mutex.");
+       hash_table_free(players);
+       cleanup();
+       exit(EXIT_FAILURE);
+   }
+
+
+
+   nlog_info("Startup done!");
 
    // Main thread loop.
    while(true)
@@ -390,18 +500,18 @@ static void accept_incoming_connections(void)
         conn->use_compression = false;
         conn->use_encryption = false;
 
-        if(slist_append(non_player_connections, conn) == NULL)
+        if(slist_append(clients, conn) == NULL)
         {
             nlog_error("Could not add incoming connection to connection storage.");
             if(close(newfd) == -1) nlog_error("Could not clean up socket after error. (%s)", strerror(errno));
             free(conn);
             continue;
         }
-        non_player_connection_count++;
+        client_count++;
     }
 }
 
-static void serve_non_player_connection_batch(void *arg)
+static void serve_client_batch(void *arg)
 {
     SListEntry *first = *(SListEntry **) arg;
     unsigned int amount = *((unsigned int *) (arg + sizeof(SListEntry *)));
@@ -409,15 +519,44 @@ static void serve_non_player_connection_batch(void *arg)
 
     for(int i = 0; i < amount; i++)
     {
-        struct connection *conn = slist_nth_data(first, i);
+        SListEntry *current_entry = slist_nth_entry(first, i);
+        struct connection *conn = slist_data(current_entry);
         if(current == NULL)
         {
             nlog_error("Bad slist index.");
             break;
         }
 
-        // TODO read packet.
-        struct mcpr_abstract_packet *pkt = mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
+        struct mcpr_abstract_packet *pkt = mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_compression ? conn->compression_treshold : 0,
+             conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
+
+        if(pkt == NULL)
+        {
+            if(mcpr_errno == MCPR_ECOMPRESSTHRESHOLD)
+            {
+                struct mcpr_abstract_packet response;
+                response.id = MCPR_PKT_LG_CB_DISCONNECT;
+                response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Compression treshold was violated.");
+
+                ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_compression ? conn->compression_treshold : 0,
+                     conn->use_encryption, conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
+
+                if(result < 0)
+                {
+                    nlog_error("Could not write packet to connection (%s ?), "
+                                "unable to properly disconnect client which violated compression treshold.", strerror(errno));
+                }
+                free(response.data.login.clientbound.disconnect.reason);
+
+                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
+                pthread_mutex_lock(clients_delete_lock);
+                slist_remove_entry(&first, current_entry);
+                pthread_mutex_unlock(clients_delete_lock);
+                free(conn);
+            }
+
+            nlog_error("Could not read packet from client. (%s ?)", strerror(errno));
+        }
 
         switch(conn->state)
         {
@@ -436,22 +575,98 @@ static void serve_non_player_connection_batch(void *arg)
                             {
                                 struct mcpr_abstract_packet response;
                                 response.id = MCPR_PKT_LG_CB_DISCONNECT;
-                                response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Protocol version " PRId32 " is not supported.", protocol_version);
+                                response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Protocol version " PRId32
+                                " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
 
                                 ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
                                     conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
 
-                                free(response.data.login.clientbound.disconnect.reason);
-
                                 if(result < 0)
                                 {
-                                    nlog_error("Could not write packet to connection (%s ?), "
-                                                "unable to disconnect client using incorrect protocol version", strerror(errno));
+                                    if(mcpr_errno != ECONNRESET)
+                                    {
+                                        nlog_error("Could not write packet to connection (%s ?), "
+                                                    "unable to properly disconnect client using incorrect protocol version", strerror(errno));
+                                    }
                                 }
+                                free(response.data.login.clientbound.disconnect.reason);
+
+                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
+                                pthread_mutex_lock(clients_delete_lock);
+                                slist_remove_entry(&first, current_entry);
+                                pthread_mutex_unlock(clients_delete_lock);
+                                free(conn);
                             }
                         }
                     }
                 }
+            }
+
+            case MCPR_STATE_STATUS:
+            {
+                switch(pkt->id)
+                {
+                    case MCPR_PK_ST_SB_REQUEST:
+                    {
+                        struct mcpr_abstract_packet response;
+                        response.id = MCPR_PKT_ST_SB_RESPONSE;
+                        response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
+                        response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
+                        response.data.status.clientbound.response.max_players = max_players;
+                        response.data.status.clientbound.response.online_players_size = hash_table_num_entries(players);
+                        response.data.status.clientbound.response.description = motd;
+                        response.data.status.clientbound.response.online_players = NULL;
+                        response.data.status.clientbound.response.favicon = NULL;
+
+                        ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
+                            conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
+
+                        if(result < 0)
+                        {
+                            if(mcpr_errno == ECONNRESET)
+                            {
+                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
+                                pthread_mutex_lock(clients_delete_lock);
+                                slist_remove_entry(&first, current_entry);
+                                pthread_mutex_unlock(clients_delete_lock);
+                            }
+                            else
+                            {
+                                nlog_error("Could not write packet to connection (%s ?)", strerror(errno));
+                            }
+                        }
+                    }
+
+                    case MCPR_PKT_ST_SB_PING:
+                    {
+                        struct mcpr_abstract_pkt response;
+                        response.id = MCPR_PKT_ST_CB_PONG;
+                        response.data.status.clientbound.pong.payload = pkt.data.status.serverbound.ping.payload;
+
+                        ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
+                            conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
+
+                        if(result < 0)
+                        {
+                            if(mcpr_errno == ECONNRESET)
+                            {
+                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", mcpr_strerror(errno));
+                                pthread_mutex_lock(clients_delete_lock);
+                                slist_remove_entry(&first, current_entry);
+                                pthread_mutex_unlock(clients_delete_lock);
+                            }
+                            else
+                            {
+                                nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                            }
+                        }
+                    }
+                }
+            }
+
+            case MCPR_STATE_LOGIN:
+            {
+                case MCPR_PKT_LG_SB_
             }
         }
 
@@ -461,10 +676,10 @@ static void serve_non_player_connection_batch(void *arg)
     free(arg);
 }
 
-static void serve_non_player_connections(void)
+static void serve_clients(void)
 {
-    unsigned int conns_per_thread = non_player_connection_count / main_threadpool_threadcount;
-    unsigned int rest = non_player_connection_count % main_threadpool_threadcount;
+    unsigned int conns_per_thread = client_count / main_threadpool_threadcount;
+    unsigned int rest = client_count % main_threadpool_threadcount;
 
     int index = 1;
 
@@ -473,12 +688,12 @@ static void serve_non_player_connections(void)
         unsigned int amount = conns_per_thread;
         if(i == (main_threadpool_threadcount - 1)) amount += rest;
 
-        SListEntry *arg1 = slist_nth_entry(non_player_connections, index);
+        SListEntry *arg1 = slist_nth_entry(clients, index);
         unsigned int arg2 = amount;
         void *args = malloc(sizeof(SListEntry *) + sizeof(unsigned int));
         memcpy(args, &arg1, sizeof(arg1));
         memcpy(args + sizeof(arg1), &arg2, sizeof(arg2));
-        thpool_add_work(main_threadpool, serve_non_player_connection_batch, args);
+        thpool_add_work(main_threadpool, serve_client_batch, args);
         index += amount;
     }
 
@@ -488,7 +703,7 @@ static void serve_non_player_connections(void)
 static void server_tick(void)
 {
     accept_incoming_connections();
-    serve_non_player_connections();
+    serve_clients();
 
 
     // Read packets from connected players..

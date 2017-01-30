@@ -86,6 +86,12 @@ enum mcpr_entity_property_modifier_operation
     MCPR_ENTITY_PROPERTY_MODIFIER_OPERATION_MULTIPLY_PERCENT
 };
 
+struct mcpr_player_sample
+{
+    char *player_name;
+    struct mcpr_uuid uuid;
+};
+
 struct mcpr_entity_property_modifier
 {
     struct mcpr_uuid uuid;
@@ -479,7 +485,15 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    char json_response;
+                    char *version_name;
+                    int protocol_version;
+                    unsigned int max_players;
+                    unsigned int online_players;
+                    char *description;
+                    char *favicon; // may be NULL.
+
+                    size_t online_players_size;
+                    struct mcpr_player_sample *online_players; // or NULL.
                 } response;
             } clientbound;
         } status;
@@ -1409,10 +1423,10 @@ struct mcpr_abstract_packet
     } data;
 };
 
-struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(FILE *in, bool use_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
-struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
+struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_treshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
+struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
 void mcpr_free_abstract_packet(struct mcpr_abstract_packet);
-ssize_t mcpr_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
-ssize_t mcpr_fd_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
+ssize_t mcpr_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
+ssize_t mcpr_fd_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
 
 #endif // MCPR_PACKET_H
