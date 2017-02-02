@@ -5,9 +5,11 @@
 #include <stdint.h>
 
 #include <jansson/jansson.h>
+#include <ninuuid/ninuuid.h>
 
 #include "mcpr.h"
 
+// TODO add more defines
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
 
 enum mcpr_resource_pack_result
@@ -89,12 +91,12 @@ enum mcpr_entity_property_modifier_operation
 struct mcpr_player_sample
 {
     char *player_name;
-    struct mcpr_uuid uuid;
+    struct ninuuid uuid;
 };
 
 struct mcpr_entity_property_modifier
 {
-    struct mcpr_uuid uuid;
+    struct ninuuid uuid;
     double amount;
     enum mcpr_entity_property_modifier_operation operation;
 };
@@ -206,7 +208,7 @@ struct mcpr_player_list_item_property
 
 struct mcpr_player_list_item_player
 {
-    struct mcpr_uuid uuid;
+    struct ninuuid uuid;
 
     struct
     {
@@ -450,7 +452,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    struct mcpr_uuid uuid;
+                    struct ninuuid uuid;
                     char *username;
                 } login_success;
 
@@ -687,7 +689,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    struct  mcpr_uuid target_player;
+                    struct  ninuuid target_player;
                 } spectate;
 
                 struct
@@ -709,7 +711,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     int32_t entity_id;
-                    struct mcpr_uuid uuid;
+                    struct ninuuid uuid;
                     enum mcpr_object type;
                     double x, y, z;
                     uint8_t pitch;
@@ -737,7 +739,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     int32_t entity_id;
-                    struct mcpr_uuid entity_uuid;
+                    struct ninuuid entity_uuid;
                     enum mcpr_mob type;
                     double x, y, z;
                     int8_t yaw;
@@ -750,7 +752,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     int32_t entity_id;
-                    struct mcpr_uuid entity_uuid;
+                    struct ninuuid entity_uuid;
                     enum mcpr_painting;
                     struct mcpr_position position;
                     int8_t direction;
@@ -759,7 +761,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     int32_t entity_id;
-                    struct mcpr_uuid player_uuid;
+                    struct ninuuid player_uuid;
                     double x, y, z;
                     int8_t yaw;
                     int8_t pitch;
@@ -807,7 +809,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    struct mcpr_uuid uuid;
+                    struct ninuuid uuid;
                     enum mcpr_boss_bar_action action;
 
                     union {

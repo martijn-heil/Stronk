@@ -32,6 +32,8 @@ ssize_t mcpr_crypto_fflush(FILE *f);
 
 
 ssize_t mcpr_crypto_generate_auth_hash(void *out, char *server_id, void *shared_secret, size_t shared_secret_len, void *server_pubkey, size_t server_pubkey_len);
+
+// Out should be the size of SHA_DIGEST_LENGTH * 2 + 2 where SHA_DIGEST_LENGTH is 20
 ssize_t mcpr_crypto_stringify_sha1(char *out, const void *hash);
 
 #endif

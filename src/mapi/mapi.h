@@ -31,7 +31,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include <uuid/uuid.h>
+#include <ninuuid/ninuuid.h>
 
 unsigned int *mapi_get_errno();
 /**
@@ -39,26 +39,25 @@ unsigned int *mapi_get_errno();
  */
 #define mapi_errno (*mapi_get_errno())
 
+struct mapi_profile
+{
+    char *id;       // Should be free'd
+    char *name;     // Should be free'd
+    bool legacy;
+};
 
-struct mapi_auth_response {
+struct mapi_auth_response
+{
     char *access_token; // Should be free'd
     char *client_token; // Should be free'd
 
     size_t available_profiles_amount;
-    struct {
-        char *id;       // Should be free'd
-        char *name;     // Should be free'd
-        bool legacy;
-    } *available_profiles; // Array of available profiles, the structs themselves should not be free'd, may not be NULL.
-
-    struct {
-        char *id;       // Should be free'd
-        char *name;     // Should be free'd
-        bool legacy;
-    } selected_profile;
+    struct mapi_profile *available_profiles; // Array of available profiles, the structs themselves should be free'd, may not be NULL.
+    struct mapi_profile selected_profile;
 
     bool user_present;
-    struct {
+    struct
+    {
         char *id; // should be free'd.
 
         char *preferred_language; // might be NULL. Should be free'd.
@@ -68,17 +67,20 @@ struct mapi_auth_response {
 void mapi_auth_response_destroy(struct mapi_auth_response *response);
 
 
-struct mapi_refresh_response {
+struct mapi_refresh_response
+{
     char *access_token;
     char *client_token;
 
-    struct {
+    struct
+    {
         char *id;
         char *name;
     } selected_profile;
 
     bool user_present;
-    struct {
+    struct
+    {
         char *id;
 
         char *preferred_language; // Might be NULL.
@@ -87,7 +89,20 @@ struct mapi_refresh_response {
 };
 void mapi_refresh_response_destroy(struct mapi_refresh_response *response);
 
-enum mapi_agent {
+struct mapi_minecraft_has_joined_response
+{
+    struct ninuuid id;
+    char *player_name;
+    struct
+    {
+        char *skin_blob_base64;
+        char *signature;
+    } properties;
+};
+void mapi_minecraft_has_joined_response_destroy(struct mapi_minecraft_has_joined_response *response);
+
+enum mapi_agent
+{
     MAPI_AGENT_MINECRAFT,
     MAPI_AGENT_SCROLLS,
 };
@@ -200,6 +215,10 @@ int mapi_generate_client_token(char *restrict buf, size_t token_len);
  * 0: Unknown error occurred.
  * 1: Player not found.
  */
-int mapi_username_to_uuid(uuid_t output, const char *restrict player_name);
+int mapi_username_to_uuid(struct ninuuid *out, const char *restrict player_name);
+
+
+
+struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(char *username, char *server_id_hash);
 
 #endif

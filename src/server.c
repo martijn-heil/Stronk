@@ -27,6 +27,7 @@
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <openssl/evp.h>
+#include <openssl/sha.h>
 
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
@@ -252,6 +253,7 @@ static void init_networking(void)
     }
 
     // Ignore broken pipe signals, has to do with sockets.
+    nlog_info("Making sure that broken pipe (SIGPIPE) signals are ignored..");
     struct sigaction new_actn, old_actn;
     new_actn.sa_handler = SIG_IGN;
     sigemptyset (&new_actn.sa_mask);
@@ -265,7 +267,6 @@ static void init_thread_pooling(void)
 {
     nlog_info("Setting up thread pools..");
 
-    nlog_info("Setting up thread pool..");
     int cpu_core_count = count_cores(); // Set up thread pool.
     if(cpu_core_count <= 0)
     {
@@ -434,6 +435,14 @@ void server_start(void)
        exit(EXIT_FAILURE);
    }
 
+   tmp_username_states = hash_table_new(pointer_hash, pointer_equal);
+   if(tmp_username_states == NULL)
+   {
+       nlog_fatal("Could not create hash table.");
+       cleanup();
+       exit(EXIT_FAILURE);
+   }
+
    if(pthread_mutex_init(clients_delete_lock, NULL) != 0)
    {
        nlog_fatal("Could not initialize mutex.");
@@ -558,6 +567,8 @@ static struct tmp_encryption_state
     void *verify_token;
     RSA *rsa;
 };
+
+static HashTable *tmp_username_states = NULL;
 
 static void serve_client_batch(void *arg)
 {
@@ -718,7 +729,7 @@ static void serve_client_batch(void *arg)
                 {
                     RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
 
-                    unsigned char *buf = NULL;
+                    unsigned char *buf = NULL; // TODO should this be freed afterwards?
                     int buflen = i2d_RSA_PUBKEY(rsa, &buf);
                     if(buflen < 0)
                     {
@@ -800,7 +811,17 @@ static void serve_client_batch(void *arg)
                 {
                     struct tmp_encryption_state *tmp_state = NULL;
                     void *decrypted_shared_secret = NULL;
+                    char *username = NULL;
+                    void *server_id_hash = NULL:
 
+                    username = hash_table_lookup(tmp_username_states, conn);
+                    if(username == HASH_TABLE_NULL)
+                    {
+                        nlog_error("Could not find entry in hash table.");
+                        char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
+                        DISCONNECT_CURRENT_CONN(reason);
+                        free(reason);
+                    }
 
                     tmp_state = hash_table_lookup(tmp_encryption_states, conn);
                     if(tmp_state == HASH_TABLE_NULL) // Shouldn't happen.
@@ -808,7 +829,10 @@ static void serve_client_batch(void *arg)
                         nlog_error("Could not find entry in hash table.");
                         char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
                         DISCONNECT_CURRENT_CONN(reason);
+                        hash_table_remove(tmp_username_states, conn);
                         free(reason);
+                        free(username);
+                        break;
                     }
                     RSA *rsa = tmp_state->rsa;
 
@@ -842,7 +866,7 @@ static void serve_client_batch(void *arg)
                         goto err;
                     }
                     EVP_CIPHER_CTX_init(conn->ctx_encrypt);
-                    if(EVP_EncryptInit_ex(&(conn->ctx_encrypt), EVP_aes_128_cfb8(),
+                    if(EVP_EncryptInit_ex(conn->ctx_encrypt, EVP_aes_128_cfb8(),
                      NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
                      {
                         nlog_error("Error upon EVP_EncryptInit_ex()."); // TODO proper error handling.
@@ -863,12 +887,86 @@ static void serve_client_batch(void *arg)
                         goto err;
                     }
 
+                    unsigned char *encoded_public_key = NULL; // TODO should this be freed afterwards?
+                    int encoded_public_key_len = i2d_RSA_PUBKEY(rsa, &encoded_public_key);
+                    if(encoded_public_key_len < 0)
+                    {
+                        // Error occured.
+                        nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
+                        break;
+                    }
+
+                    server_id_hash = malloc(SHA_DIGEST_LENGTH);
+                    if(server_id_hash == NULL)
+                    {
+                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                        goto err;
+                    }
+                    username = hash_table_lookup(tmp_username_states, conn);
+                    if(username == HASH_TABLE_NULL)
+                    {
+                        goto err;
+                    }
+
+                    SHA_CTX sha_ctx;
+                    if(unlikely(SHA1_Init(&sha_ctx) == 0))
+                    {
+                        nlog_error("Could not initialize SHA-1 hash.");
+                        goto err;
+                    }
+                    if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_len) == 0)
+                    {
+                        nlog_error("Could not update SHA-1 hash.");
+                        uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
+                        SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
+                        goto err;
+                    }
+                    if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0)
+                    {
+                        nlog_error("Could not update SHA-1 hash.");
+                        uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
+                        SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
+                        goto err;
+                    }
+                    if(SHA1_Final(server_id_hash, &sha_ctx) == 0)
+                    {
+                        nlog_error("Could not finalize SHA-1 hash.");
+                        goto err;
+                    }
+
+                    char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
+                    mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
+
+                    struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(username, stringified_server_id_hash);
+                    if(mapi_result == NULL)
+                    {
+                        // TODO handle legit non error case where a failure happened.
+                        goto err;
+                    }
+
+
+                    struct mcpr_abstract_packet response;
+                    response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
+                    response.data.login.clientbound.login_success.uuid = mapi_result.id;
+                    response.data.login.clientbound.login_success.username = username;
+
+                    if(WRITE_PACKET(&response) < 0)
+                    {
+                        nlog_error("Could not send login success packet to connection. (%s ?)", mcpr_strerror(mcpr_errno));
+                        char *reason = mcpr_as_chat("An error occurred.");
+                        DISCONNECT_CURRENT_CONN(reason);
+                        free(reason);
+                        goto err;
+                    }
 
                     hash_table_remove(tmp_encryption_states, conn);
+                    hash_table_remove(tmp_username_states, conn);
                     RSA_free(rsa);
                     free(tmp_state->verify_token);
                     free(tmp_state);
                     free(decrypted_shared_secret);
+                    free(username);
+                    free(server_id_hash);
                     break;
 
                     err:
@@ -876,10 +974,13 @@ static void serve_client_batch(void *arg)
                         DISCONNECT_CURRENT_CONN(reason);
                         free(reason);
                         hash_table_remove(tmp_encryption_states, conn);
+                        hash_table_remove(tmp_username_states, conn);
                         RSA_free(rsa);
                         free(tmp_state->verify_token);
                         free(tmp_state);
                         free(decrypted_shared_secret);
+                        free(username);
+                        free(server_id_hash);
                         break;
                 }
             }
