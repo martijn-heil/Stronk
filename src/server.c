@@ -726,7 +726,7 @@ static void serve_client_batch(void *arg)
                         nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
                         break;
                     }
-                    if(buflen > INT32_MAX || buflen < INT32_LEAST) // TODO is INT32_LEAST a thing?
+                    if(buflen > INT32_MAX || buflen < INT32_MIX) // TODO is INT32_LEAST a thing?
                     {
                         nlog_error("Integer overflow.");
                         RSA_free(rsa);
