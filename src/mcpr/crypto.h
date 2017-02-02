@@ -31,7 +31,6 @@ ssize_t mcpr_crypto_fwrite(FILE *out, void *in, size_t len, bool use_encryption,
 ssize_t mcpr_crypto_fflush(FILE *f);
 
 
-ssize_t mcpr_crypto_generate_server_public_key(void *out, size_t pubkey_len);
 ssize_t mcpr_crypto_generate_auth_hash(void *out, char *server_id, void *shared_secret, size_t shared_secret_len, void *server_pubkey, size_t server_pubkey_len);
 ssize_t mcpr_crypto_stringify_sha1(char *out, const void *hash);
 

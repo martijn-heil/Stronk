@@ -15,8 +15,8 @@ struct connection
     unsigned long compression_threshold; // Not guaranteed to be initialized if use_compression is set to false.
 
     bool use_encryption;
-    EVP_CIPHER_CTX ctx_encrypt;  // Not guaranteed to be initialized if use_encryption is set to false
-    EVP_CIPHER_CTX ctx_decrypt;  // Not guaranteed to be initialized if use_encryption is set to false
+    EVP_CIPHER_CTX *ctx_encrypt;  // Will be initialized to NULL. Should be free'd
+    EVP_CIPHER_CTX *ctx_decrypt;  // Will be initialized to NULL. Should be free'd
     int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
 };
 

@@ -13,6 +13,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <unistd.h>
@@ -21,6 +23,10 @@
 
 #include <zlog.h>
 #include <jansson/jansson.h>
+
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/evp.h>
 
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
@@ -46,10 +52,33 @@
 
     Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
 */
+// TODO improve detecting, some systems will probably define __GNU_LIBRARY__ when they really don't use glibc.
 #ifdef __GNU_LIBRARY__
     #define STANDARD_STREAMS_ASSIGNABLE 1
 #else
     #define STANDARD_STREAMS_ASSIGNABLE 0
+#endif
+
+#ifndef HAVE_SECURE_RANDOM
+#define HAVE_SECURE_RANDOM
+    static ssize_t secure_random(void *buf, size_t len) {
+        int urandomfd = open("/dev/urandom", O_RDONLY);
+        if(urandomfd == -1) {
+            return -1;
+        }
+
+        ssize_t urandomread = read(urandomfd, buf, len);
+        if(urandomread == -1) {
+            return -1;
+        }
+        if(urandomread != len) {
+            return -1;
+        }
+
+        close(urandomfd);
+
+        return len;
+    }
 #endif
 
 // Why the hell isn't this nanosleep defined anyway in Ubuntu/WSL?
@@ -81,7 +110,7 @@ static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivale
 static int server_socket;
 static char *motd = "A bloody stronk server.";
 static unsigned int max_players;
-static HashTable *players; // hash table indexed by strings of compressed UUIDs
+static HashTable *players = NULL; // hash table indexed by strings of compressed UUIDs
 static size_t client_count = 0;
 static pthread_mutex_t *clients_delete_lock;
 static SListEntry *clients = NULL; // Clients which do not have a player object associated with them.
@@ -397,6 +426,14 @@ void server_start(void)
        exit(EXIT_FAILURE);
    }
 
+   tmp_encryption_states = hash_table_new(pointer_hash, pointer_equal);
+   if(tmp_encryption_states == NULL)
+   {
+       nlog_fatal("Could not create hash table.");
+       cleanup();
+       exit(EXIT_FAILURE);
+   }
+
    if(pthread_mutex_init(clients_delete_lock, NULL) != 0)
    {
        nlog_fatal("Could not initialize mutex.");
@@ -499,6 +536,8 @@ static void accept_incoming_connections(void)
         conn->state = MCPR_STATE_HANDSHAKE;
         conn->use_compression = false;
         conn->use_encryption = false;
+        conn->ctx_encrypt = NULL;
+        conn->ctx_decrypt = NULL;
 
         if(slist_append(clients, conn) == NULL)
         {
@@ -510,6 +549,15 @@ static void accept_incoming_connections(void)
         client_count++;
     }
 }
+
+
+static HashTable *tmp_encryption_states = NULL;
+static struct tmp_encryption_state
+{
+    int32_t verify_token_length;
+    void *verify_token;
+    RSA *rsa;
+};
 
 static void serve_client_batch(void *arg)
 {
@@ -527,6 +575,45 @@ static void serve_client_batch(void *arg)
             break;
         }
 
+
+        // Can be called multiple times in the scope.
+        // Returns ssize_t less than 0 upon error.
+        // Sets mcpr_errno upon error.
+        // May be used like a function.
+        #define WRITE_PACKET(pkt_123)
+            mcpr_fd_write_abstract_packet(conn->fd, pkt_123, conn->use_compression, false, conn->use_compression ? conn->compression_treshold : 0, \
+                conn->use_encryption, conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? conn->ctx_encrypt : NULL); \
+
+
+        // Should only be called once.
+        // Should not be used like a normal function call.
+        #define CLOSE_CURRENT_CONN() \
+            if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", mcpr_strerror(errno)); \
+            pthread_mutex_lock(clients_delete_lock); \
+            slist_remove_entry(&first, current_entry); \
+            pthread_mutex_unlock(clients_delete_lock); \
+            if(conn->ctx_encrypt != NULL) EVP_CIPHER_CTX_cleanup(conn->ctx_encrypt); free(conn->ctx_encrypt); \
+            if(conn->ctx_decrypt != NULL) EVP_CIPHER_CTX_cleanup(conn->ctx_decrypt); free(conn->ctx_decrypt); \
+            free(conn);
+
+        // Should only be called once.
+        // Should not be used like a normal function call.
+        #define DISCONNECT_CURRENT_CONN(_reason) \
+            if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) \
+            { \
+                struct mcpr_abstract_packet _response; \
+                _response.id = ((conn->state == MCPR_STATE_LOGIN) ? MCPR_PKT_LG_CB_DISCONNECT : MCPR_PKT_PL_CB_DISCONNECT); \
+                _response.data.login.clientbound.disconnect.reason = _reason; \
+                if(WRITE_PACKET(&_response) < 0) \
+                { \
+                    nlog_error("Could not write packet to connection (%s ?), " \
+                                "unable to properly disconnect client.", mcpr_strerror(mcpr_errno)); \
+                } \
+            } \
+            CLOSE_CURRENT_CONN();
+
+
+
         struct mcpr_abstract_packet *pkt = mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_compression ? conn->compression_treshold : 0,
              conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
 
@@ -534,29 +621,15 @@ static void serve_client_batch(void *arg)
         {
             if(mcpr_errno == MCPR_ECOMPRESSTHRESHOLD)
             {
-                struct mcpr_abstract_packet response;
-                response.id = MCPR_PKT_LG_CB_DISCONNECT;
-                response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Compression treshold was violated.");
-
-                ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_compression ? conn->compression_treshold : 0,
-                     conn->use_encryption, conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
-
-                if(result < 0)
-                {
-                    nlog_error("Could not write packet to connection (%s ?), "
-                                "unable to properly disconnect client which violated compression treshold.", strerror(errno));
-                }
-                free(response.data.login.clientbound.disconnect.reason);
-
-                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
-                pthread_mutex_lock(clients_delete_lock);
-                slist_remove_entry(&first, current_entry);
-                pthread_mutex_unlock(clients_delete_lock);
-                free(conn);
+                char *reason = mcpr_as_chat("Compression treshold was violated.");
+                DISCONNECT_CURRENT_CONN();
+                free(reason);
             }
 
             nlog_error("Could not read packet from client. (%s ?)", strerror(errno));
         }
+
+
 
         switch(conn->state)
         {
@@ -573,29 +646,9 @@ static void serve_client_batch(void *arg)
                         {
                             if(conn->state == MCPR_STATE_LOGIN)
                             {
-                                struct mcpr_abstract_packet response;
-                                response.id = MCPR_PKT_LG_CB_DISCONNECT;
-                                response.data.login.clientbound.disconnect.reason = mcpr_as_chat("Protocol version " PRId32
-                                " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
-
-                                ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
-                                    conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
-
-                                if(result < 0)
-                                {
-                                    if(mcpr_errno != ECONNRESET)
-                                    {
-                                        nlog_error("Could not write packet to connection (%s ?), "
-                                                    "unable to properly disconnect client using incorrect protocol version", strerror(errno));
-                                    }
-                                }
-                                free(response.data.login.clientbound.disconnect.reason);
-
-                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
-                                pthread_mutex_lock(clients_delete_lock);
-                                slist_remove_entry(&first, current_entry);
-                                pthread_mutex_unlock(clients_delete_lock);
-                                free(conn);
+                                char *reason = mcpr_as_chat("Protocol version " PRId32 " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
+                                DISCONNECT_CURRENT_CONN(reason);
+                                free(reason);
                             }
                         }
                     }
@@ -618,46 +671,41 @@ static void serve_client_batch(void *arg)
                         response.data.status.clientbound.response.online_players = NULL;
                         response.data.status.clientbound.response.favicon = NULL;
 
-                        ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
-                            conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
+                        ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,\
+                            conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);\
 
                         if(result < 0)
                         {
                             if(mcpr_errno == ECONNRESET)
                             {
-                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", strerror(errno));
-                                pthread_mutex_lock(clients_delete_lock);
-                                slist_remove_entry(&first, current_entry);
-                                pthread_mutex_unlock(clients_delete_lock);
+                                CLOSE_CURRENT_CONN();
+                                break;
                             }
                             else
                             {
-                                nlog_error("Could not write packet to connection (%s ?)", strerror(errno));
+                                nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                break;
                             }
                         }
                     }
 
                     case MCPR_PKT_ST_SB_PING:
                     {
-                        struct mcpr_abstract_pkt response;
+                        struct mcpr_abstract_packet response;
                         response.id = MCPR_PKT_ST_CB_PONG;
                         response.data.status.clientbound.pong.payload = pkt.data.status.serverbound.ping.payload;
 
-                        ssize_t result = mcpr_fd_write_abstract_packet(conn->fd, &response, conn->use_compression, false, conn->use_encryption,
-                            conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? &(conn->ctx_encrypt) : NULL);
-
-                        if(result < 0)
+                        if(WRITE_PACKET(&response) < 0)
                         {
                             if(mcpr_errno == ECONNRESET)
                             {
-                                if(close(conn->fd) == -1) nlog_error("Error whilst closing socket. (%s)", mcpr_strerror(errno));
-                                pthread_mutex_lock(clients_delete_lock);
-                                slist_remove_entry(&first, current_entry);
-                                pthread_mutex_unlock(clients_delete_lock);
+                                CLOSE_CURRENT_CONN();
+                                break;
                             }
                             else
                             {
                                 nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                break;
                             }
                         }
                     }
@@ -666,7 +714,174 @@ static void serve_client_batch(void *arg)
 
             case MCPR_STATE_LOGIN:
             {
-                case MCPR_PKT_LG_SB_
+                case MCPR_PKT_LG_SB_LOGIN_START:
+                {
+                    RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
+
+                    unsigned char *buf = NULL;
+                    int buflen = i2d_RSA_PUBKEY(rsa, &buf);
+                    if(buflen < 0)
+                    {
+                        // Error occured.
+                        nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
+                        break;
+                    }
+                    if(buflen > INT32_MAX || buflen < INT32_LEAST) // TODO is INT32_LEAST a thing?
+                    {
+                        nlog_error("Integer overflow.");
+                        RSA_free(rsa);
+                        break;
+                    }
+
+                    int32_t verify_token_length = 16;
+                    uint8_t *verify_token = malloc(verify_token_length * sizeof(uint8_t)); // 128 bit verify token.
+                    if(verify_token == NULL)
+                    {
+                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                        RSA_free(rsa);
+                        break;
+                    }
+
+                    if(secure_random(verify_token, verify_token_length) < 0)
+                    {
+                        nlog_error("Could not get random data.");
+                        RSA_free(rsa);
+                        break;
+                    }
+
+
+                    struct mcpr_abstract_packet response;
+                    response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
+                    response.data.login.clientbound.encryption_request.server_id = ""; // Yes that's supposed to be an empty string.
+                    response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
+                    response.data.login.clientbound.encryption_request.public_key = buf;
+                    response.data.login.clientbound.encryption_request.verify_token_length = verify_token_length;
+                    response.data.login.clientbound.encryption_request.verify_token = verify_token;
+
+
+                    if(WRITE_PACKET(&response) < 0)
+                    {
+                        if(mcpr_errno == ECONNRESET)
+                        {
+                            CLOSE_CURRENT_CONN();
+                            RSA_free(rsa);
+                            break;
+                        }
+                        else
+                        {
+                            nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                            RSA_free(rsa);
+                            break;
+                        }
+                    }
+
+                    struct tmp_encryption_state *tmp_state = malloc(sizeof(struct tmp_encryption_state))
+                    if(tmp_state == NULL)
+                    {
+                        nlog_error("Could not allocate memory (%s)", strerror(errno));
+                        RSA_free(rsa);
+                        break;
+                    }
+
+                    tmp_state->rsa = rsa;
+                    tmp_state->verify_token_length = verify_token_length;
+                    tmp_state->verify_token = verify_token;
+
+
+                    if(hash_table_insert(tmp_encryption_states, conn, tmp_state) == 0)
+                    {
+                        nlog_error("Could not insert entry into hash table. (%s ?)", strerror(errno));
+                        RSA_free(rsa);
+                        break;
+                    }
+                }
+
+                case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
+                {
+                    struct tmp_encryption_state *tmp_state = NULL;
+                    void *decrypted_shared_secret = NULL;
+
+
+                    tmp_state = hash_table_lookup(tmp_encryption_states, conn);
+                    if(tmp_state == HASH_TABLE_NULL) // Shouldn't happen.
+                    {
+                        nlog_error("Could not find entry in hash table.");
+                        char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
+                        DISCONNECT_CURRENT_CONN(reason);
+                        free(reason);
+                    }
+                    RSA *rsa = tmp_state->rsa;
+
+                    int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
+                    void *shared_secret = pkt->data.login.serverbound.encryption_response.shared_secret;
+
+                    if(shared_secret_length > INT_MAX)
+                    {
+                        nlog_error("Integer overflow.");
+                        goto err;
+                    }
+
+                    decrypted_shared_secret = malloc(RSA_size(rsa));
+                    if(decrypted_shared_secret == NULL)
+                    {
+                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                        goto err;
+                    }
+
+                    int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, rsa, RSA_PKCS1_PADDING);
+                    if(size < 0)
+                    {
+                        nlog_error("Could not decrypt shared secret."); // TODO proper error handling.
+                        goto err;
+                    }
+
+                    conn->ctx_encrypt = malloc(sizeof(conn->ctx_encrypt));
+                    if(conn->ctx_encrypt == NULL)
+                    {
+                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                        goto err;
+                    }
+                    EVP_CIPHER_CTX_init(conn->ctx_encrypt);
+                    if(EVP_EncryptInit_ex(&(conn->ctx_encrypt), EVP_aes_128_cfb8(),
+                     NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
+                     {
+                        nlog_error("Error upon EVP_EncryptInit_ex()."); // TODO proper error handling.
+                        goto err;
+                    }
+
+                    conn->ctx_decrypt = malloc(sizeof(conn->ctx_decrypt));
+                    if(conn->ctx_decrypt == NULL)
+                    {
+                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                        goto err;
+                    }
+                    EVP_CIPHER_CTX_init(conn->ctx_decrypt);
+                    if(EVP_DecryptInit_ex(conn->ctx_decrypt), EVP_aes_128_cfb8(),
+                     NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
+                     {
+                        nlog_error("Error upon EVP_DecryptInit_ex()."); // TODO proper error handling.
+                        goto err;
+                    }
+
+
+                    hash_table_remove(tmp_encryption_states, conn);
+                    RSA_free(rsa);
+                    free(tmp_state->verify_token);
+                    free(tmp_state);
+                    free(decrypted_shared_secret);
+                    break;
+
+                    err:
+                        char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
+                        DISCONNECT_CURRENT_CONN(reason);
+                        free(reason);
+                        hash_table_remove(tmp_encryption_states, conn);
+                        RSA_free(rsa);
+                        free(tmp_state->verify_token);
+                        free(tmp_state);
+                        free(decrypted_shared_secret);
+                        break;
+                }
             }
         }
 
@@ -674,6 +889,10 @@ static void serve_client_batch(void *arg)
     }
 
     free(arg);
+
+    #undef CLOSE_CURRENT_CONN
+    #undef DISCONNECT_CURRENT_CONN
+    #undef WRITE_PACKET
 }
 
 static void serve_clients(void)
