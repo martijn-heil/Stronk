@@ -65,7 +65,7 @@
 #define ntoh32(x) ntohl(x)
 #define ntoh64(x) ntohll(x)
 
-
+// deprecated
 void hton(void *what, size_t n);
 void ntoh(void *what, size_t n);
 void bswap(void *what, size_t n);
