@@ -1,12 +1,13 @@
 #include <stdint.h>
 
-#include <c11threads.h>
+#include <pthread.h>
 
 #include "world.h"
 
 
 struct block {
     int_fast32_t type_id;
+    void *extra_data;
 };
 
 /*
@@ -52,7 +53,7 @@ struct block {
 
                                             South
 
-West to east, north to south block changing is the fastest (as they are index in that direction), so from top to bottom, left to right:
+West to east, north to south block changing is the fastest (as they are indexed in that direction), so from top to bottom, left to right:
 
  -------------------------------------->
  -------------------------------------->
@@ -70,12 +71,15 @@ West to east, north to south block changing is the fastest (as they are index in
 
 
 struct chunk_section {
-    mtx_t lock;
+    pthread_rwlock_t lock;
 
     struct block blocks[4096]; // 16x16x16
 };
 
 struct chunk {
+    int_least32_t x;
+    int_least32_t y;
+    unsigned long long last_update;
     struct chunk_section sections[16]; // 16 high indexed bottom to top.
 };
 

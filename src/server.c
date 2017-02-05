@@ -812,7 +812,6 @@ static void serve_client_batch(void *arg)
                     struct tmp_encryption_state *tmp_state = NULL;
                     void *decrypted_shared_secret = NULL;
                     char *username = NULL;
-                    void *server_id_hash = NULL:
 
                     username = hash_table_lookup(tmp_username_states, conn);
                     if(username == HASH_TABLE_NULL)
@@ -896,17 +895,7 @@ static void serve_client_batch(void *arg)
                         break;
                     }
 
-                    server_id_hash = malloc(SHA_DIGEST_LENGTH);
-                    if(server_id_hash == NULL)
-                    {
-                        nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                        goto err;
-                    }
-                    username = hash_table_lookup(tmp_username_states, conn);
-                    if(username == HASH_TABLE_NULL)
-                    {
-                        goto err;
-                    }
+                    uint8_t server_id_hash[SHA_DIGEST_LENGTH];
 
                     SHA_CTX sha_ctx;
                     if(unlikely(SHA1_Init(&sha_ctx) == 0))
@@ -959,6 +948,8 @@ static void serve_client_batch(void *arg)
                         goto err;
                     }
 
+                    conn->state = MCPR_STATE_PLAY;
+
                     hash_table_remove(tmp_encryption_states, conn);
                     hash_table_remove(tmp_username_states, conn);
                     RSA_free(rsa);
@@ -966,7 +957,6 @@ static void serve_client_batch(void *arg)
                     free(tmp_state);
                     free(decrypted_shared_secret);
                     free(username);
-                    free(server_id_hash);
                     break;
 
                     err:
@@ -980,7 +970,6 @@ static void serve_client_batch(void *arg)
                         free(tmp_state);
                         free(decrypted_shared_secret);
                         free(username);
-                        free(server_id_hash);
                         break;
                 }
             }
