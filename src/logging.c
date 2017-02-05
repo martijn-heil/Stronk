@@ -87,14 +87,15 @@ int logging_init(void)
         if(new_stdout == NULL)
         {
             nlog_error("Could not redirect stdout to log.");
+            return 0;
         }
         if(setvbuf(new_stdout, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
         {
             nlog_error("Could not redirect stdout to log.");
             fclose(new_stdout);
-        } else {
-            stdout = new_stdout;
+            return 0;
         }
+        stdout = new_stdout;
         
 
         cookie_io_functions_t new_stderr_funcs;
@@ -106,15 +107,18 @@ int logging_init(void)
         if(new_stderr == NULL)
         {
             nlog_error("Could not redirect stderr to log.");
+            return 0;
         }
         if(setvbuf(new_stderr, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
         {
             nlog_error("Could not redirect stderr to log.");
             fclose(new_stderr);
-        } else {
-            stderr = new_stderr;
+            return 0;
         }
+        stderr = new_stderr;
     #endif
+    
+    return 0;
 }
 
 void logging_cleanup(void) {
