@@ -11,7 +11,7 @@ int logging_init(void);
 void logging_cleanup(void);
 
 
-extern zlog_category_t *zc; // don't access this..
+extern zlog_category_t *_zc; // don't access this..
 
 #undef zlog_fatal
 #undef zlog_error
@@ -45,11 +45,11 @@ extern zlog_category_t *zc; // don't access this..
 
 // nlog for ninlog ofcourse :P
 // on a serious note, this is used to make migrating to other logging systems easier.
-#define nlog_fatal(...)    zlog_fatal(zc, __VA_ARGS__)
-#define nlog_error(...)    zlog_error(zc, __VA_ARGS__)
-#define nlog_warn(...)     zlog_warn(zc, __VA_ARGS__)
-#define nlog_notice(...)   zlog_notice(zc, __VA_ARGS__)
-#define nlog_info(...)     zlog_info(zc, __VA_ARGS__)
-#define nlog_debug(...)    zlog_debug(zc, __VA_ARGS__)
+#define nlog_fatal(...)    zlog_fatal(_zc, __VA_ARGS__)
+#define nlog_error(...)    zlog_error(_zc, __VA_ARGS__)
+#define nlog_warn(...)     zlog_warn(_zc, __VA_ARGS__)
+#define nlog_notice(...)   zlog_notice(_zc, __VA_ARGS__)
+#define nlog_info(...)     zlog_info(_zc, __VA_ARGS__)
+#define nlog_debug(...)    zlog_debug(_zc, __VA_ARGS__)
 
 #endif
