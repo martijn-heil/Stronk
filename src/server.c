@@ -21,7 +21,6 @@
 #include <signal.h>
 #include <pthread.h>
 
-#include <zlog.h>
 #include <jansson/jansson.h>
 
 #include <openssl/rsa.h>
