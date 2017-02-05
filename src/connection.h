@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <openssl/evp.h>
+
 struct connection
 {
     int fd;
