@@ -15,6 +15,7 @@
     #define STANDARD_STREAMS_ASSIGNABLE 0
 #endif
 
+zlog_category_t *_zc;
 
 #if STANDARD_STREAMS_ASSIGNABLE
     static ssize_t new_stdout_write(void *cookie, char *buf, size_t size)
@@ -59,7 +60,7 @@ int logging_init(void)
     }
 
     zc = zlog_get_category("stronk");
-    if(!zc)
+    if(!_zc)
     {
         fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
         zlog_fini();
