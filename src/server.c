@@ -39,6 +39,7 @@
 
 #include "server.h"
 #include "stronk.h"
+#include "logging.h"
 #include "util.h"
 
 /*
@@ -53,12 +54,6 @@
 
     Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
 */
-// TODO improve detecting, some systems will probably define __GNU_LIBRARY__ when they really don't use glibc.
-#ifdef __GNU_LIBRARY__
-    #define STANDARD_STREAMS_ASSIGNABLE 1
-#else
-    #define STANDARD_STREAMS_ASSIGNABLE 0
-#endif
 
 #ifndef HAVE_SECURE_RANDOM
 #define HAVE_SECURE_RANDOM
@@ -90,8 +85,6 @@
 
 // Function prototypes.
 static void init_thread_pooling(void);
-static void init_logging(void);
-static void cleanup_logging(void);
 static void cleanup_thread_pooling(void);
 static void cleanup(void);
 static void *secure_malloc(size_t size);
@@ -113,7 +106,6 @@ static bool logging_init = false;
 static bool thread_pooling_init = false;
 static bool networking_init = false;
 threadpool main_threadpool;
-zlog_category_t *zc;
 
 
 
@@ -201,30 +193,6 @@ void server_crash(void)
     server_shutdown();
 }
 
-static int make_socket (uint16_t port) {
-    struct sockaddr_in name;
-
-    /* Create the socket. */
-    int sockfd = socket(PF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
-    {
-        nlog_error("Could not create socket. (%s)", strerror(errno));
-        return -1
-    }
-
-    /* Give the socket a name. */
-    name.sin_family = AF_INET;
-    name.sin_port = hton16(port);
-    name.sin_addr.s_addr = hton32(INADDR_ANY);
-    if (bind(sockfd, (struct sockaddr *) &name, sizeof (name)) < 0)
-    {
-        nlog_error("Could not bind socket to address. (%s)", strerror(errno));
-        return -1;
-    }
-
-    return sockfd;
-}
-
 static void init_thread_pooling(void)
 {
     nlog_info("Setting up thread pools..");
@@ -253,113 +221,6 @@ static void init_thread_pooling(void)
     thread_pooling_init = true;
 }
 
-#if STANDARD_STREAMS_ASSIGNABLE
-    static ssize_t new_stdout_write(void *cookie, char *buf, size_t size)
-    {
-        char *new_buf = malloc(size + 1);
-        if(new_buf == NULL) return 0;
-        memcpy(new_buf, buf, size);
-        new_buf[size] = '\0';
-
-        nlog_info(new_buf);
-        return size;
-    }
-
-    static ssize_t new_stderr_write(void *cookie, char *buf, size_t size)
-    {
-        char *new_buf = malloc(size + 1);
-        if(new_buf == NULL) return 0;
-        memcpy(new_buf, buf, size);
-
-        // Remove newline at the end, if there is one.
-        if(new_buf[size - 1] == '\n')
-        {
-            new_buf[size - 1] = '\0'
-        }
-        else
-        {
-            new_buf[size] = '\0';
-        }
-
-        nlog_error(new_buf);
-        return size;
-    }
-#endif
-
-static void init_logging(void)
-{
-    int zlog_status = zlog_init("/etc/zlog.conf");
-    if(zlog_status)
-    {
-        fprintf(stderr, "Could not initialize zlog with /etc/zlog.conf (%s ?)\n", strerror(errno));
-        cleanup();
-        exit(EXIT_FAILURE);
-    }
-
-    zc = zlog_get_category("stronk");
-    if(!zc)
-    {
-        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
-        zlog_fini();
-        cleanup();
-        exit(EXIT_FAILURE);
-    }
-
-    nlog_info("Logging system was successfully initialized.");
-
-    nlog_info("Setting application locale to make sure we use UTF-8..");
-    if(setlocale(LC_ALL, "") == NULL) // important, make sure we can use UTF-8.
-    {
-        nlog_warn("Could not set application locale to make sure we use UTF-8.");
-    }
-
-    #if STANDARD_STREAMS_ASSIGNABLE
-        nlog_info("Redirecting stderr and stdout to log..");
-
-        cookie_io_functions_t new_stdout_funcs;
-        new_stdout_funcs.write = new_stdout_write;
-        new_stdout_funcs.read = NULL;
-        new_stdout_funcs.seek = NULL;
-        new_stdout_funcs.close = NULL;
-        FILE *new_stdout = fopencookie(NULL, "a", new_stdout_funcs);
-        if(new_stdout == NULL)
-        {
-            nlog_error("Could not redirect stdout to log.");
-        }
-        if(setvbuf(new_stdout, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
-        {
-            nlog_error("Could not redirect stdout to log.");
-            fclose(new_stdout);
-        }
-        stdout = new_stdout;
-
-        cookie_io_functions_t new_stderr_funcs;
-        new_stderr_funcs.write = new_stderr_write;
-        new_stderr_funcs.read = NULL;
-        new_stderr_funcs.seek = NULL;
-        new_stderr_funcs.close = NULL;
-        FILE *new_stderr = fopencookie(NULL, "a", new_stderr_funcs);
-        if(new_stderr == NULL)
-        {
-            nlog_error("Could not redirect stderr to log.");
-        }
-        if(setvbuf(new_stderr, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
-        {
-            nlog_error("Could not redirect stderr to log.");
-            fclose(new_stderr);
-        }
-        stderr = new_stderr;
-    #endif
-
-    logging_init = true;
-}
-
-void cleanup_logging(void)
-{
-    nlog_info("Closing log..");
-    zlog_fini();
-}
-
 void cleanup_thread_pooling(void)
 {
     nlog_info("Destroying thread pool..");
@@ -374,7 +235,7 @@ void cleanup_networking(void)
 
 static void init(void)
 {
-    init_logging();
+    if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
     init_thread_pooling();
     if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
    
@@ -440,13 +301,10 @@ void cleanup(void)
     if(thread_pooling_init) cleanup_thread_pooling();
 
 
-    if(logging_init) cleanup_logging(); // Logging alwas as last.
+    if(logging_init) logging_cleanup(); // Logging alwas as last.
 }
 
 static void server_tick(void)
 {
     net_tick();
-
-
-    // Read packets from connected players..
 }
