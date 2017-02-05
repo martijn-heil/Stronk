@@ -30,10 +30,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <jansson/jansson.h>
-#include <uuid/uuid.h>
+#include <ninuuid/ninuuid.h>
 
 #include "mcpr.h"
 
@@ -58,7 +59,7 @@ ssize_t mcpr_read_varint        (int32_t *out, FILE *in);
 ssize_t mcpr_read_varlong       (int64_t *out, FILE *in);
 ssize_t mcpr_read_position      (struct mcpr_position *out, FILE *in);
 ssize_t mcpr_read_angle         (int8_t *out, FILE *in);
-ssize_t mcpr_read_uuid          (uuid_t out, FILE *in);
+ssize_t mcpr_read_uuid          (struct ninuuid *out, FILE *in);
 ssize_t mcpr_read_byte_array    (void *out, FILE *in);
 
 
@@ -76,7 +77,7 @@ ssize_t mcpr_write_varint       (FILE *out, int32_t in);
 ssize_t mcpr_write_varlong      (FILE *out, int64_t in);
 ssize_t mcpr_write_position     (FILE *out, const struct mcpr_position *in);
 ssize_t mcpr_write_angle        (FILE *out, int8_t in);
-ssize_t mcpr_write_uuid         (FILE *out, uuid_t in);
+ssize_t mcpr_write_uuid         (FILE *out, struct ninuuid *in);
 ssize_t mcpr_write_byte_array   (FILE *out, void *in, size_t len);
 
 // result should be free'd. NULL upon error
