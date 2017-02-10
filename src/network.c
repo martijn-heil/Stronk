@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include <errno.h>
 
-#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -82,8 +82,8 @@ int net_init(void) {
     sigemptyset (&new_actn.sa_mask);
     new_actn.sa_flags = 0;
     sigaction (SIGPIPE, &new_actn, &old_actn);
-    
-    
+
+
     // Set up temporary state storage.
     nlog_info("Initializing temporary state storage.");
     tmp_encryption_states = hash_table_new(pointer_hash, pointer_equal);
@@ -92,14 +92,14 @@ int net_init(void) {
         nlog_fatal("Could not create hash table.");
         return -1;
     }
-    
+
     tmp_username_states = hash_table_new(pointer_hash, pointer_equal);
     if(tmp_username_states == NULL)
     {
         nlog_fatal("Could not create hash table.");
         return -1;
     }
-    
+
     if(pthread_mutex_init(clients_delete_lock, NULL) != 0)
     {
         nlog_fatal("Could not initialize mutex.");
@@ -244,9 +244,8 @@ static void serve_client_batch(void *arg)
         // Returns ssize_t less than 0 upon error.
         // Sets mcpr_errno upon error.
         // May be used like a function.
-        #define WRITE_PACKET(pkt_123)
-            mcpr_fd_write_abstract_packet(conn->fd, pkt_123, conn->use_compression, false, conn->use_compression ? conn->compression_treshold : 0, \
-                conn->use_encryption, conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? conn->ctx_encrypt : NULL); \
+        #define WRITE_PACKET(pkt)
+            connection_write_abstract_packet(pkt)
 
 
         // Should only be called once.
@@ -278,8 +277,7 @@ static void serve_client_batch(void *arg)
 
 
 
-        struct mcpr_abstract_packet *pkt = mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_compression ? conn->compression_treshold : 0,
-             conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
+        struct mcpr_abstract_packet *pkt = connection_read_abstract_packet(conn);
 
         if(pkt == NULL)
         {

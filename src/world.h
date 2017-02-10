@@ -2,6 +2,7 @@
 #define WORLD_H
 
 typedef void * world;
+typedef void * block;
 
 
 

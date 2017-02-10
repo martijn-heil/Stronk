@@ -6,6 +6,7 @@
 
 #include <jansson/jansson.h>
 #include <ninuuid/ninuuid.h>
+#include <nbt/nbt.h>
 
 #include "mcpr.h"
 
@@ -107,6 +108,20 @@ struct mcpr_entity_property
     double value;
     int32_t number_of_modifiers;
     struct mcpr_entity_property_modifier *modifiers;
+};
+
+struct mcpr_chunk_section
+{
+    uint8_t bits_per_block;
+
+    int32_t palette_length; // 0 if palette is NULL
+    int32_t *palette; // or NULL
+
+    int32_t block_array_length;
+    uint64_t *blocks;
+
+    uint8_t *block_light;
+    uint8_t *sky_light // Only in the overworld, else NULL
 };
 
 enum mcpr_sound_category
@@ -791,7 +806,7 @@ struct mcpr_abstract_packet
                 {
                     struct mcpr_position location;
                     enum mcpr_update_block_entity_action action;
-                    nbt_t *nbt;
+                    nbt_node *nbt;
                 } update_block_entity;
 
                 struct
@@ -988,7 +1003,10 @@ struct mcpr_abstract_packet
                     bool ground_up_continuous;
                     int32_t primary_bit_mask;
                     int32_t size;
-                    // TODO
+                    struct mcpr_chunk_section *chunk_sections;
+                    uint8_t *biomes; // or NULL
+                    int32_t block_entity_count;
+                    nbt_node *block_entities; // or NULL
                 } chunk_data;
 
                 struct
@@ -1425,10 +1443,10 @@ struct mcpr_abstract_packet
     } data;
 };
 
-struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_treshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
+struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(int in, bool use_compression, unsigned long compression_treshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
 struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
 void mcpr_free_abstract_packet(struct mcpr_abstract_packet);
 ssize_t mcpr_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
-ssize_t mcpr_fd_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
+ssize_t mcpr_fd_write_abstract_packet(int out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
 
 #endif // MCPR_PACKET_H

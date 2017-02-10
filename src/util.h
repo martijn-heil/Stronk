@@ -46,8 +46,6 @@
     #define IF_GCC(x)
 #endif
 
-// Use as: TODO("Kill sum more tigers"), also, make sure to use it on it's own line.
-#define TODO(x) DO_PRAGMA(message "TODO - " x)
 
 
 #define CAST(type_to, type_from, x) (((union {type_from src; type dst;} *) &(x))->dst)
@@ -76,7 +74,7 @@ void bswap(void *what, size_t n);
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop);
 void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2);
 void timespec_addraw(struct timespec *result, const struct timespec *t1, long sec, long nsec);
-void ms_to_timespec(struct timespec *ts, unsigned long ms);
+void ms_to_timespec(struct timespec *ts, unsigned long long ms);
 void timespec_to_timeval(struct timeval *tv, const struct timespec *ts);
 void timeval_to_timespec(struct timespec *ts, const struct timeval *tv);
 
