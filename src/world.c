@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <errno.h>
 
 #include <sys/types.h>
@@ -116,7 +117,7 @@ int world_manager_init(void)
     world = malloc(sizeof(struct world));
     if(world == NULL) { nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
 
-    world->chunks = hash_table_new(ull_hash, ull_equal); // TODO uint64_t functions
+    world->chunks = hash_table_new(ull_hash, ull_equal);
     if(chunks == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)) return -1; }
 };
 

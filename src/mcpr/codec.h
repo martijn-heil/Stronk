@@ -58,11 +58,6 @@ static const size_t MCPR_VARLONG_SIZE_MAX = 10;
 #define MCPR_STR_MAX 2147483652
 
 
-struct mcpr_position {
-    long long int x;
-    long long int y;
-    long long int z;
-};
 
 
 // Encoding/decoding functions return the amount of bytes written for encode, and amount of
@@ -221,7 +216,7 @@ ssize_t mcpr_decode_double          (double *out, const void *in);
  * @param [in] len Length of string to decode, may not be equal to or less than 0.
  * @returns The amount of bytes written, or < 0 upon error.
  */
-ssize_t mcpr_decode_string          (char *out, const void *in, int32_t len);
+ssize_t mcpr_decode_string          (char **out, const void *in, size_t maxlen);
 
 /**
  * Will decode chat from in.

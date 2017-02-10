@@ -115,6 +115,12 @@ struct mcpr_packet {
     size_t data_len;
 };
 
+struct mcpr_position {
+    long long int x;
+    long long int y;
+    long long int z;
+};
+
 ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compression);
 
 // Does not process packet length field.

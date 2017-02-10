@@ -13,6 +13,13 @@
 // TODO add more defines
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
 
+enum mcpr_dimension
+{
+    MCPR_DIMENSION_OVERWORLD,
+    MCPR_DIMENSION_NETHER,
+    MCPR_DIMENSION_END
+};
+
 enum mcpr_resource_pack_result
 {
     MCPR_RESOURCE_PACK_RESULT_SUCCESS,
@@ -651,7 +658,7 @@ struct mcpr_abstract_packet
                     bool is_flying;
                     bool is_creative;
                     float flying_speed;
-                    float walking_speed;
+                    float field_of_view_modifier;
                 } player_abilities;
 
                 struct
@@ -1147,6 +1154,7 @@ struct mcpr_abstract_packet
                     bool z_is_relative;
                     bool yaw_is_relative;
                     bool pitch_is_relative;
+                    int32_t teleport_id;
                 } player_position_and_look;
 
                 struct

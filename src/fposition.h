@@ -5,9 +5,9 @@
 
 struct fposition {
     world *world;
-    float x, y, z;
-    unsigned char yaw;
-    unsigned char pitch;
+    double x, y, z;
+    float yaw;
+    float pitch;
 };
 
 #endif
