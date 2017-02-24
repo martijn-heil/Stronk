@@ -8,7 +8,7 @@
 #include <mcpr/mcpr.h>
 #include <mcpr/mcpr_abstract_packet.h>
 
-#include "fposition.h"
+#include <world/fposition.h>
 
 struct player {
     int32_t entity_id;
@@ -44,6 +44,8 @@ struct player {
         } displayed_skin_parts;
 
     } client_settings;
+
+    long last_teleport_id;
 };
 
 

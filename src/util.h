@@ -10,16 +10,22 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
+
+
 #ifdef __GNUC__
     #define DO_PRAGMA(x) _Pragma (#x)
 #else
     #define DO_PRAGMA(x)
 #endif
 
+
 #ifdef __GNUC__
     #ifndef likely
         #define likely(x)       __builtin_expect(!!(x), 1)
     #endif
+
+
+
 
     #ifndef unlikely
         #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -35,6 +41,7 @@
 #endif
 
 #ifdef __GNUC__
+
     #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
 #else
     #define DO_GCC_PRAGMA(x)
@@ -100,7 +107,7 @@ static int secure_random(void *buf, size_t len) {
     if(urandomread == -1) {
         return -1;
     }
-    if(urandomread != len) {
+    if(((size_t) urandomread) != len) {
         return -1;
     }
 

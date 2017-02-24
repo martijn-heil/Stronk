@@ -25,22 +25,22 @@ extern zlog_category_t *_zc; // don't access this..
 #endif
 
 #define zlog_fatal(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_FATAL, __VA_ARGS__)
 #define zlog_error(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_ERROR, __VA_ARGS__)
 #define zlog_warn(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_WARN, __VA_ARGS__)
 #define zlog_notice(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_NOTICE, __VA_ARGS__)
 #define zlog_info(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_INFO, __VA_ARGS__)
 #define zlog_debug(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
+	zlog(cat, FILENAME, sizeof(FILENAME)-1, __func__, sizeof(__func__)-1, __LINE__, \
 	ZLOG_LEVEL_DEBUG, __VA_ARGS__)
 
 // nlog for ninlog ofcourse :P

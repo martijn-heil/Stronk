@@ -31,15 +31,20 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
-#include <uuid/uuid.h>
 
 #include <jansson/jansson.h>
-#include <safe_math.h>
+
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <openssl/sha.h>
+
 #include <curl/curl.h>
+
+#include <ninuuid/ninuuid.h>
+
+#include "mcpr.h"
 
 static const size_t MCPR_BOOL_SIZE      = 1;
 static const size_t MCPR_BYTE_SIZE      = 1;
@@ -104,7 +109,7 @@ ssize_t mcpr_encode_varlong         (void *out, int64_t i);
 ssize_t mcpr_encode_chunk_section   (); // TODO
 ssize_t mcpr_encode_position        (void *out, const struct mcpr_position *in);
 ssize_t mcpr_encode_angle           (void *out, uint8_t angle); // Angles start at 0 all the way to 255.
-ssize_t mcpr_encode_uuid            (void *out, uuid_t in);
+ssize_t mcpr_encode_uuid            (void *out, const struct ninuuid *in);
 
 
 /**
@@ -211,8 +216,8 @@ ssize_t mcpr_decode_double          (double *out, const void *in);
  * Will write a NUL terminated UTF-8 string of length len bytes to out.
  * Decodes len bytes.
  *
- * @param [out] out Output buffer. Should be at least (len + 1) bytes long.
- * @param [in] in Input buffer. Should be at least len bytes long.
+ * @param [out] out Output buffer. Will be dynamicly allocated using malloc()
+ * @param [in] in Input buffer. Should be at least maxlen bytes long.
  * @param [in] len Length of string to decode, may not be equal to or less than 0.
  * @returns The amount of bytes written, or < 0 upon error.
  */
@@ -270,7 +275,7 @@ ssize_t mcpr_decode_angle           (uint8_t *out, const void *in);
  * Decodes 16 bytes.
  * @returns The amount of bytes read, or < 0 upon error.
  */
-ssize_t mcpr_decode_uuid            (uuid_t out, const void *in);
+ssize_t mcpr_decode_uuid            (struct ninuuid *out, const void *in);
 
 
 #endif

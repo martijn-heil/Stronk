@@ -11,3 +11,6 @@ Stronk.exe
 Stronk
 Stronk.cbp
 .idea
+.vscode
+build
+compile_commands.json

@@ -32,7 +32,7 @@
 #include <netinet/in.h>
 
 #include <jansson/jansson.h>
-#include <uuid/uuid.h>
+#include <ninuuid/ninuuid.h>
 
 #include "mcpr.h"
 #include "streams.h"
@@ -69,7 +69,7 @@ FILE *mcpr_open_packet(struct mcpr_packet *pkt)
 }
 
 
-ssize_t mcpr_read_byte      (int8_t *out, FILE *in)
+ssize_t mcpr_read_byte(int8_t *out, FILE *in)
 {
     char c = getc(in);
     if (c == EOF) return -1;
@@ -77,7 +77,7 @@ ssize_t mcpr_read_byte      (int8_t *out, FILE *in)
     return sizeof(int8_t);
 }
 
-ssize_t mcpr_read_ubyte     (uint8_t *out, FILE *in)
+ssize_t mcpr_read_ubyte(uint8_t *out, FILE *in)
 {
     unsigned char c = getc(in);
     if (c == EOF) return -1;
@@ -85,7 +85,7 @@ ssize_t mcpr_read_ubyte     (uint8_t *out, FILE *in)
     return sizeof(uint8_t);
 }
 
-ssize_t mcpr_read_short     (int16_t *out, FILE *in)
+ssize_t mcpr_read_short(int16_t *out, FILE *in)
 {
     int16_t tmp;
     size_t status = fread(&tmp, sizeof(int16_t), 1, in);
@@ -94,7 +94,7 @@ ssize_t mcpr_read_short     (int16_t *out, FILE *in)
     return sizeof(int16_t);
 }
 
-ssize_t mcpr_read_ushort    (uint16_t *out, FILE *in)
+ssize_t mcpr_read_ushort(uint16_t *out, FILE *in)
 {
     uint16_t tmp;
     size_t status = fread(&tmp, sizeof(uint16_t), 1, in);
@@ -103,7 +103,7 @@ ssize_t mcpr_read_ushort    (uint16_t *out, FILE *in)
     return sizeof(uint16_t);
 }
 
-ssize_t mcpr_read_int       (int32_t *out, FILE *in)
+ssize_t mcpr_read_int(int32_t *out, FILE *in)
 {
     int32_t tmp;
     size_t status = fread(&tmp, sizeof(int32_t), 1, in);
@@ -112,7 +112,7 @@ ssize_t mcpr_read_int       (int32_t *out, FILE *in)
     return sizeof(int32_t);
 }
 
-ssize_t mcpr_read_long      (int64_t *out, FILE *in)
+ssize_t mcpr_read_long(int64_t *out, FILE *in)
 {
     int64_t tmp;
     size_t status = fread(&tmp, sizeof(int64_t), 1, in);
@@ -121,17 +121,17 @@ ssize_t mcpr_read_long      (int64_t *out, FILE *in)
     return sizeof(int64_t);
 }
 
-ssize_t mcpr_read_float     (float *out, FILE *in)
+ssize_t mcpr_read_float(float *out, FILE *in)
 {
     // TODO
 }
 
-ssize_t mcpr_read_double    (double *out, FILE *in)
+ssize_t mcpr_read_double(double *out, FILE *in)
 {
     // TODO
 }
 
-ssize_t mcpr_read_string    (char *out, FILE *in)
+ssize_t mcpr_read_string(char *out, FILE *in)
 {
     flockfile(in);
     int32_t len;
@@ -149,12 +149,12 @@ ssize_t mcpr_read_string    (char *out, FILE *in)
         return -1;
 }
 
-ssize_t mcpr_read_chat      (json_t **out, FILE *in)
+ssize_t mcpr_read_chat(json_t **out, FILE *in)
 {
     // TODO
 }
 
-ssize_t mcpr_read_varint    (int32_t *out, FILE *in)
+ssize_t mcpr_read_varint(int32_t *out, FILE *in)
 {
     unsigned int num_read = 0;
     int32_t result = 0;
@@ -189,7 +189,7 @@ ssize_t mcpr_read_varint    (int32_t *out, FILE *in)
         return -1;
 }
 
-ssize_t mcpr_read_varlong   (int64_t *out, FILE *in)
+ssize_t mcpr_read_varlong(int64_t *out, FILE *in)
 {
     unsigned int num_read = 0;
     int64_t result = 0;
@@ -251,14 +251,9 @@ ssize_t mcpr_read_angle     (int8_t *out, FILE *in)
     return 1;
 }
 
-ssize_t mcpr_read_uuid      (uuid_t out, FILE *in)
+ssize_t mcpr_read_uuid      (struct ninuuid *out, FILE *in)
 {
-
-    // This is kinda hacky.. uuid_t is USUALLY a typedef'd unsigned char raw[16]
-    // If there is an implementation which does not define uuid_t as unsigned char raw[16] we have a bit of an issue here.
-    uuid_t tmp;
-    if (fread(&tmp, 16, 1, in) != 1) return -1;
-    uuid_copy(out, tmp);
+    if (fread(out->bytes, 16, 1, in) != 1) return -1;
     return 16;
 }
 
@@ -317,10 +312,12 @@ ssize_t mcpr_write_varint   (FILE *out, int32_t in);
 ssize_t mcpr_write_varlong  (FILE *out, int64_t in);
 ssize_t mcpr_write_position (FILE *out, const struct mcpr_position *in);
 ssize_t mcpr_write_angle    (FILE *out, int8_t in);
-ssize_t mcpr_write_uuid     (FILE *out, uuid_t in);
+ssize_t mcpr_write_uuid     (FILE *out, struct ninuuid *in);
 
 // TODO handle legacy server list ping
-struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_no_compression, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt); {
+struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_no_compression,
+    bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt)
+{
     flockfile(in);
 
     // Read packet length.

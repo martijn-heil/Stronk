@@ -1,6 +1,11 @@
 #ifndef MCPR_CRYPTO_H
 #define MCPR_CRYPTO_H
 
+#include <stdbool.h>
+
+#include <sys/types.h>
+
+#include <openssl/evp.h>
 
 /**
  * Encrypt data for use in the Minecraft protocol.
@@ -11,7 +16,7 @@
  *
  * @returns The amount of bytes written to out, or a negative integer upon error.
  */
-ssize_t mcpr_crypto_encrypt(void restrict* out, const void restrict* in, EVP_CIPHER_CTX ctx_encrypt, size_t len);
+ssize_t mcpr_crypto_encrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX ctx_encrypt, size_t len);
 
 /**
  * Decrypt data for use in the Minecraft protocol.
@@ -21,7 +26,7 @@ ssize_t mcpr_crypto_encrypt(void restrict* out, const void restrict* in, EVP_CIP
  *
  * @returns The amount of bytes written to out, or a negative integer upon error.
  */
-ssize_t mcpr_crypto_decrypt(void restrict* out, const void restrict* in, EVP_CIPHER_CTX ctx_decrypt, size_t len);
+ssize_t mcpr_crypto_decrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX ctx_decrypt, size_t len);
 
 // These functions may change internal state.
 // Synchronizing should be done by the user, based on the file pointer.

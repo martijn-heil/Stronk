@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
-#include <string.h>
+#include <stdbool.h>
 #include <errno.h>
 
 #include <sys/types.h>
@@ -11,8 +11,9 @@
 #include <mcpr/mcpr.h>
 #include <mcpr/abstract_packet.h>
 
-#include "logging.h"
-#include "connection.h"
+#include <logging/logging.h>
+#include <network/connection.h>
+
 #include "world.h"
 
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
@@ -264,4 +265,12 @@ static int send_chunk_data(player *p, const struct chunk *chunk)
         nlog_error("Could not send chunk data packet. (%s)", mcpr_strerror(errno));
         return -1;
     }
+
+    // Clean up..
+    for(int i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
+    {
+        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].blocks)
+        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].block_light)
+    }
+    free(pkt.data.play.clientbound.chunk_data.chunk_sections);
 }

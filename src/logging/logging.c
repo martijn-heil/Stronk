@@ -1,12 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <errno.h>
+#include <locale.h>
 
 #include <sys/types.h>
 
 #include <zlog.h>
 
-#include "logging.c"
+#include "logging/logging.h"
 
 
 #ifdef __GNU_LIBRARY__
@@ -18,18 +21,19 @@
 zlog_category_t *_zc;
 
 #if STANDARD_STREAMS_ASSIGNABLE
-    static ssize_t new_stdout_write(void *cookie, char *buf, size_t size)
+    static ssize_t new_stdout_write(void *cookie, const char *buf, size_t size)
     {
         char *new_buf = malloc(size + 1);
         if(new_buf == NULL) return 0;
         memcpy(new_buf, buf, size);
         new_buf[size] = '\0';
 
-        zlog(_zc, FILENAME, sizeof(FILENAME)-1, "null", 4, "null", ZLOG_LEVEL_INFO, new_buf);
+        nlog_info("%s", new_buf);
+        free(new_buf);
         return size;
     }
 
-    static ssize_t new_stderr_write(void *cookie, char *buf, size_t size)
+    static ssize_t new_stderr_write(void *cookie, const char *buf, size_t size)
     {
         char *new_buf = malloc(size + 1);
         if(new_buf == NULL) return 0;
@@ -38,14 +42,15 @@ zlog_category_t *_zc;
         // Remove newline at the end, if there is one.
         if(new_buf[size - 1] == '\n')
         {
-            new_buf[size - 1] = '\0'
+            new_buf[size - 1] = '\0';
         }
         else
         {
             new_buf[size] = '\0';
         }
 
-        zlog(_zc, FILENAME, sizeof(FILENAME)-1, "null", 4, "null", ZLOG_LEVEL_ERROR, new_buf);
+        nlog_error("%s", new_buf);
+        free(new_buf);
         return size;
     }
 #endif
@@ -59,7 +64,7 @@ int logging_init(void)
         return -1;
     }
 
-    zc = zlog_get_category("stronk");
+    _zc = zlog_get_category("stronk");
     if(!_zc)
     {
         fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
@@ -96,7 +101,7 @@ int logging_init(void)
             return 0;
         }
         stdout = new_stdout;
-        
+
 
         cookie_io_functions_t new_stderr_funcs;
         new_stderr_funcs.write = new_stderr_write;
@@ -117,7 +122,7 @@ int logging_init(void)
         }
         stderr = new_stderr;
     #endif
-    
+
     return 0;
 }
 

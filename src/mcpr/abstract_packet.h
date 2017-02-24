@@ -8,10 +8,204 @@
 #include <ninuuid/ninuuid.h>
 #include <nbt/nbt.h>
 
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 
 // TODO add more defines
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
+
+struct mcpr_entity_metadata_entry
+{
+    enum mcpr_entity_metadata_type type; // TODO different way to specify what this entry is about.
+
+    union
+    {
+        struct
+        {
+            union
+            {
+                struct
+                {
+                    bool on_fire;
+                    bool crouched;
+                    bool sprinting;
+                    bool invisible;
+                    bool glowing_effect;
+                    bool elytra_flying;
+                } flags;
+
+                int32_t air;
+                char *custom_name;
+                bool custom_name_visible;
+                bool is_silent;
+                bool gravity;
+            };
+        } entity;
+
+        struct
+        {
+            void *potion_slot;
+        } potion;
+
+        struct
+        {
+            struct mcpr_position spawn_position;
+        } falling_block;
+
+        struct
+        {
+            union
+            {
+                float radius;
+                int32_t color;
+                bool ignore_radius;
+                int32_t particle_id;
+                int32_t particle_parameter_1;
+                int32_t particle_parameter_2;
+            };
+        } area_effect_cloud;
+
+        struct
+        {
+            int32_t hooked_entity_id_plus_one; // Hooked entity id + 1, or 0 if there is no hooked entity
+        } fishing_hook;
+
+        struct
+        {
+            bool is_critical;
+        } arrow;
+
+        struct
+        {
+            int32_t color;
+        } tipped_arrow;
+
+        struct
+        {
+            union
+            {
+                int32_t time_since_last_hit;
+                int32_t forward_direction;
+                float damage_taken;
+                int32_t type;
+                bool right_paddle_turning, left_paddle_turning;
+            };
+        } boat;
+
+        // TODO endercrystal and the rest.
+    };
+};
+
+enum mcpr_mob
+{
+    MCPR_MOB_ELDER_GUARDIAN,
+    MCPR_MOB_WITHER_SKELETON,
+    MCPR_MOB_STRAY,
+    MCPR_MOB_HUSK,
+    MCPR_MOB_ZOMBIE_VILLAGER,
+    MCPR_MOB_SKELETON_HORSE,
+    MCPR_MOB_ZOMBIE_HORSE,
+    MCPR_MOB_ARMOR_STAND,
+    MCPR_MOB_DONKEY,
+    MCPR_MOB_MULE,
+    MCPR_MOB_EVOCATION_ILLAGER,
+    MCPR_MOB_VEX,
+    MCPR_MOB_VINDICATION_ILLAGER,
+    MCPR_MOB_CREEPER,
+    MCPR_MOB_SKELETON,
+    MCPR_MOB_SPIDER,
+    MCPR_MOB_GIANT,
+    MCPR_MOB_ZOMBIE,
+    MCPR_MOB_SLIME,
+    MCPR_MOB_GHAST,
+    MCPR_MOB_PIG_ZOMBIE,
+    MCPR_MOB_ENDERMAN,
+    MCPR_MOB_CAVE_SPIDER,
+    MCPR_MOB_SILVERFISH,
+    MCPR_MOB_BLAZE,
+    MCPR_MOB_LAVA_SLIME,
+    MCPR_MOB_ENDER_DRAGON,
+    MCPR_MOB_WITHER_BOSS,
+    MCPR_MOB_BAT,
+    MCPR_MOB_WITCH,
+    MCPR_MOB_ENDERMITE,
+    MCPR_MOB_GUARDIAN,
+    MCPR_MOB_SHULKER,
+    MCPR_MOB_PIG,
+    MCPR_MOB_SHEEP,
+    MCPR_MOB_COW,
+    MCPR_MOB_CHICKEN,
+    MCPR_MOB_SQUID,
+    MCPR_MOB_WOLF,
+    MCPR_MOB_MUSHROOM_COW,
+    MCPR_MOB_SNOW_MAN,
+    MCPR_MOB_OCELOT,
+    MCPR_MOB_VILLAGER_GOLEM,
+    MCPR_MOB_HORSE,
+    MCPR_MOB_RABBIT,
+    MCPR_MOB_POLAR_BEAR,
+    MCPR_MOB_LLAMA,
+    MCPR_MOB_VILLAGER
+};
+
+enum mcpr_object
+{
+    MCPR_OBJECT_BOAT,
+    MCPR_OBJECT_ITEM_STACK,
+    MCPR_OBJECT_AREA_EFFECT_CLOUD,
+    MCPR_OBJECT_MINECART,
+    MCPR_OBJECT_ACTIVATED_TNT,
+    MCPR_OBJECT_ENDER_CRYSTAL,
+    MCPR_OBJECT_TIPPED_ARROW,
+    MCPR_OBJECT_SNOWBALL,
+    MCPR_OBJECT_EGG,
+    MCPR_OBJECT_FIRE_BALL,
+    MCPR_OBJECT_FIRE_CHARGE,
+    MCPR_OBJECT_THROWN_ENDERPEARL,
+    MCPR_OBJECT_WITHER_SKULL,
+    MCPR_OBJECT_SHULKER_BULLET,
+    MCPR_OBJECT_LLAMA_SPIT,
+    MCPR_OBJECT_FALLING_OBJECT,
+    MCPR_OBJECT_ITEM_FRAME,
+    MCPR_OBJECT_EYE_OF_ENDER,
+    MCPR_OBJECT_THROWN_POTION,
+    MCPR_OBJECT_THROWN_EXP_BOTTLE,
+    MCPR_OBJECT_FIREWORK_ROCKET,
+    MCPR_OBJECT_LEASH_KNOT,
+    MCPR_OBJECT_ARMOR_STAND,
+    MCPR_OBJECT_EVOCATION_FANG,
+    MCPR_OBJECT_FISHING_HOOK,
+    MCPR_OBJECT_SPECTRAL_ARROW,
+    MCPR_OBJECT_DRAGON_FIREBALL
+};
+
+enum mcpr_use_entity_type
+{
+    MCPR_USE_ENTITY_TYPE_INTERACT,
+    MCPR_USE_ENTITY_TYPE_INTERACT_AT,
+    MCPR_USE_ENTITY_TYPE_ATTACK
+};
+
+enum mcpr_entity_property_key
+{
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_MAX_HEALTH,
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_FOLLOW_RANGE,
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_KNOCKBACK_RESISTANCE,
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_MOVEMENT_SPEED,
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_ATTACK_DAMAGE,
+    MCPR_ENTITY_PROPERTY_KEY_GENERIC_ATTACK_SPEED,
+    MCPR_ENTITY_PROPERTY_KEY_HORSE_JUMP_SPEED,
+    MCPR_ENTITY_PROPERTY_KEY_ZOMBIE_SPAWN_REINFORCEMENTS_CHANCE,
+};
+
+enum mcpr_animation
+{
+    MCPR_ANIMATION_SWING_MAIN_ARM,
+    MCPR_ANIMATION_TAKE_DAMAGE,
+    MCPR_ANIMATION_LEAVE_BED,
+    MCPR_ANIMATION_SWING_OFFHAND,
+    MCPR_ANIMATION_CRITICAL_EFFECT,
+    MCPR_ANIMATION_MAGIC_CRITICAL_EFFECT
+};
 
 enum mcpr_dimension
 {
@@ -128,7 +322,7 @@ struct mcpr_chunk_section
     uint64_t *blocks;
 
     uint8_t *block_light;
-    uint8_t *sky_light // Only in the overworld, else NULL
+    uint8_t *sky_light; // Only in the overworld, else NULL
 };
 
 enum mcpr_sound_category
@@ -386,7 +580,7 @@ struct mcpr_explosion_record
     int8_t x, y, z;
 };
 
-enum mcpr_map_icon
+enum mcpr_map_icon_type
 {
     MCPR_MAP_ICON_WHITE_ARROW,
     MCPR_MAP_ICON_GREEN_ARROW,
@@ -403,7 +597,7 @@ enum mcpr_map_icon
 struct mcpr_map_icon
 {
     uint8_t direction;
-    enum mcpr_map_icon type;
+    enum mcpr_map_icon_type type;
     int8_t x, z;
 };
 
@@ -460,7 +654,7 @@ struct mcpr_abstract_packet
             {
                 struct
                 {
-                    struct mcpr_chat_message reason;
+                    char *reason; // Chat
                 } disconnect;
 
                 struct
@@ -517,7 +711,7 @@ struct mcpr_abstract_packet
                     char *favicon; // may be NULL.
 
                     size_t online_players_size;
-                    struct mcpr_player_sample *online_players; // or NULL.
+                    struct mcpr_player_sample *player_sample; // or NULL.
                 } response;
             } clientbound;
         } status;
@@ -588,7 +782,7 @@ struct mcpr_abstract_packet
                     int8_t button;
                     int16_t action_number;
                     int32_t mode;
-                    struct mcpr_slot clicked_item;
+                    void * clicked_item;
                 } click_window;
 
                 struct
@@ -695,7 +889,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     int16_t slot;
-                    struct mcpr_slot clicked_item;
+                    void * clicked_item;
                 } creative_inventory_action;
 
                 struct
@@ -775,7 +969,7 @@ struct mcpr_abstract_packet
                 {
                     int32_t entity_id;
                     struct ninuuid entity_uuid;
-                    enum mcpr_painting;
+                    enum mcpr_painting type;
                     struct mcpr_position position;
                     int8_t direction;
                 } spawn_painting;
@@ -929,7 +1123,7 @@ struct mcpr_abstract_packet
                 {
                     uint8_t window_id;
                     int16_t count;
-                    struct mcpr_slot *slots;
+                    void * *slots;
                 } window_items;
 
                 struct
@@ -943,7 +1137,7 @@ struct mcpr_abstract_packet
                 {
                     uint8_t window_id;
                     int16_t slot;
-                    struct mcpr_slot slot_data;
+                    void * slot_data;
                 } set_slot;
 
                 struct
@@ -1278,7 +1472,7 @@ struct mcpr_abstract_packet
                 {
                     int32_t entity_id;
                     enum mcpr_equipment_slot slot;
-                    struct mcpr_slot slot;
+                    void * slot;
                 } entity_equipment;
 
                 struct

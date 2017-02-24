@@ -35,13 +35,8 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <sys/types.h>
 #include <arpa/inet.h>
-#include <uuid/uuid.h>
-
-#include <jansson/jansson.h>
-#include <nbt/nbt.h>
-#include <openssl/rsa.h>
-#include <openssl/x509.h>
 
 /*
     Minecraft Protocol (http://wiki.vg/Protocol)
@@ -67,7 +62,7 @@ int *mcpr_get_errno();
  */
 #define mcpr_errno (*mcpr_get_errno())
 
-const char *mcpr_strerror(int mcpr_errno;);
+const char *mcpr_strerror(int mcpr_errno);
 
 
 /**
@@ -80,14 +75,14 @@ const char *mcpr_strerror(int mcpr_errno;);
  *
  * @returns The new size of out or -1 upon error.
  */
-ssize_t mcpr_decompress(void restrict* out, const void restrict *in, size_t max_out_size, size_t in_size);
+ssize_t mcpr_decompress(void *restrict out, const void *restrict in, size_t max_out_size, size_t in_size);
 
 /**
  * Out should be at least the size of mcr_compress_bounds(n)
  *
  * Returns the new size of out or -1 upon error.
  */
-ssize_t mcpr_compress(void restrict* out, const void restrict* in, size_t n);
+ssize_t mcpr_compress(void *restrict out, const void *restrict in, size_t n);
 
 /**
  * Calculate maximum compressed size for len amount of bytes.
@@ -120,11 +115,6 @@ struct mcpr_position {
     long long int y;
     long long int z;
 };
-
-ssize_t mcpr_encode_packet(void *out, struct mcpr_packet *pkt, bool use_compression);
-
-// Does not process packet length field.
-struct mcpr_packet *mcpr_decode_packet(void *in, size_t packet_len, bool use_compression, bool force_no_compression);
 
 char *mcpr_as_chat(const char *message_fmt, ...);
 

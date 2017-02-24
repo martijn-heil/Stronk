@@ -36,9 +36,10 @@
 #include <mcpr/abstract_packet.h>
 #include <mcpr/fdstreams.h>
 
+#include <logging/logging.h>
+
 #include "server.h"
 #include "stronk.h"
-#include "logging.h"
 #include "util.h"
 
 /*
@@ -237,7 +238,7 @@ static void init(void)
     if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
     init_thread_pooling();
     if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
-   
+
 
     nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
     json_set_alloc_funcs(secure_malloc, secure_free);

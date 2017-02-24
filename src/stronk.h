@@ -5,7 +5,7 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "logging.h"
+#include <logging/logging.h>
 
 extern unsigned int main_threadpool_threadcount;
 extern threadpool main_threadpool;

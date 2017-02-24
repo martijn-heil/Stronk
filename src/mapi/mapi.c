@@ -411,7 +411,7 @@ int mapi_generate_client_token(char *restrict buf, size_t token_len) {
     return 0;
 }
 
-int mapi_username_to_uuid(uuid_t output, const char *restrict player_name) {
+int mapi_username_to_uuid(struct ninuuid *output, const char *restrict player_name) {
     const char *fmt = "https://api.mojang.com/users/profiles/minecraft/%s";
     char url[strlen(fmt) + strlen(player_name) + 1];
     sprintf(&url[0], fmt, player_name);
@@ -426,13 +426,7 @@ int mapi_username_to_uuid(uuid_t output, const char *restrict player_name) {
     if(compressed_uuid == NULL) { mapi_errno = 0; return -1; } // Not a string.
     if(strlen(compressed_uuid) != 32) { mapi_errno = 0; return -1; } // UUID is malformed, it is not 32 characters long.
 
-    char uncompressed_uuid[37]; // 36 characters + NUL byte.
-    mapi_uuid_decompress_string(&uncompressed_uuid[0], compressed_uuid);
-    uuid_t uuid;
-    int parse_status = uuid_parse(&uncompressed_uuid[0], uuid);
-    if(parse_status == -1) { mapi_errno = 0; return -1; }
-    uuid_copy(output, uuid);
-
+    ninuuid_from_compressed_string(output, compressed_uuid);
     return 0;
 }
 // Big whitespace to divide actual functions from private helper functions.

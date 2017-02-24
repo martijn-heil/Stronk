@@ -32,9 +32,11 @@
 #include <mcpr/fdstreams.h>
 #include <mcpr/codec.h>
 
+#include <logging/logging.h>
+
 #include "network.h"
-#include "stronk.h"
-#include "util.h"
+#include "../stronk.h"
+#include "../util.h"
 
 static int server_socket;
 static size_t client_count = 0;
@@ -300,7 +302,7 @@ static void serve_client_batch(void *arg)
         {
             if(mcpr_errno == MCPR_ECOMPRESSTHRESHOLD)
             {
-                char *reason = mcpr_as_chat("Compression treshold was violated.");
+                char *reason = mcpr_as_chat("Compression threshold was violated.");
                 DISCONNECT_CURRENT_CONN(reason);
                 free(reason);
             }
@@ -763,8 +765,16 @@ static void serve_client_batch(void *arg)
 
                         if(WRITE_PACKET(&player_abilities_pkt) < 0)
                         {
-                            nlog_error("Could not write player abilities packet. (%s)", mcpr_strerror(mcpr_errno));
-                            goto err;
+                            if(mcpr_errno == ECONNRESET)
+                            {
+                                CLOSE_CURRENT_CONN();
+                                goto cleanup_only;
+                            }
+                            else
+                            {
+                                nlog_error("Could not write player abilities packet. (%s)", mcpr_strerror(mcpr_errno));
+                                goto err;
+                            }
                         }
 
                         break;
@@ -837,6 +847,15 @@ static void serve_client_batch(void *arg)
 
                         player->client_settings_known = true;
 
+
+                        if(world_send_chunk_data(p) < 0)
+                        {
+                            nlog_error("Could not send chunk data to player. (%s ?)", strerror(errno));
+                            char *reason = mcpr_as_chat("An error occurred whilst logging in.");
+                            DISCONNECT_CURRENT_CONN(reason);
+                            free(reason);
+                        }
+
                         struct mcpr_abstract_packet response;
                         response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
                         response.data.play.clientbound.player_position_and_look.x = player->pos.x;
@@ -851,12 +870,13 @@ static void serve_client_batch(void *arg)
                         response.data.play.clientbound.player_position_and_look.pitch_is_relative = false;
                         response.data.play.clientbound.player_position_and_look.yaw_is_relative = false;
 
-                        response.data.play.clientbound.player_position_and_look.teleport_id = 0; // TODO
+                        response.data.play.clientbound.player_position_and_look.teleport_id = 0;
 
                         if(WRITE_PACKET(&response) < 0)
                         {
                             if(mcpr_errno == ECONNRESET)
                             {
+                                CLOSE_CURRENT_CONN();
                                 break;
                             }
                             else
@@ -868,6 +888,47 @@ static void serve_client_batch(void *arg)
                                 free(reason);
                             }
                         }
+                        player->last_teleport_id = 0;
+                    }
+
+                    case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:
+                    {
+                        if(player->last_teleport_id == 0)
+                        {
+                            struct mcpr_abstract_packet response;
+                            response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
+                            response.data.play.clientbound.player_position_and_look.x = player->pos.x;
+                            response.data.play.clientbound.player_position_and_look.feet_y = player->pos.y;
+                            response.data.play.clientbound.player_position_and_look.feet_z = player->pos.z;
+                            response.data.play.clientbound.player_position_and_look.pitch = player->pos.pitch;
+                            response.data.play.clientbound.player_position_and_look.yaw = player->pos.yaw;
+
+                            response.data.play.clientbound.player_position_and_look.x_is_relative = false;
+                            response.data.play.clientbound.player_position_and_look.y_is_relative = false;
+                            response.data.play.clientbound.player_position_and_look.z_is_relative = false;
+                            response.data.play.clientbound.player_position_and_look.pitch_is_relative = false;
+                            response.data.play.clientbound.player_position_and_look.yaw_is_relative = false;
+
+                            response.data.play.clientbound.player_position_and_look.teleport_id = 0;
+
+                            if(WRITE_PACKET(&response) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    break;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not send confirmation player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+
+                                    char *reason = mcpr_as_chat("An error occurred whilst logging in.");
+                                    DISCONNECT_CURRENT_CONN(reason);
+                                    free(reason);
+                                }
+                            }
+                        }
+                        player->last_teleport_id++;
                     }
                 }
             }
@@ -881,4 +942,11 @@ static void serve_client_batch(void *arg)
     #undef CLOSE_CURRENT_CONN
     #undef DISCONNECT_CURRENT_CONN
     #undef WRITE_PACKET
+}
+
+
+static struct player *conn_to_player(struct connection *conn)
+{
+    struct player *p = hash_table_lookup(players, conn);
+    return p != HASH_TABLE_NULL ? p : NULL
 }
