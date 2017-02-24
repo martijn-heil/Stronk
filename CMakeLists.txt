@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 2.5)
 #set(CMAKE_LEGACY_CYGWIN_WIN32 0) # Remove when CMake >= 2.8.4 is required
-SET(CMAKE_C_COMPILER C:/bin/gcc.bat)
 project(Stronk C)
 
 # Change -DHAVE_LIBUUID to either one of these;
