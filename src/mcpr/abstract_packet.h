@@ -13,88 +13,6 @@
 // TODO add more defines
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
 
-struct mcpr_entity_metadata_entry
-{
-    enum mcpr_entity_metadata_type type; // TODO different way to specify what this entry is about.
-
-    union
-    {
-        struct
-        {
-            union
-            {
-                struct
-                {
-                    bool on_fire;
-                    bool crouched;
-                    bool sprinting;
-                    bool invisible;
-                    bool glowing_effect;
-                    bool elytra_flying;
-                } flags;
-
-                int32_t air;
-                char *custom_name;
-                bool custom_name_visible;
-                bool is_silent;
-                bool gravity;
-            };
-        } entity;
-
-        struct
-        {
-            void *potion_slot;
-        } potion;
-
-        struct
-        {
-            struct mcpr_position spawn_position;
-        } falling_block;
-
-        struct
-        {
-            union
-            {
-                float radius;
-                int32_t color;
-                bool ignore_radius;
-                int32_t particle_id;
-                int32_t particle_parameter_1;
-                int32_t particle_parameter_2;
-            };
-        } area_effect_cloud;
-
-        struct
-        {
-            int32_t hooked_entity_id_plus_one; // Hooked entity id + 1, or 0 if there is no hooked entity
-        } fishing_hook;
-
-        struct
-        {
-            bool is_critical;
-        } arrow;
-
-        struct
-        {
-            int32_t color;
-        } tipped_arrow;
-
-        struct
-        {
-            union
-            {
-                int32_t time_since_last_hit;
-                int32_t forward_direction;
-                float damage_taken;
-                int32_t type;
-                bool right_paddle_turning, left_paddle_turning;
-            };
-        } boat;
-
-        // TODO endercrystal and the rest.
-    };
-};
-
 enum mcpr_mob
 {
     MCPR_MOB_ELDER_GUARDIAN,
@@ -414,6 +332,11 @@ enum mcpr_player_list_item_action
     MCPR_PLAYER_LIST_ITEM_ACTION_REMOVE_PLAYER
 };
 
+struct mcpr_rotation
+{
+    // TODO
+};
+
 struct mcpr_player_list_item_property
 {
     char *name;
@@ -608,6 +531,612 @@ enum mcpr_combat_event
     MCPR_COMBAT_EVENT_ENTITY_DEAD
 };
 
+struct mcpr_entity_metadata_entry
+{
+    int32_t index; // TODO different way to specify what this entry is about.
+
+    union
+    {
+        struct
+        {
+            union
+            {
+                struct
+                {
+                    bool on_fire;
+                    bool crouched;
+                    bool sprinting;
+                    bool invisible;
+                    bool glowing_effect;
+                    bool elytra_flying;
+                } flags;
+
+                int32_t air;
+                char *custom_name;
+                bool custom_name_visible;
+                bool is_silent;
+                bool gravity;
+
+                struct
+                {
+                    union
+                    {
+                        struct
+                        {
+                            void *potion_slot;
+                        } potion;
+                    };
+                } projectile;
+
+                struct
+                {
+                    struct mcpr_position spawn_position;
+                } falling_block;
+
+                struct
+                {
+                    union
+                    {
+                        float radius;
+                        int32_t color;
+                        bool ignore_radius;
+                        int32_t particle_id;
+                        int32_t particle_parameter_1;
+                        int32_t particle_parameter_2;
+                    };
+                } area_effect_cloud;
+
+                struct
+                {
+                    int32_t hooked_entity_id_plus_one; // Hooked entity id + 1, or 0 if there is no hooked entity
+                } fishing_hook;
+
+                struct
+                {
+                    union
+                    {
+                        struct
+                        {
+                            bool is_critical;
+                        } flags;
+
+                        struct
+                        {
+                            int32_t color;
+                        } tipped_arrow;
+                    };
+                } arrow;
+
+                struct
+                {
+                    union
+                    {
+                        int32_t time_since_last_hit;
+                        int32_t forward_direction;
+                        float damage_taken;
+                        int32_t type;
+                        bool right_paddle_turning, left_paddle_turning;
+                    };
+                } boat;
+
+                struct
+                {
+                    union
+                    {
+                        struct mcpr_position *beam_target; // or NULL
+                        bool show_bottom;
+                    };
+                } ender_crystal;
+
+                struct
+                {
+                    union
+                    {
+                        struct
+                        {
+                            bool invulnerable;
+                        } wither_skull;
+                    };
+                } fireball;
+
+                struct
+                {
+                    union
+                    {
+                        void *firework_info_slot;
+                        int32_t entity_id;
+                    };
+                } fireworks;
+
+                struct
+                {
+                    union
+                    {
+                        struct
+                        {
+                            void *slot_item;
+                        } item_frame;
+                    };
+                } hanging;
+
+                struct
+                {
+                    union
+                    {
+                        void *slot_item;
+                    };
+                } item;
+
+                struct
+                {
+                    union
+                    {
+                        struct
+                        {
+                            bool hand_active;
+                            enum mcpr_hand active_hand;
+                        } hand_flags;
+
+                        float health;
+                        int32_t potion_effect_color;
+                        bool potion_is_ambient;
+                        int32_t arrows_in_entity;
+
+                        struct
+                        {
+                            union
+                            {
+                                float additional_hearts;
+                                int32_t score;
+
+                                struct
+                                {
+                                    bool cape_enabled;
+                                    bool jacket_enabled;
+                                    bool left_sleeve_enabled, right_sleeve_enabled;
+                                    bool left_pants_enabled ,right_pants_enabled;
+                                    bool hat_enabled;
+                                } flags;
+
+                                enum mcpr_side_based_hand main_hand;
+                            };
+                        } player;
+
+                        struct
+                        {
+                            union
+                            {
+                                struct
+                                {
+                                    bool is_small;
+                                    bool has_arms;
+                                    bool no_baseplate;
+                                    bool set_marker;
+                                } flags;
+
+                                struct mcpr_rotation head_rotation;
+                                struct mcpr_rotation body_rotation;
+                                struct mcpr_rotation right_arm_rotation, left_arm_rotation;
+                                struct mcpr_rotation right_leg_rotation, left_leg_rotation;
+                            };
+                        } armor_stand;
+
+                        struct
+                        {
+                            union
+                            {
+                                struct
+                                {
+                                    bool no_ai;
+                                    bool left_handed;
+                                } flags;
+
+                                struct
+                                {
+                                    union
+                                    {
+                                        struct
+                                        {
+                                            struct
+                                            {
+                                                bool is_hanging;
+                                            } flags;
+                                        } bat;
+                                    };
+                                } ambient;
+
+                                struct
+                                {
+                                    union
+                                    {
+                                        struct
+                                        {
+
+                                        } squid;
+                                    };
+                                } water_mob;
+
+                                struct
+                                {
+                                    union
+                                    {
+                                        struct ageable
+                                        {
+                                            union
+                                            {
+                                                bool is_baby;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                struct
+                                                                {
+                                                                    bool is_tame;
+                                                                    bool is_saddled;
+                                                                    bool has_chest;
+                                                                    bool is_bred;
+                                                                    bool is_eating;
+                                                                    bool is_rearing;
+                                                                    bool is_mouth_open;
+                                                                } flags;
+
+                                                                struct ninuuid *owner; // or NULL
+                                                            };
+
+                                                            struct
+                                                            {
+                                                                union
+                                                                {
+                                                                    enum mcpr_horse_variant variant;
+                                                                    enum mcpr_horse_armor armor;
+                                                                };
+                                                            } horse;
+
+                                                            struct
+                                                            {
+                                                                union
+                                                                {
+                                                                    bool has_chest;
+
+                                                                    struct
+                                                                    {
+                                                                        int32_t strength;
+                                                                        enum mcpr_dye_color carpet_color;
+                                                                        enum mcpr_llama_variant variant;
+                                                                    } llama;
+                                                                };
+                                                            } chested_horse;
+                                                        } abstract_horse;
+
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                bool has_saddle;
+                                                                int32_t boost_time;
+                                                            };
+                                                        } pig;
+
+                                                        struct
+                                                        {
+                                                            enum mcpr_rabbit_variant variant;
+                                                        } rabbit;
+
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                bool standing_up;
+                                                            };
+                                                        } polar_bear;
+
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                struct
+                                                                {
+                                                                    unsigned char color;
+                                                                    bool is_sheared;
+                                                                } flags;
+                                                            };
+                                                        } sheep;
+
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                struct
+                                                                {
+                                                                    bool is_sitting;
+                                                                    bool is_angry;
+                                                                    bool is_tamed;
+                                                                } flags;
+
+                                                                struct
+                                                                {
+                                                                    union
+                                                                    {
+                                                                        enum mcpr_ocelot_variant variant;
+                                                                    };
+                                                                } ocelot;
+
+                                                                struct
+                                                                {
+                                                                    float damage_taken;
+                                                                    bool is_begging;
+                                                                    enum mcpr_dye_color collar_color;
+                                                                } wolf;
+                                                            };
+                                                        } tameable_animal;
+
+
+                                                    };
+                                                } animal;
+                                            };
+
+                                            struct
+                                            {
+                                                union
+                                                {
+                                                    enum mcpr_villager_profession profession;
+                                                };
+                                            } villager;
+                                        };
+
+                                        struct
+                                        {
+                                            union
+                                            {
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool is_player_made;
+                                                        } flags;
+                                                    };
+                                                } iron_golem;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool no_pumpkin_hat;
+                                                        } flags;
+                                                    };
+                                                } snowman;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        enum mcpr_direction direction;
+                                                        struct mcpr_position *attachment_position; // or NULL
+                                                        int8_t shield_height;
+                                                        enum mcpr_dye_color color;
+                                                    };
+                                                } shulker;
+                                            };
+                                        } golem;
+
+                                        struct
+                                        {
+                                            union
+                                            {
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool is_on_fire;
+                                                        } flags;
+                                                    };
+                                                } blaze;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        enum mcpr_creeper_state state;
+                                                        bool is_charged;
+                                                        bool is_ignited;
+                                                    };
+                                                } creeper;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        bool is_retracting_spikes;
+                                                        int32_t target_entity_id;
+                                                    };
+                                                } guardian;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        enum mcpr_evocation_illager_spell spell;
+                                                    };
+                                                } evocation_illager;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool in_attack_mode;
+                                                        } flags;
+                                                    };
+                                                } vex;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool has_target;
+                                                        } flags;
+                                                    };
+                                                } vindication_illager;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        bool is_swinging_arms;
+                                                    };
+                                                } abstract_skeleton;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        struct
+                                                        {
+                                                            bool is_climbing;
+                                                        } flags;
+                                                    };
+                                                } spider;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        bool is_aggressive;
+                                                    };
+                                                } witch;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        int32_t center_head_target, left_head_target, right_head_target;
+                                                        int32_t invulnerable_time;
+                                                    };
+                                                } wither;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        bool is_baby;
+                                                        bool are_hands_up;
+
+                                                        struct
+                                                        {
+                                                            union
+                                                            {
+                                                                bool is_converting;
+                                                                enum mcpr_villager_profession profession;
+                                                            };
+                                                        } zombie_villager;
+                                                    };
+                                                } zombie;
+
+                                                struct
+                                                {
+                                                    union
+                                                    {
+                                                        int32_t carried_block; // or -1
+                                                        bool is_screaming;
+                                                    };
+                                                } enderman;
+                                            };
+                                        } monster;
+                                    };
+                                } creature;
+
+                                struct
+                                {
+                                    enum mcpr_dragon_phase phase;
+                                } ender_dragon;
+
+                                struct
+                                {
+                                    union
+                                    {
+                                        struct
+                                        {
+                                            union
+                                            {
+                                                bool is_attacking;
+                                            };
+                                        } ghast
+                                    };
+                                } flying;
+
+                                struct
+                                {
+                                    union
+                                    {
+                                        int32_t size;
+                                    };
+                                } slime;
+                            };
+                        } insentient;
+                    };
+                } living;
+
+                struct
+                {
+                    union
+                    {
+                        int32_t shaking_power;
+                        int32_t shaking_direction;
+                        float shaking_multiplier;
+                        int32_t custom_block_id_and_damage;
+                        int32_t custom_block_y_position;
+                        bool show_custom_block;
+
+                        struct
+                        {
+                            union
+                            {
+                                bool is_powered;
+                            };
+                        } minecart_furnace;
+
+                        struct
+                        {
+                            union
+                            {
+                                char *command;
+                                char *chat_last_output;
+                            };
+                        } minecart_command_block;
+                    };
+                } minecart;
+
+                struct
+                {
+                    union
+                    {
+                        int32_t fuse_time;
+                    };
+                } tnt_primed;
+            };
+        } entity;
+
+        struct
+        {
+            bool is_baby;
+        } ageable;
+    };
+};
+
 struct mcpr_abstract_packet
 {
     int8_t id;
@@ -625,11 +1154,6 @@ struct mcpr_abstract_packet
                     enum mcpr_state next_state;
                 } handshake;
             } serverbound;
-
-            union // handshake - clientbound
-            {
-
-            } clientbound;
         } handshake;
 
         struct // login
