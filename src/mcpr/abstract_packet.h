@@ -10,7 +10,6 @@
 
 #include "mcpr/mcpr.h"
 
-// TODO add more defines
 #define MCPR_PKT_HS_SB_HANDSHAKE 0x00;
 
 
