@@ -119,6 +119,7 @@ void net_cleanup(void) {
     // TODO
 }
 
+// TODO keep alive packets
 void net_tick(void) {
     accept_incoming_connections();
     serve_clients();
