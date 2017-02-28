@@ -3,10 +3,11 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <ninuuid/ninuuid.h>
 #include <mcpr/mcpr.h>
-#include <mcpr/mcpr_abstract_packet.h>
+#include <mcpr/abstract_packet.h>
 
 #include <world/fposition.h>
 
@@ -46,6 +47,8 @@ struct player {
     } client_settings;
 
     long last_teleport_id;
+    struct timespec last_keepalive_received; // Based on server_get_internal_clock_time()
+    struct timespec last_keepalive_sent; // Based on server_get_internal_clock_time()
 };
 
 

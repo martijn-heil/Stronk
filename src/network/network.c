@@ -297,495 +297,396 @@ static void serve_client_batch(void *arg)
 
 
 
-        struct mcpr_abstract_packet *pkt = connection_read_abstract_packet(conn); // TODO read multiple packets in a single tick.
-
-        if(pkt == NULL)
+        if(player != NULL)
         {
-            if(mcpr_errno == MCPR_ECOMPRESSTHRESHOLD)
-            {
-                char *reason = mcpr_as_chat("Compression threshold was violated.");
-                DISCONNECT_CURRENT_CONN(reason);
-                free(reason);
-            }
+            struct timespec now;
+            server_get_internal_clock_time(&now);
 
-            nlog_error("Could not read packet from client. (%s ?)", strerror(errno));
+            struct timespec diff;
+            timespec_diff(&diff, &(player->last_keepalive_sent), &now);
+
+            if(diff.tv_sec >= 10)
+            {
+                struct mcpr_abstract_packet keep_alive;
+
+                keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
+                keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
+
+
+
+                if(WRITE_PACKET(&keep_alive) < 0)
+                {
+                    if(mcpr_errno == ECONNRESET)
+                    {
+                        CLOSE_CURRENT_CONN();
+                        continue;
+                    }
+                    else
+                    {
+                        nlog_error("Could not send keep alive packet. (%s)", mcpr_strerror(mcpr_errno));
+                    }
+                }
+                else
+                {
+                    server_get_internal_clock_time(&(player->last_keepalive_sent));
+                }
+            }
         }
 
 
-
-        switch(conn->state)
+        // Loop handling all packets available.
+        unsigned int packet_counter = 0;
+        loop_start:
         {
-            case MCPR_STATE_HANDSHAKE:
-            {
-                switch(pkt->id)
-                {
-                    case MCPR_PKT_HS_SB_HANDSHAKE:
-                    {
-                        int32_t protocol_version = pkt->data.handshake.serverbound.handshake.protocol_version;
-                        conn->state = pkt->data.handshake.serverbound.handshake.next_state;
+            // Only handle a maximum amount of packets for this connection,
+            // in this single tick, to prevent locking up the server.
+            if(packet_counter >= 50) continue;
 
-                        if(protocol_version != MCPR_PROTOCOL_VERSION)
+
+            struct mcpr_abstract_packet *pkt = connection_read_abstract_packet(conn);
+
+            if (pkt == NULL)
+            {
+                if(mcpr_errno == MCPR_ECOMPRESSTHRESHOLD)
+                {
+                    char *reason = mcpr_as_chat("Compression threshold was violated.");
+                    DISCONNECT_CURRENT_CONN(reason);
+                    free(reason);
+                    goto disconnected;
+                }
+                else if (mcpr_errno != EAGAIN && mcpr_errno != EWOULDBLOCK)
+                {
+                    nlog_error("Could not read packet from client. (%s ?)", strerror(errno));
+                    goto loop_start;
+                }
+                else
+                {
+                    nlog_debug("No data to be received on socket %i", conn->fd);
+                    goto exit_current_conn;
+                }
+            }
+
+
+
+
+
+            switch(conn->state)
+            {
+                case MCPR_STATE_HANDSHAKE:
+                {
+                    switch(pkt->id)
+                    {
+                        case MCPR_PKT_HS_SB_HANDSHAKE:
                         {
-                            if(conn->state == MCPR_STATE_LOGIN)
+                            int32_t protocol_version = pkt->data.handshake.serverbound.handshake.protocol_version;
+                            conn->state = pkt->data.handshake.serverbound.handshake.next_state;
+
+                            if(protocol_version != MCPR_PROTOCOL_VERSION)
                             {
-                                char *reason = mcpr_as_chat("Protocol version " PRId32 " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
-                                DISCONNECT_CURRENT_CONN(reason);
-                                free(reason);
+                                if(conn->state == MCPR_STATE_LOGIN)
+                                {
+                                    char *reason = mcpr_as_chat("Protocol version " PRId32 " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
+                                    DISCONNECT_CURRENT_CONN(reason);
+                                    free(reason);
+                                    goto exit_current_conn;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            case MCPR_STATE_STATUS:
-            {
-                switch(pkt->id)
+                case MCPR_STATE_STATUS:
                 {
-                    case MCPR_PK_ST_SB_REQUEST:
+                    switch(pkt->id)
                     {
-                        struct mcpr_abstract_packet response;
-                        response.id = MCPR_PKT_ST_SB_RESPONSE;
-                        response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
-                        response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
-                        response.data.status.clientbound.response.max_players = max_players;
-                        response.data.status.clientbound.response.online_players_size = hash_table_num_entries(players);
-                        response.data.status.clientbound.response.description = motd;
-                        response.data.status.clientbound.response.online_players = NULL;
-                        response.data.status.clientbound.response.favicon = NULL;
-
-
-                        if(WRITE_PACKET(&response) < 0)
+                        case MCPR_PK_ST_SB_REQUEST:
                         {
-                            if(mcpr_errno == ECONNRESET)
+                            struct mcpr_abstract_packet response;
+                            response.id = MCPR_PKT_ST_SB_RESPONSE;
+                            response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
+                            response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
+                            response.data.status.clientbound.response.max_players = max_players;
+                            response.data.status.clientbound.response.online_players_size = hash_table_num_entries(players);
+                            response.data.status.clientbound.response.description = motd;
+                            response.data.status.clientbound.response.online_players = NULL;
+                            response.data.status.clientbound.response.favicon = NULL;
+
+
+                            if(WRITE_PACKET(&response) < 0)
                             {
-                                CLOSE_CURRENT_CONN();
-                                break;
-                            }
-                            else
-                            {
-                                nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
-                                break;
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto exit_current_conn;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                    goto next_packet;
+                                }
                             }
                         }
-                    }
 
-                    case MCPR_PKT_ST_SB_PING:
-                    {
-                        struct mcpr_abstract_packet response;
-                        response.id = MCPR_PKT_ST_CB_PONG;
-                        response.data.status.clientbound.pong.payload = pkt.data.status.serverbound.ping.payload;
-
-                        if(WRITE_PACKET(&response) < 0)
+                        case MCPR_PKT_ST_SB_PING:
                         {
-                            if(mcpr_errno == ECONNRESET)
+                            struct mcpr_abstract_packet response;
+                            response.id = MCPR_PKT_ST_CB_PONG;
+                            response.data.status.clientbound.pong.payload = pkt.data.status.serverbound.ping.payload;
+
+                            if(WRITE_PACKET(&response) < 0)
                             {
-                                CLOSE_CURRENT_CONN();
-                                break;
-                            }
-                            else
-                            {
-                                nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
-                                break;
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto exit_current_conn;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                    goto next_packet;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            case MCPR_STATE_LOGIN:
-            {
-                switch(pkt->id)
+                case MCPR_STATE_LOGIN:
                 {
-                    case MCPR_PKT_LG_SB_LOGIN_START:
+                    switch(pkt->id)
                     {
-                        RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
-
-                        unsigned char *buf = NULL; // TODO should this be freed afterwards?
-                        int buflen = i2d_RSA_PUBKEY(rsa, &buf);
-                        if(buflen < 0)
+                        case MCPR_PKT_LG_SB_LOGIN_START:
                         {
-                            // Error occured.
-                            nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
-                            break;
-                        }
-                        if(buflen > INT32_MAX || buflen < INT32_MIX) // TODO is INT32_LEAST a thing?
-                        {
-                            nlog_error("Integer overflow.");
-                            RSA_free(rsa);
-                            break;
-                        }
+                            RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
 
-                        int32_t verify_token_length = 16;
-                        uint8_t *verify_token = malloc(verify_token_length * sizeof(uint8_t)); // 128 bit verify token.
-                        if(verify_token == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            RSA_free(rsa);
-                            break;
-                        }
-
-                        if(secure_random(verify_token, verify_token_length) < 0)
-                        {
-                            nlog_error("Could not get random data.");
-                            RSA_free(rsa);
-                            break;
-                        }
-
-
-                        struct mcpr_abstract_packet response;
-                        response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
-                        response.data.login.clientbound.encryption_request.server_id = ""; // Yes that's supposed to be an empty string.
-                        response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
-                        response.data.login.clientbound.encryption_request.public_key = buf;
-                        response.data.login.clientbound.encryption_request.verify_token_length = verify_token_length;
-                        response.data.login.clientbound.encryption_request.verify_token = verify_token;
-
-
-                        if(WRITE_PACKET(&response) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            unsigned char *buf = NULL; // TODO should this be freed afterwards?
+                            int buflen = i2d_RSA_PUBKEY(rsa, &buf);
+                            if(buflen < 0)
                             {
-                                CLOSE_CURRENT_CONN();
+                                // Error occured.
+                                nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
+                                goto next_packet;
+                            }
+                            if(buflen > INT32_MAX || buflen < INT32_MIX) // TODO is INT32_LEAST a thing?
+                            {
+                                nlog_error("Integer overflow.");
                                 RSA_free(rsa);
-                                break;
+                                goto next_packet;
                             }
-                            else
+
+                            int32_t verify_token_length = 16;
+                            uint8_t *verify_token = malloc(verify_token_length * sizeof(uint8_t)); // 128 bit verify token.
+                            if(verify_token == NULL)
                             {
-                                nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
                                 RSA_free(rsa);
-                                break;
+                                goto next_packet;
+                            }
+
+                            if(secure_random(verify_token, verify_token_length) < 0)
+                            {
+                                nlog_error("Could not get random data.");
+                                RSA_free(rsa);
+                                goto next_packet;
+                            }
+
+
+                            struct mcpr_abstract_packet response;
+                            response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
+                            response.data.login.clientbound.encryption_request.server_id = ""; // Yes that's supposed to be an empty string.
+                            response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
+                            response.data.login.clientbound.encryption_request.public_key = buf;
+                            response.data.login.clientbound.encryption_request.verify_token_length = verify_token_length;
+                            response.data.login.clientbound.encryption_request.verify_token = verify_token;
+
+
+                            if(WRITE_PACKET(&response) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    RSA_free(rsa);
+                                    goto next_packet;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                    RSA_free(rsa);
+                                    goto next_packet;
+                                }
+                            }
+
+                            struct tmp_encryption_state *tmp_state = malloc(sizeof(struct tmp_encryption_state))
+                            if(tmp_state == NULL)
+                            {
+                                nlog_error("Could not allocate memory (%s)", strerror(errno));
+                                RSA_free(rsa);
+                                goto next_packet;
+                            }
+
+                            tmp_state->rsa = rsa;
+                            tmp_state->verify_token_length = verify_token_length;
+                            tmp_state->verify_token = verify_token;
+
+
+                            if(hash_table_insert(tmp_encryption_states, conn, tmp_state) == 0)
+                            {
+                                nlog_error("Could not insert entry into hash table. (%s ?)", strerror(errno));
+                                RSA_free(rsa);
+                                goto next_packet;
                             }
                         }
 
-                        struct tmp_encryption_state *tmp_state = malloc(sizeof(struct tmp_encryption_state))
-                        if(tmp_state == NULL)
+                        case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
                         {
-                            nlog_error("Could not allocate memory (%s)", strerror(errno));
-                            RSA_free(rsa);
-                            break;
-                        }
+                            bool player_inserted = false;
+                            bool player_inserted2 = false;
+                            struct tmp_encryption_state *tmp_state = NULL;
+                            void *decrypted_shared_secret = NULL;
+                            char *username = NULL;
 
-                        tmp_state->rsa = rsa;
-                        tmp_state->verify_token_length = verify_token_length;
-                        tmp_state->verify_token = verify_token;
-
-
-                        if(hash_table_insert(tmp_encryption_states, conn, tmp_state) == 0)
-                        {
-                            nlog_error("Could not insert entry into hash table. (%s ?)", strerror(errno));
-                            RSA_free(rsa);
-                            break;
-                        }
-                    }
-
-                    case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
-                    {
-                        bool player_inserted = false;
-                        bool player_inserted2 = false;
-                        struct tmp_encryption_state *tmp_state = NULL;
-                        void *decrypted_shared_secret = NULL;
-                        char *username = NULL;
-
-                        username = hash_table_lookup(tmp_username_states, conn);
-                        if(username == HASH_TABLE_NULL)
-                        {
-                            nlog_error("Could not find entry in hash table.");
-                            char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
-                            DISCONNECT_CURRENT_CONN(reason);
-                            free(reason);
-                        }
-
-                        tmp_state = hash_table_lookup(tmp_encryption_states, conn);
-                        if(tmp_state == HASH_TABLE_NULL) // Shouldn't happen.
-                        {
-                            nlog_error("Could not find entry in hash table.");
-                            char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
-                            DISCONNECT_CURRENT_CONN(reason);
-                            hash_table_remove(tmp_username_states, conn);
-                            free(reason);
-                            free(username);
-                            break;
-                        }
-                        RSA *rsa = tmp_state->rsa;
-
-                        int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
-                        void *shared_secret = pkt->data.login.serverbound.encryption_response.shared_secret;
-
-                        if(shared_secret_length > INT_MAX)
-                        {
-                            nlog_error("Integer overflow.");
-                            goto err;
-                        }
-
-                        decrypted_shared_secret = malloc(RSA_size(rsa));
-                        if(decrypted_shared_secret == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            goto err;
-                        }
-
-                        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, rsa, RSA_PKCS1_PADDING);
-                        if(size < 0)
-                        {
-                            nlog_error("Could not decrypt shared secret."); // TODO proper error handling.
-                            goto err;
-                        }
-
-                        conn->ctx_encrypt = malloc(sizeof(conn->ctx_encrypt));
-                        if(conn->ctx_encrypt == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            goto err;
-                        }
-                        EVP_CIPHER_CTX_init(conn->ctx_encrypt);
-                        if(EVP_EncryptInit_ex(conn->ctx_encrypt, EVP_aes_128_cfb8(),
-                         NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
-                         {
-                            nlog_error("Error upon EVP_EncryptInit_ex()."); // TODO proper error handling.
-                            goto err;
-                        }
-
-                        conn->ctx_decrypt = malloc(sizeof(conn->ctx_decrypt));
-                        if(conn->ctx_decrypt == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            goto err;
-                        }
-                        EVP_CIPHER_CTX_init(conn->ctx_decrypt);
-                        if(EVP_DecryptInit_ex(conn->ctx_decrypt), EVP_aes_128_cfb8(),
-                         NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
-                         {
-                            nlog_error("Error upon EVP_DecryptInit_ex()."); // TODO proper error handling.
-                            goto err;
-                        }
-
-                        unsigned char *encoded_public_key = NULL; // TODO should this be freed afterwards?
-                        int encoded_public_key_len = i2d_RSA_PUBKEY(rsa, &encoded_public_key);
-                        if(encoded_public_key_len < 0)
-                        {
-                            // Error occured.
-                            nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
-                            break;
-                        }
-
-                        uint8_t server_id_hash[SHA_DIGEST_LENGTH];
-
-                        SHA_CTX sha_ctx;
-                        if(unlikely(SHA1_Init(&sha_ctx) == 0))
-                        {
-                            nlog_error("Could not initialize SHA-1 hash.");
-                            goto err;
-                        }
-                        if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_len) == 0)
-                        {
-                            nlog_error("Could not update SHA-1 hash.");
-                            uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
-                            SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
-                            goto err;
-                        }
-                        if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0)
-                        {
-                            nlog_error("Could not update SHA-1 hash.");
-                            uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
-                            SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
-                            goto err;
-                        }
-                        if(SHA1_Final(server_id_hash, &sha_ctx) == 0)
-                        {
-                            nlog_error("Could not finalize SHA-1 hash.");
-                            goto err;
-                        }
-
-                        char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
-                        mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
-
-                        struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(username, stringified_server_id_hash);
-                        if(mapi_result == NULL)
-                        {
-                            // TODO handle legit non error case where a failure happened.
-                            goto err;
-                        }
-
-
-                        struct mcpr_abstract_packet response;
-                        response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
-                        response.data.login.clientbound.login_success.uuid = mapi_result->id;
-                        response.data.login.clientbound.login_success.username = username;
-
-                        if(WRITE_PACKET(&response) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            username = hash_table_lookup(tmp_username_states, conn);
+                            if(username == HASH_TABLE_NULL)
                             {
-                                CLOSE_CURRENT_CONN();
-                                break;
-                            }
-                            else
-                            {
-                                nlog_error("Could not send login success packet to connection. (%s ?)", mcpr_strerror(mcpr_errno));
-                                char *reason = mcpr_as_chat("An error occurred.");
+                                nlog_error("Could not find entry in hash table.");
+                                char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
                                 DISCONNECT_CURRENT_CONN(reason);
                                 free(reason);
+                                goto exit_current_conn;
                             }
-                            goto err;
-                        }
 
-                        conn->state = MCPR_STATE_PLAY;
-
-                        hash_table_remove(tmp_encryption_states, conn);
-                        hash_table_remove(tmp_username_states, conn);
-                        RSA_free(rsa);
-                        free(tmp_state->verify_token);
-                        free(tmp_state);
-                        free(decrypted_shared_secret);
-                        free(username);
-
-                        player = malloc(sizeof(player));
-                        if(player == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            goto err;
-                        }
-                        player->uuid = mapi_result->id;
-                        player->conn = *conn;
-                        player->brand = NULL;
-                        player->invulnerable = false;
-                        player->is_flying = false;
-                        player->allow_flying = false;
-                        player->gamemode = MCPR_GAMEMODE_SURVIVAL;
-                        player->client_settings_known = false;
-
-                        player->compass_target.x = 0;
-                        player->compass_target.y = 0;
-                        player->compass_target.z = 0;
-
-
-                        if(pthread_mutex_lock(clients_delete_lock) != 0)
-                        {
-                            nlog_error("Could not lock client deletion lock. (%s)", strerror(errno));
-                            goto err;
-                        }
-                        slist_remove_entry(&first, current_entry);
-                        pthread_mutex_unlock(clients_delete_lock);
-                        free(conn);
-
-                        if(pthread_mutex_lock(entity_id_counter_lock) != 0)
-                        {
-                            nlog_error("Could not lock global entity ID counter lock. (%s)", strerror(errno));
-                            goto err;
-                        }
-                        player->entity_id = entity_id_counter;
-                        entity_id_counter++;
-                        pthread_mutex_unlock(entity_id_counter_lock);
-
-                        if(hash_table_insert(players, &(player->uuid), player) == 0)
-                        {
-                            nlog_error("Could not add player to players hash table. (%s ?)", strerror(errno));
-                            goto err;
-                        }
-                        player_inserted = true;
-
-                        if(hash_table_insert(conn_to_player, conn, player) == 0)
-                        {
-                            nlog_error("Could not add player to hash table. (%s ?)", strerror(errno));
-                            goto err;
-                        }
-                        player_inserted2 = true;
-
-                        struct mcpr_abstract_packet join_game_pkt;
-                        join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
-                        join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
-                        join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
-                        join_game_pkt.data.play.clientbound.join_game.hardcore = false;
-                        join_game_pkt.data.play.clientbound.join_game.dimension = MCPR_DIMENSION_OVERWORLD;
-                        join_game_pkt.data.play.clientbound.join_game.difficulty = MCPR_DIFFICULTY_PEACEFUL;
-                        join_game_pkt.data.play.clientbound.join_game.max_players = 999;
-                        join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
-                        join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
-
-                        if(WRITE_PACKET(&join_game_pkt) < 0)
-                        {
-                            nlog_error("Could not send join game packet. (%s)", mcpr_strerror(mcpr_errno));
-                            goto err;
-                        }
-
-
-                        uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
-                        ssize_t encode_str_result = mcpr_encode_string(server_brand_buf, "Stronk");
-                        if(encode_str_result < 0)
-                        {
-                            nlog_error("Could not encode brand string.");
-                            goto err;
-                        }
-
-
-                        struct mcpr_abstract_packet pm_brand;
-                        pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
-                        pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
-                        pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
-                        pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
-
-                        if(WRITE_PACKET(&pm_brand) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            tmp_state = hash_table_lookup(tmp_encryption_states, conn);
+                            if(tmp_state == HASH_TABLE_NULL) // Shouldn't happen.
                             {
-                                CLOSE_CURRENT_CONN();
-                                goto cleanup_only;
+                                nlog_error("Could not find entry in hash table.");
+                                char *reason = mcpr_as_chat("An error occurred whilst setting up encryption.");
+                                DISCONNECT_CURRENT_CONN(reason);
+                                hash_table_remove(tmp_username_states, conn);
+                                free(reason);
+                                free(username);
+                                goto exit_current_conn;
                             }
-                            else
+                            RSA *rsa = tmp_state->rsa;
+
+                            int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
+                            void *shared_secret = pkt->data.login.serverbound.encryption_response.shared_secret;
+
+                            if(shared_secret_length > INT_MAX)
                             {
-                                nlog_error("Could not write MC|BRAND plugin message. (%s)", mcpr_strerror(mcpr_errno));
+                                nlog_error("Integer overflow.");
                                 goto err;
                             }
-                        }
 
-                        struct mcpr_abstract_packet spawn_position_pkt;
-                        spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
-                        spawn_position_pkt.location = player->compass_target;
-
-                        if(WRITE_PACKET(&spawn_position_pkt) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            decrypted_shared_secret = malloc(RSA_size(rsa));
+                            if(decrypted_shared_secret == NULL)
                             {
-                                CLOSE_CURRENT_CONN();
-                                goto cleanup_only;
-                            }
-                            else
-                            {
-                                nlog_error("Could not write spawn position packet. (%s)", mcpr_strerror(mcpr_errno));
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
                                 goto err;
                             }
-                        }
 
-                        struct mcpr_abstract_packet player_abilities_pkt;
-                        player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
-                        player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
-                        player_abilities_pkt.data.play.clientbound.player_abilities.can_fly = player->allow_flying;
-                        player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
-                        player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
-                        player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1f;
-
-                        if(WRITE_PACKET(&player_abilities_pkt) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, rsa, RSA_PKCS1_PADDING);
+                            if(size < 0)
                             {
-                                CLOSE_CURRENT_CONN();
-                                goto cleanup_only;
-                            }
-                            else
-                            {
-                                nlog_error("Could not write player abilities packet. (%s)", mcpr_strerror(mcpr_errno));
+                                nlog_error("Could not decrypt shared secret."); // TODO proper error handling.
                                 goto err;
                             }
-                        }
 
-                        break;
-                        err:
-                            char *reason = mcpr_as_chat("An error occurred whilst logging in.");
-                            DISCONNECT_CURRENT_CONN(reason);
-                            free(reason);
-                        cleanup_only:
-                            if(player_inserted) hash_table_remove(players, &(player->uuid));
-                            if(player_inserted2) hash_table_remove(conn_to_player, &(player->uuid))
+                            conn->ctx_encrypt = malloc(sizeof(conn->ctx_encrypt));
+                            if(conn->ctx_encrypt == NULL)
+                            {
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                                goto err;
+                            }
+                            EVP_CIPHER_CTX_init(conn->ctx_encrypt);
+                            if(EVP_EncryptInit_ex(conn->ctx_encrypt, EVP_aes_128_cfb8(),
+                             NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
+                             {
+                                nlog_error("Error upon EVP_EncryptInit_ex()."); // TODO proper error handling.
+                                goto err;
+                            }
+
+                            conn->ctx_decrypt = malloc(sizeof(conn->ctx_decrypt));
+                            if(conn->ctx_decrypt == NULL)
+                            {
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                                goto err;
+                            }
+                            EVP_CIPHER_CTX_init(conn->ctx_decrypt);
+                            if(EVP_DecryptInit_ex(conn->ctx_decrypt), EVP_aes_128_cfb8(),
+                             NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
+                             {
+                                nlog_error("Error upon EVP_DecryptInit_ex()."); // TODO proper error handling.
+                                goto err;
+                            }
+
+                            unsigned char *encoded_public_key = NULL; // TODO should this be freed afterwards?
+                            int encoded_public_key_len = i2d_RSA_PUBKEY(rsa, &encoded_public_key);
+                            if(encoded_public_key_len < 0)
+                            {
+                                // Error occured.
+                                nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
+                                goto err;
+                            }
+
+                            uint8_t server_id_hash[SHA_DIGEST_LENGTH];
+
+                            SHA_CTX sha_ctx;
+                            if(unlikely(SHA1_Init(&sha_ctx) == 0))
+                            {
+                                nlog_error("Could not initialize SHA-1 hash.");
+                                goto err;
+                            }
+                            if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_len) == 0)
+                            {
+                                nlog_error("Could not update SHA-1 hash.");
+                                uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
+                                SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
+                                goto err;
+                            }
+                            if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0)
+                            {
+                                nlog_error("Could not update SHA-1 hash.");
+                                uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
+                                SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
+                                goto err;
+                            }
+                            if(SHA1_Final(server_id_hash, &sha_ctx) == 0)
+                            {
+                                nlog_error("Could not finalize SHA-1 hash.");
+                                goto err;
+                            }
+
+                            char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
+                            mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
+
+                            struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(username, stringified_server_id_hash);
+                            if(mapi_result == NULL)
+                            {
+                                // TODO handle legit non error case where a failure happened.
+                                goto err;
+                            }
+
+
+                            struct mcpr_abstract_packet response;
+                            response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
+                            response.data.login.clientbound.login_success.uuid = mapi_result->id;
+                            response.data.login.clientbound.login_success.username = username;
+
+                            if(WRITE_PACKET(&response) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto cleanup_only;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not send login success packet to connection. (%s ?)", mcpr_strerror(mcpr_errno));
+                                    goto err;
+                                }
+                            }
+
+                            conn->state = MCPR_STATE_PLAY;
+
                             hash_table_remove(tmp_encryption_states, conn);
                             hash_table_remove(tmp_username_states, conn);
                             RSA_free(rsa);
@@ -793,109 +694,255 @@ static void serve_client_batch(void *arg)
                             free(tmp_state);
                             free(decrypted_shared_secret);
                             free(username);
-                            free(player);
-                            break;
-                    }
-                }
-            }
 
-            case MCPR_STATE_PLAY:
-            {
-                switch(pkt->id)
-                {
-                    case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
-                    {
-                        if(strcmp(pkt->data.play.serverbound.plugin_message.channel, "MC|BRAND") == 0)
-                        {
-                            int32_t data_length = pkt->data.play.serverbound.plugin_message.data_length;
-                            if(data_length < 0) break;
-                            if(data_length > SIZE_MAX) break;
-                            void *data = pkt->data.play.serverbound.plugin_message.data;
-
-                            char *client_brand;
-                            ssize_t result = mcpr_decode_string(&client_brand, data, (size_t) data_length);
-                            if(result < 0) break;
-
-                            player->client_brand = client_brand;
-                        }
-                    }
-
-                    case MCPR_PKT_PL_SB_CLIENT_SETTINGS:
-                    {
-                        // We don't know how the locale in the packet is allocated, so we need to copy the string to ensure
-                        // that it is allocated via malloc()
-                        char *locale = pkt->data.play.serverbound.client_settings.locale;
-                        player->client_settings->locale = malloc(strlen(locale) + 1);
-                        if(player->client_settings->locale == NULL)
-                        {
-                            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-                            break;
-                        }
-                        strcpy(player->client_settings->locale, locale, strlen(locale));
-
-                        player->client_settings->view_distance = pkt->data.play.serverbound.client_settings.view_distance;
-                        player->client_settings->chat_mode = pkt->data.play.serverbound.client_settings.chat_mode;
-                        player->client_settings->chat_colors = pkt->data.play.serverbound.client_settings.chat_colors;
-                        player->client_settings->chat_mode = pkt->data.play.serverbound.client_settings.chat_mode;
-
-                        player->client_settings->displayed_skin_parts->cape_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.cape_enabled;
-                        player->client_settings->displayed_skin_parts->jacket_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.jacket_enabled;
-                        player->client_settings->displayed_skin_parts->left_sleeve_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_sleeve_enabled;
-                        player->client_settings->displayed_skin_parts->right_sleeve_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_sleeve_enabled;
-                        player->client_settings->displayed_skin_parts->left_pants_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_pants_enabled;
-                        player->client_settings->displayed_skin_parts->right_pants_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_pants_enabled;
-                        player->client_settings->displayed_skin_parts->hat_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.hat_enabled;
-
-                        player->client_settings_known = true;
-
-
-                        if(world_send_chunk_data(p) < 0)
-                        {
-                            nlog_error("Could not send chunk data to player. (%s ?)", strerror(errno));
-                            char *reason = mcpr_as_chat("An error occurred whilst logging in.");
-                            DISCONNECT_CURRENT_CONN(reason);
-                            free(reason);
-                        }
-
-                        struct mcpr_abstract_packet response;
-                        response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
-                        response.data.play.clientbound.player_position_and_look.x = player->pos.x;
-                        response.data.play.clientbound.player_position_and_look.feet_y = player->pos.y;
-                        response.data.play.clientbound.player_position_and_look.feet_z = player->pos.z;
-                        response.data.play.clientbound.player_position_and_look.pitch = player->pos.pitch;
-                        response.data.play.clientbound.player_position_and_look.yaw = player->pos.yaw;
-
-                        response.data.play.clientbound.player_position_and_look.x_is_relative = false;
-                        response.data.play.clientbound.player_position_and_look.y_is_relative = false;
-                        response.data.play.clientbound.player_position_and_look.z_is_relative = false;
-                        response.data.play.clientbound.player_position_and_look.pitch_is_relative = false;
-                        response.data.play.clientbound.player_position_and_look.yaw_is_relative = false;
-
-                        response.data.play.clientbound.player_position_and_look.teleport_id = 0;
-
-                        if(WRITE_PACKET(&response) < 0)
-                        {
-                            if(mcpr_errno == ECONNRESET)
+                            player = malloc(sizeof(player));
+                            if(player == NULL)
                             {
-                                CLOSE_CURRENT_CONN();
-                                break;
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                                goto err;
                             }
-                            else
-                            {
-                                nlog_error("Could not send player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+                            player->uuid = mapi_result->id;
+                            player->conn = *conn;
+                            player->brand = NULL;
+                            player->invulnerable = false;
+                            player->is_flying = false;
+                            player->allow_flying = false;
+                            player->gamemode = MCPR_GAMEMODE_SURVIVAL;
+                            player->client_settings_known = false;
 
+                            player->compass_target.x = 0;
+                            player->compass_target.y = 0;
+                            player->compass_target.z = 0;
+
+
+                            if(pthread_mutex_lock(clients_delete_lock) != 0)
+                            {
+                                nlog_error("Could not lock client deletion lock. (%s)", strerror(errno));
+                                goto err;
+                            }
+                            slist_remove_entry(&first, current_entry);
+                            pthread_mutex_unlock(clients_delete_lock);
+                            free(conn);
+
+                            if(pthread_mutex_lock(entity_id_counter_lock) != 0)
+                            {
+                                nlog_error("Could not lock global entity ID counter lock. (%s)", strerror(errno));
+                                goto err;
+                            }
+                            player->entity_id = entity_id_counter;
+                            entity_id_counter++;
+                            pthread_mutex_unlock(entity_id_counter_lock);
+
+                            if(hash_table_insert(players, &(player->uuid), player) == 0)
+                            {
+                                nlog_error("Could not add player to players hash table. (%s ?)", strerror(errno));
+                                goto err;
+                            }
+                            player_inserted = true;
+
+                            if(hash_table_insert(conn_to_player, conn, player) == 0)
+                            {
+                                nlog_error("Could not add player to hash table. (%s ?)", strerror(errno));
+                                goto err;
+                            }
+                            player_inserted2 = true;
+
+                            struct mcpr_abstract_packet join_game_pkt;
+                            join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
+                            join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
+                            join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
+                            join_game_pkt.data.play.clientbound.join_game.hardcore = false;
+                            join_game_pkt.data.play.clientbound.join_game.dimension = MCPR_DIMENSION_OVERWORLD;
+                            join_game_pkt.data.play.clientbound.join_game.difficulty = MCPR_DIFFICULTY_PEACEFUL;
+                            join_game_pkt.data.play.clientbound.join_game.max_players = 999;
+                            join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
+                            join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
+
+                            if(WRITE_PACKET(&join_game_pkt) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto cleanup_only;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not send join game packet. (%s)", mcpr_strerror(mcpr_errno));
+                                    goto err;
+                                }
+                            }
+
+
+                            uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
+                            ssize_t encode_str_result = mcpr_encode_string(server_brand_buf, "Stronk");
+                            if(encode_str_result < 0)
+                            {
+                                nlog_error("Could not encode brand string.");
+                                goto err;
+                            }
+
+
+                            struct mcpr_abstract_packet pm_brand;
+                            pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
+                            pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
+                            pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
+                            pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
+
+                            if(WRITE_PACKET(&pm_brand) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto cleanup_only;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write MC|BRAND plugin message. (%s)", mcpr_strerror(mcpr_errno));
+                                    goto err;
+                                }
+                            }
+
+                            struct mcpr_abstract_packet spawn_position_pkt;
+                            spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
+                            spawn_position_pkt.location = player->compass_target;
+
+                            if(WRITE_PACKET(&spawn_position_pkt) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto cleanup_only;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write spawn position packet. (%s)", mcpr_strerror(mcpr_errno));
+                                    goto err;
+                                }
+                            }
+
+                            struct mcpr_abstract_packet player_abilities_pkt;
+                            player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
+                            player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
+                            player_abilities_pkt.data.play.clientbound.player_abilities.can_fly = player->allow_flying;
+                            player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
+                            player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
+                            player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1f;
+
+                            if(WRITE_PACKET(&player_abilities_pkt) < 0)
+                            {
+                                if(mcpr_errno == ECONNRESET)
+                                {
+                                    CLOSE_CURRENT_CONN();
+                                    goto cleanup_only;
+                                }
+                                else
+                                {
+                                    nlog_error("Could not write player abilities packet. (%s)", mcpr_strerror(mcpr_errno));
+                                    goto err;
+                                }
+                            }
+
+                            goto cleanup_only;
+                            err:
                                 char *reason = mcpr_as_chat("An error occurred whilst logging in.");
                                 DISCONNECT_CURRENT_CONN(reason);
                                 free(reason);
+
+                                if(player_inserted) hash_table_remove(players, &(player->uuid));
+                                if(player_inserted2) hash_table_remove(conn_to_player, &(player->uuid))
+                                hash_table_remove(tmp_encryption_states, conn);
+                                hash_table_remove(tmp_username_states, conn);
+                                RSA_free(rsa);
+                                free(tmp_state->verify_token);
+                                free(tmp_state);
+                                free(decrypted_shared_secret);
+                                free(username);
+                                free(player);
+                                goto exit_current_conn;
+
+                            cleanup_only:
+                                if(player_inserted) hash_table_remove(players, &(player->uuid));
+                                if(player_inserted2) hash_table_remove(conn_to_player, &(player->uuid))
+                                hash_table_remove(tmp_encryption_states, conn);
+                                hash_table_remove(tmp_username_states, conn);
+                                RSA_free(rsa);
+                                free(tmp_state->verify_token);
+                                free(tmp_state);
+                                free(decrypted_shared_secret);
+                                free(username);
+                                free(player);
+                                goto next_packet;
+                        }
+                    }
+                }
+
+                case MCPR_STATE_PLAY:
+                {
+                    switch(pkt->id)
+                    {
+                        case MCPR_PKT_PL_SB_KEEP_ALIVE:
+                        {
+                            // We currently ignore keep alive ID's, we may need change that in the future.
+                            server_get_internal_clock_time(&(player->last_keepalive_received));
+                        }
+
+                        case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
+                        {
+                            if(strcmp(pkt->data.play.serverbound.plugin_message.channel, "MC|BRAND") == 0)
+                            {
+                                int32_t data_length = pkt->data.play.serverbound.plugin_message.data_length;
+                                if(data_length < 0) goto next_packet;
+                                if(data_length > SIZE_MAX) goto next_packet;
+                                void *data = pkt->data.play.serverbound.plugin_message.data;
+
+                                char *client_brand;
+                                ssize_t result = mcpr_decode_string(&client_brand, data, (size_t) data_length);
+                                if(result < 0) goto next_packet;
+
+                                player->client_brand = client_brand;
                             }
                         }
-                        player->last_teleport_id = 0;
-                    }
 
-                    case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:
-                    {
-                        if(player->last_teleport_id == 0)
+                        case MCPR_PKT_PL_SB_CLIENT_SETTINGS:
                         {
+                            // We don't know how the locale in the packet is allocated, so we need to copy the string to ensure
+                            // that it is allocated via malloc()
+                            char *locale = pkt->data.play.serverbound.client_settings.locale;
+                            player->client_settings->locale = malloc(strlen(locale) + 1);
+                            if(player->client_settings->locale == NULL)
+                            {
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
+                            }
+                            else
+                            {
+                                strcpy(player->client_settings->locale, locale, strlen(locale));
+                            }
+
+                            player->client_settings->view_distance = pkt->data.play.serverbound.client_settings.view_distance;
+                            player->client_settings->chat_mode = pkt->data.play.serverbound.client_settings.chat_mode;
+                            player->client_settings->chat_colors = pkt->data.play.serverbound.client_settings.chat_colors;
+                            player->client_settings->chat_mode = pkt->data.play.serverbound.client_settings.chat_mode;
+
+                            player->client_settings->displayed_skin_parts->cape_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.cape_enabled;
+                            player->client_settings->displayed_skin_parts->jacket_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.jacket_enabled;
+                            player->client_settings->displayed_skin_parts->left_sleeve_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_sleeve_enabled;
+                            player->client_settings->displayed_skin_parts->right_sleeve_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_sleeve_enabled;
+                            player->client_settings->displayed_skin_parts->left_pants_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_pants_enabled;
+                            player->client_settings->displayed_skin_parts->right_pants_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_pants_enabled;
+                            player->client_settings->displayed_skin_parts->hat_enabled = pkt->data.play.serverbound.client_settings.displayed_skin_parts.hat_enabled;
+
+                            player->client_settings_known = true;
+
+
+                            if(world_send_chunk_data(p) < 0)
+                            {
+                                nlog_error("Could not send chunk data to player. (%s ?)", strerror(errno));
+                                char *reason = mcpr_as_chat("An error occurred whilst logging in.");
+                                DISCONNECT_CURRENT_CONN(reason);
+                                free(reason);
+                                goto exit_current_conn;
+                            }
+
                             struct mcpr_abstract_packet response;
                             response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
                             response.data.play.clientbound.player_position_and_look.x = player->pos.x;
@@ -917,26 +964,102 @@ static void serve_client_batch(void *arg)
                                 if(mcpr_errno == ECONNRESET)
                                 {
                                     CLOSE_CURRENT_CONN();
-                                    break;
                                 }
                                 else
                                 {
-                                    nlog_error("Could not send confirmation player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+                                    nlog_error("Could not send player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
 
                                     char *reason = mcpr_as_chat("An error occurred whilst logging in.");
                                     DISCONNECT_CURRENT_CONN(reason);
                                     free(reason);
                                 }
+                                goto exit_current_conn;
                             }
+                            player->last_teleport_id = 0;
                         }
-                        player->last_teleport_id++;
+
+                        case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:
+                        {
+                            if(player->last_teleport_id == 0)
+                            {
+                                struct mcpr_abstract_packet response;
+                                response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
+                                response.data.play.clientbound.player_position_and_look.x = player->pos.x;
+                                response.data.play.clientbound.player_position_and_look.feet_y = player->pos.y;
+                                response.data.play.clientbound.player_position_and_look.feet_z = player->pos.z;
+                                response.data.play.clientbound.player_position_and_look.pitch = player->pos.pitch;
+                                response.data.play.clientbound.player_position_and_look.yaw = player->pos.yaw;
+
+                                response.data.play.clientbound.player_position_and_look.x_is_relative = false;
+                                response.data.play.clientbound.player_position_and_look.y_is_relative = false;
+                                response.data.play.clientbound.player_position_and_look.z_is_relative = false;
+                                response.data.play.clientbound.player_position_and_look.pitch_is_relative = false;
+                                response.data.play.clientbound.player_position_and_look.yaw_is_relative = false;
+
+                                response.data.play.clientbound.player_position_and_look.teleport_id = 0;
+
+                                if(WRITE_PACKET(&response) < 0)
+                                {
+                                    if(mcpr_errno == ECONNRESET)
+                                    {
+                                        CLOSE_CURRENT_CONN();
+                                        goto exit_current_conn;
+                                    }
+                                    else
+                                    {
+                                        nlog_error("Could not send confirmation player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+
+                                        char *reason = mcpr_as_chat("An error occurred whilst logging in.");
+                                        DISCONNECT_CURRENT_CONN(reason);
+                                        free(reason);
+                                        goto exit_current_conn;
+                                    }
+                                }
+                            }
+                            player->last_teleport_id++;
+                        }
                     }
                 }
             }
-        }
 
-        mcpr_free_abstract_packet(pkt);
+
+
+
+
+            // Normal control flow will get here automaticly,
+            // only jump to here if you wish to exit the current packet prematurely
+            next_packet:
+                mcpr_free_abstract_packet(pkt);
+                packet_counter++;
+                goto loop_start;
+
+            exit_current_conn:
+                mcpr_free_abstract_packet(pkt);
+                continue; // serve next connection in the for loop high above.
+        }
     }
+
+
+    if(player != NULL)
+    {
+        struct timespec now;
+        server_get_internal_clock_time(&now);
+
+        struct timespec diff;
+        timespec_diff(&diff, &(player->last_keepalive_received), &now);
+
+        if(diff.tv_sec >= 30)
+        {
+            char uuid[16];
+            ninuuid_to_string(&(player->uuid), uuid);
+            nlog_error("Player with UUID %s timed out. (server-side)", uuid);
+
+            char *reason = mcpr_as_chat("Timed out. (server-side)");
+            DISCONNECT_CURRENT_CONN(reason);
+            free(reason);
+        }
+    }
+
 
     free(arg);
 

@@ -79,7 +79,7 @@ void bswap(void *what, size_t n);
 
 
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop);
-void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2);
+void timespec_add(struct timespec *result, const struct timespec *t1, const struct timespec *t2); // All timespecs can alias eachother
 void timespec_addraw(struct timespec *result, const struct timespec *t1, long sec, long nsec);
 void ms_to_timespec(struct timespec *ts, unsigned long long ms);
 void timespec_to_timeval(struct timeval *tv, const struct timespec *ts);

@@ -42,18 +42,6 @@
 #include "stronk.h"
 #include "util.h"
 
-/*
-    <quote>
-
-    In the GNU C Library, stdin, stdout, and stderr are normal variables which you can set just like any others. For example,
-    to redirect the standard output to a file, you could do:
-        fclose (stdout);
-        stdout = fopen ("standard-output-file", "w");
-
-    </quote>
-
-    Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
-*/
 
 #ifndef HAVE_SECURE_RANDOM
 #define HAVE_SECURE_RANDOM
@@ -106,6 +94,7 @@ static bool logging_init = false;
 static bool thread_pooling_init = false;
 static bool networking_init = false;
 threadpool main_threadpool;
+static struct timespec internal_clock; // Every time the clock ticks 50ms is added
 
 
 
@@ -307,4 +296,17 @@ void cleanup(void)
 static void server_tick(void)
 {
     net_tick();
+
+
+    // Do this last.
+    struct timespec addend;
+    addend.tv_sec = 0;
+    addend.tv_nsec = tick_duration_ns;
+    timespec_add(&internal_clock, &internal_clock, &addend);
+}
+
+struct timespec server_get_internal_clock_time(struct timespec *out)
+{
+    out->tv_sec = internal_clock.tv_sec;
+    out->tv_nsec = internal_clock.tv_nsec;
 }

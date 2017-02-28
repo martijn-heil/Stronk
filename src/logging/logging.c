@@ -12,6 +12,19 @@
 #include "logging/logging.h"
 
 
+/*
+    <quote>
+
+    In the GNU C Library, stdin, stdout, and stderr are normal variables which you can set just like any others. For example,
+    to redirect the standard output to a file, you could do:
+        fclose (stdout);
+        stdout = fopen ("standard-output-file", "w");
+
+    </quote>
+
+    Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
+*/
+
 #ifdef __GNU_LIBRARY__
     #define STANDARD_STREAMS_ASSIGNABLE 1
 #else
