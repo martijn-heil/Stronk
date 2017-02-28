@@ -33,10 +33,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <openssl/evp.h>
 #include <jansson/jansson.h>
 #include <ninuuid/ninuuid.h>
 
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 
 /**
  * Open a packet's binary data as a file stream for reading. Can be used for the mcpr_read_* functions.
@@ -54,7 +55,7 @@ ssize_t mcpr_read_long          (int64_t *out, FILE *in);
 ssize_t mcpr_read_float         (float *out, FILE *in);
 ssize_t mcpr_read_double        (double *out, FILE *in);
 ssize_t mcpr_read_string        (char **out, FILE *in);
-ssize_t mcpr_read_chat          (json_t **out, FILE *in);
+ssize_t mcpr_read_chat          (char **out, FILE *in, size_t maxlen);
 ssize_t mcpr_read_varint        (int32_t *out, FILE *in);
 ssize_t mcpr_read_varlong       (int64_t *out, FILE *in);
 ssize_t mcpr_read_position      (struct mcpr_position *out, FILE *in);
@@ -71,8 +72,8 @@ ssize_t mcpr_write_int          (FILE *out, int32_t in);
 ssize_t mcpr_write_long         (FILE *out, int64_t in);
 ssize_t mcpr_write_float        (FILE *out, float in);
 ssize_t mcpr_write_double       (FILE *out, double in);
-ssize_t mcpr_write_string       (FILE *out, const char *restrict in);
-ssize_t mcpr_write_chat         (FILE *out, const json_t *in);
+ssize_t mcpr_write_string       (FILE *out, const char *in);
+ssize_t mcpr_write_chat         (FILE *out, const char *json_in);
 ssize_t mcpr_write_varint       (FILE *out, int32_t in);
 ssize_t mcpr_write_varlong      (FILE *out, int64_t in);
 ssize_t mcpr_write_position     (FILE *out, const struct mcpr_position *in);

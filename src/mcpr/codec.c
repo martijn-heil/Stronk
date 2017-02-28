@@ -30,18 +30,20 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 #include <errno.h>
 
 #include <ninuuid/ninuuid.h>
+#include <safe_math.h>
 
 #include "mcpr/codec.h"
-#include "../util.h"
+#include "util.h"
 
 #ifdef MCPR_DO_LOGGING
     #include "stronk.h"
 #endif
 
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 
 // TODO better logging
 
@@ -313,66 +315,11 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     return final_bytes_read;
 }
 
-ssize_t mcpr_decode_chat(json_t **out, const void *in)
+ssize_t mcpr_decode_chat(json_t **out, const void *in, size_t maxsize)
 {
-    int32_t len;
-    int bytes_read = mcpr_decode_varint(&len, in, 5);
-    if(bytes_read < 0)
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Error whilst decoding varint.");
-        #endif
-        return bytes_read;
-    }
-
-    // Do lot's of safety checks, arithmetic overflow and such things.
-    if(len < 1)
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Length of string is less than 1.");
-        #endif
-        return -1;
-    }
-    uint32_t ulen = (uint32_t) len; // len is guaranteed to be positive at this point.
-    if(ulen == UINT32_MAX)
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("uint32 arithmetic overflow error.");
-        #endif
-        return -1;;
-    } // Adding the extra 1 for a NUL byte would overflow.
-
-    if(unlikely((ulen + 1) > SIZE_MAX))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Length of string does not fit iside size_t, arithmetic overflow error.");
-        #endif
-
-        return -1;
-    } // The result would not fit in size_t, so we can't malloc it.
-
-    size_t bufsize;
-    if(unlikely(safe_mul(&bufsize, (size_t) (ulen + 1), sizeof(char)))) { return -1; }
-
-
-
-    char *buf = malloc(bufsize);
-    if(unlikely(buf == NULL))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not allocate memory for buffer. (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-
-
-    int status = mcpr_decode_string(buf, (in + bytes_read), len);
-
-    if(unlikely(status < 0))
-    {
-        free(buf);
-        return status;
-    }
+    char *buf;
+    ssize_t decode_string_result = mcpr_decode_string(&buf, in, maxsize);
+    if(decode_string_result < 0) return -1;
 
     json_error_t err;
     *out = json_loads(buf, 0, &err);
@@ -386,15 +333,7 @@ ssize_t mcpr_decode_chat(json_t **out, const void *in)
         return -1;
     }
 
-    int result;
-    if(!safe_add(&result, bytes_read, (int) len))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Safe add (result = bytes_read + len) failed. Arithmetic overflow error.");
-        #endif
-        return -1;
-    }
-    return result;
+    return decode_string_result;
 }
 
 // TODO fix

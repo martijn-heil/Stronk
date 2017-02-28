@@ -22,6 +22,11 @@
     streams.c - Encoding & decoding functions operating on streams.
 */
 
+// Apparently required with Cygwin
+#ifdef __CYGWIN__
+    #define _POSIX_SOURCE
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -30,37 +35,26 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/types.h>
 
 #include <jansson/jansson.h>
 #include <ninuuid/ninuuid.h>
 
-#include "mcpr.h"
-#include "streams.h"
-#include "crypto.h"
-
-
-
-#ifdef __GNUC__
-    #ifndef likely
-        #define likely(x)       __builtin_expect(!!(x), 1)
-    #endif
-
-    #ifndef unlikely
-        #define unlikely(x)     __builtin_expect(!!(x), 0)
-    #endif
-#else
-    #ifndef likely
-        #define likely(x) (x)
-    #endif
-
-    #ifndef unlikely
-        #define unlikely(x) (x)
-    #endif
-#endif
+#include "mcpr/mcpr.h"
+#include "mcpr/streams.h"
+#include "mcpr/crypto.h"
 
 
 #define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+
+#define hton16(x) htons(x)
+#define hton32(x) htonl(x)
+#define hton64(x) htonll(x)
+
+#define ntoh16(x) ntohs(x)
+#define ntoh32(x) ntohl(x)
+#define ntoh64(x) ntohll(x)
 
 
 FILE *mcpr_open_packet(struct mcpr_packet *pkt)
@@ -131,7 +125,8 @@ ssize_t mcpr_read_double(double *out, FILE *in)
     // TODO
 }
 
-ssize_t mcpr_read_string(char *out, FILE *in)
+// TODO fix
+ssize_t mcpr_read_string(char **out, FILE *in)
 {
     flockfile(in);
     int32_t len;
@@ -144,14 +139,15 @@ ssize_t mcpr_read_string(char *out, FILE *in)
 
     return bytes_read_1 + bytes_read_2;
 
+
     err:
         funlockfile(in);
         return -1;
 }
 
-ssize_t mcpr_read_chat(json_t **out, FILE *in)
+ssize_t mcpr_read_chat(char **out, FILE *in, size_t maxlen)
 {
-    // TODO
+    return mcpr_read_string(out, in, maxlen);
 }
 
 ssize_t mcpr_read_varint(int32_t *out, FILE *in)
@@ -164,7 +160,7 @@ ssize_t mcpr_read_varint(int32_t *out, FILE *in)
     do
     {
         read = getc(in);
-        if (tmp == EOF) goto err;
+        if (read == EOF) goto err;
         int value = (read & 0x7F); // 0x7F == 0b01111111
         result |= (value << (7 * num_read));
 
@@ -173,14 +169,14 @@ ssize_t mcpr_read_varint(int32_t *out, FILE *in)
         {
             goto err;
         }
-        else if (unlikely((num_read - 1) >= max_len))
+        else if ((num_read - 1) >= max_len)
         {
             goto err;
         }
     } while ((read & 0x80) != 0); // 0x80 == 0b10000000
     funlockfile(in);
 
-    ntoh(&result, sizeof(result));
+    result = ntoh32(result);
     *out = result;
     return num_read;
 
@@ -205,14 +201,14 @@ ssize_t mcpr_read_varlong(int64_t *out, FILE *in)
         result |= (value << (7 * num_read));
 
         num_read++;
-        if (unlikely(num_read > 10))
+        if (num_read > 10)
         {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("VarLong is longer than 10 bytes!");
             #endif
             return -1;
         }
-        else if (unlikely((num_read - 1) >= max_len))
+        else if ((num_read - 1) >= max_len)
         {
             #ifdef MCPR_DO_LOGGING
                 nlog_error("Max length (%zu) exceeded whilst decoding VarLong", max_len);
@@ -230,7 +226,7 @@ ssize_t mcpr_read_position(struct mcpr_position *out, FILE *in)
 {
     int64_t iin;
     if(fread(&iin, sizeof(int64_t), 1, in) != 1) return -1;
-    ntoh(&iin, sizeof(int64_t));
+    iin = ntoh64(iin);
 
     int64_t x = iin >> 38;
     int64_t y = (iin >> 26) & 0xFFF;
@@ -274,7 +270,7 @@ ssize_t mcpr_write_ubyte    (FILE *out, uint8_t in)
 
 ssize_t mcpr_write_short    (FILE *out, int16_t in)
 {
-    in = htons(in);
+    in = hton16(in);
     if (fwrite(&in, sizeof(int16_t), 1, out) != 1) return -1;
     fflush(out);
     return sizeof(int16_t);
@@ -282,7 +278,7 @@ ssize_t mcpr_write_short    (FILE *out, int16_t in)
 
 ssize_t mcpr_write_ushort   (FILE *out, uint16_t in)
 {
-    in = htons(in);
+    in = hton16(in);
     if (fwrite(&in, sizeof(uint16_t), 1, out) != 1) return -1;
     fflush(out);
     return sizeof(uint16_t);
@@ -290,7 +286,7 @@ ssize_t mcpr_write_ushort   (FILE *out, uint16_t in)
 
 ssize_t mcpr_write_int      (FILE *out, int32_t in)
 {
-    in = htonl(in);
+    in = hton32(in);
     if (fwrite(&in, sizeof(int32_t), 1, out) != 1) return -1;
     fflush(out);
     return sizeof(int32_t);
@@ -298,7 +294,7 @@ ssize_t mcpr_write_int      (FILE *out, int32_t in)
 
 ssize_t mcpr_write_long     (FILE *out, int64_t in)
 {
-    in = htonll(in);
+    in = hton64(in);
     if (fwrite(&in, sizeof(int64_t), 1, out) != 1) return -1;
     fflush(out);
     return sizeof(int64_t);
@@ -347,7 +343,7 @@ struct mcpr_packet *mcpr_read_packet(FILE *in, bool use_compression, bool force_
         } while ((read & 0x80) != 0); // 0x80 == 0b10000000
 
         mcpr_fflush(in);
-        ntoh(&result, sizeof(result));
+        result = ntoh32(result);
         pkt_len = result;
     }
 

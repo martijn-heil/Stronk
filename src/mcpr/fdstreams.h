@@ -33,10 +33,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <jansson/jansson.h>
+#include <openssl/evp.h>
 #include <ninuuid/ninuuid.h>
 
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 
 ssize_t mcpr_fd_read_byte          (int8_t *out, int in);
 ssize_t mcpr_fd_read_ubyte         (uint8_t *out, int in);
@@ -46,8 +46,8 @@ ssize_t mcpr_fd_read_int           (int32_t *out, int in);
 ssize_t mcpr_fd_read_long          (int64_t *out, int in);
 ssize_t mcpr_fd_read_float         (float *out, int in);
 ssize_t mcpr_fd_read_double        (double *out, int in);
-ssize_t mcpr_fd_read_string        (char **out, int in);
-ssize_t mcpr_fd_read_chat          (json_t **out, int in);
+ssize_t mcpr_fd_read_string        (char **out, int in, size_t maxlen);
+ssize_t mcpr_fd_read_chat          (char **out, int in, size_t maxlen);
 ssize_t mcpr_fd_read_varint        (int32_t *out, int in);
 ssize_t mcpr_fd_read_varlong       (int64_t *out, int in);
 ssize_t mcpr_fd_read_position      (struct mcpr_position *out, int in);
@@ -64,8 +64,8 @@ ssize_t mcpr_fd_write_int          (int out, int32_t in);
 ssize_t mcpr_fd_write_long         (int out, int64_t in);
 ssize_t mcpr_fd_write_float        (int out, float in);
 ssize_t mcpr_fd_write_double       (int out, double in);
-ssize_t mcpr_fd_write_string       (int out, const char *restrict in);
-ssize_t mcpr_fd_write_chat         (int out, const json_t *in);
+ssize_t mcpr_fd_write_string       (int out, const char *in);
+ssize_t mcpr_fd_write_chat         (int out, const char *json_in);
 ssize_t mcpr_fd_write_varint       (int out, int32_t in);
 ssize_t mcpr_fd_write_varlong      (int out, int64_t in);
 ssize_t mcpr_fd_write_position     (int out, const struct mcpr_position *in);

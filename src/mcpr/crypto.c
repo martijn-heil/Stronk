@@ -4,7 +4,7 @@
 #include <openssl/x509.h>
 #include <openssl/sha.h>
 
-#include "crypto.h"
+#include "mcpr/crypto.h"
 
 int mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX ctx_encrypt, size_t len) {
     if(len > INT_MAX) { return -1; }

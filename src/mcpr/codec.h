@@ -44,7 +44,7 @@
 
 #include <ninuuid/ninuuid.h>
 
-#include "mcpr.h"
+#include "mcpr/mcpr.h"
 
 static const size_t MCPR_BOOL_SIZE      = 1;
 static const size_t MCPR_BYTE_SIZE      = 1;
@@ -232,7 +232,7 @@ ssize_t mcpr_decode_string          (char **out, const void *in, size_t maxlen);
  *
  * @returns The amount of bytes read, or < 0 upon error.
  */
-ssize_t mcpr_decode_chat            (json_t **out, const void *in);
+ssize_t mcpr_decode_chat            (json_t **out, const void *in, size_t maxlen);
 
 /*
  * Will decode a Minecraft VarInt from in. Will read no further than maxlen.
