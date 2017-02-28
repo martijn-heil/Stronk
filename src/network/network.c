@@ -1050,7 +1050,7 @@ static void serve_client_batch(void *arg)
 
         if(diff.tv_sec >= 30)
         {
-            char uuid[16];
+            char uuid[37];
             ninuuid_to_string(&(player->uuid), uuid);
             nlog_error("Player with UUID %s timed out. (server-side)", uuid);
 
