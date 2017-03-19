@@ -1,7 +1,7 @@
 /*
     MIT License
 
-    Copyright (c) 2016 Martijn Heil
+    Copyright (c) 2017 Martijn Heil
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -20,12 +20,28 @@
     SOFTWARE.
 */
 
-#ifndef STRONK_SERVER_H
-#define STRONK_SERVER_H
+#ifndef NINIO_BSTREAM_H
+#define NINIO_BSTREAM_H
 
-#include <time.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <sys/types.h>
 
-void server_start(void);
-struct timespec server_get_internal_clock_time(struct timespec *out);
+
+struct bstream
+{
+    void *cookie; // may be NULL
+    ssize_t (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
+    ssize_t (*write)(struct bstream *stream, void *in, size_t bytes); // May be NULL
+    void (*free)(struct bstream *stream); // may be NULL
+};
+
+
+bool bstream_from_fd(struct bstream *stream, int fd);
+
+
+ssize_t bstream_read(struct bstream *stream, void *buf, size_t bytes);
+ssize_t bstream_write(struct bstream *stream, const void *buf, size_t bytes);
+void bstream_free(struct bstream *stream);
 
 #endif

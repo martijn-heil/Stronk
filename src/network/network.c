@@ -1,3 +1,25 @@
+/*
+    MIT License
+
+    Copyright (c) 2016 Martijn Heil
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -23,7 +45,10 @@
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 
+#include <algo/slist.h>
 #include <algo/hash-table.h>
+#include <algo/hash-pointer.h>
+#include <algo/compare-pointer.h>
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
 
@@ -34,9 +59,9 @@
 
 #include <logging/logging.h>
 
-#include "network.h"
-#include "../stronk.h"
-#include "../util.h"
+#include "network/network.h"
+#include "stronk.h"
+#include "util.h"
 
 static int server_socket;
 static size_t client_count = 0;
@@ -61,7 +86,7 @@ static struct tmp_encryption_state
 static HashTable *tmp_username_states = NULL;
 
 static HashTable *players = NULL;
-static HashTable *conn_to_player = NULL;
+static HashTable *conn_to_player_hashtable = NULL;
 
 
 int net_init(void) {
@@ -133,7 +158,7 @@ static int make_server_socket (uint16_t port) {
 
     // Create the socket.
     int sockfd = socket(PF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
+    if (sockfd < 0)
     {
         nlog_error("Could not create socket. (%s)", strerror(errno));
         return -1;
@@ -156,7 +181,7 @@ static void accept_incoming_connections(void)
 {
     while(true)
     {
-        int newfd = accept(server_socket, NULL, NULL)
+        int newfd = accept(server_socket, NULL, NULL);
         if(newfd == -1)
         {
             if(errno == EAGAIN || errno == EWOULDBLOCK) // There are no incoming connections in the queue.
@@ -214,7 +239,7 @@ static void serve_clients(void)
 
     int index = 1;
 
-    for(unsigned int i = 0; i < main_threadpool_threadcount, i++)
+    for(unsigned int i = 0; i < main_threadpool_threadcount; i++)
     {
         unsigned int amount = conns_per_thread;
         if(i == (main_threadpool_threadcount - 1)) amount += rest;
@@ -262,9 +287,9 @@ static void serve_client_batch(void *arg)
             if(conn->ctx_decrypt != NULL) EVP_CIPHER_CTX_cleanup(conn->ctx_decrypt); free(conn->ctx_decrypt); \
             if(player != NULL) \
             { \
-                free(player->locale);
-                free(player->client_brand);
-                free(player);
+                free(player->locale); \
+                free(player->client_brand); \
+                free(player); \
             } \
             else \
             { \
@@ -406,7 +431,7 @@ static void serve_client_batch(void *arg)
                             response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
                             response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
                             response.data.status.clientbound.response.max_players = max_players;
-                            response.data.status.clientbound.response.online_players_size = hash_table_num_entries(players);
+                            response.data.status.clientbound.response.online_players_size = 0;
                             response.data.status.clientbound.response.description = motd;
                             response.data.status.clientbound.response.online_players = NULL;
                             response.data.status.clientbound.response.favicon = NULL;

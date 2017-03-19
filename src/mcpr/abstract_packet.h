@@ -1,10 +1,34 @@
+/*
+    MIT License
+
+    Copyright (c) 2017 Martijn Heil
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/
+
 #ifndef MCPR_ABSTRACT_PACKET_H
 #define MCPR_ABSTRACT_PACKET_H
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
-#include <jansson/jansson.h>
+#include <openssl/evp.h>
+
 #include <ninuuid/ninuuid.h>
 #include <nbt/nbt.h>
 
@@ -141,8 +165,100 @@
 #define MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT           0x1C;
 #define MCPR_PKT_PL_SB_USE_ITEM                         0x1D;
 
+enum mcpr_painting
+{
+    MCPR_PAINTING_ALBAN,
+    MCPR_PAINTING_AZTEC,
+    MCPR_PAINTING_AZTEC2,
+    MCPR_PAINTING_BOMB,
+    MCPR_PAINTING_BURNING_SKULL,
+    MCPR_PAINTING_BUST,
+    MCPR_PAINTING_COURBET,
+    MCPR_PAINTING_CREEBET,
+    MCPR_PAINTING_DONKEYKONG,
+    MCPR_PAINTING_FIGHTERS,
+    MCPR_PAINTING_GRAHAM,
+    MCPR_PAINTING_KEBAB,
+    MCPR_PAINTING_MATCH,
+    MCPR_PAINTING_PIG_SCENE,
+    MCPR_PAINTING_PLANT,
+    MCPR_PAINTING_POINTER,
+    MCPR_PAINTING_POOL,
+    MCPR_PAINTING_SEA,
+    MCPR_PAINTING_SKELETON,
+    MCPR_PAINTING_SKULL_AND_ROSES,
+    MCPR_PAINTING_STAGE,
+    MCPR_PAINTING_SUNSET,
+    MCPR_PAINTING_VOID,
+    MCPR_PAINTING_WANDERER,
+    MCPR_PAINTING_WASTELAND,
+    MCPR_PAINTING_WITHER,
+};
 
+enum mcpr_potion_effect
+{
+    // TODO
+    MCPR_POTION_EFFECT_
+};
 
+enum mcpr_creeper_state
+{
+    MCPR_CREEPER_STATE_IDLE,
+    MCPR_CREEPER_STATE_FUSE,
+};
+
+enum mcpr_evocation_evoker_spell
+{
+    MCPR_EVOCATION_EVOKER_SPELL_FANGS,
+    MCPR_EVOCATION_EVOKER_SPELL_NONE,
+    MCPR_EVOCATION_EVOKER_SPELL_SUMMON,
+    MCPR_EVOCATION_EVOKER_SPELL_WOLOLO,
+};
+
+enum mcpr_boss_bar_division
+{
+    // TODO
+    MCPR_BOSS_BAR_DIVISION_
+};
+
+enum mcpr_update_block_entity_action
+{
+    MCPR_UPDATE_BLOCK_ENTITY_ACTION_SET_MOB_SPAWNER_DATA
+};
+
+enum mcpr_ocelot_variant
+{
+    MCPR_OCELOT_VARIANT_BLACK_CAT,
+    MCPR_OCELOT_VARIANT_RED_CAT,
+    MCPR_OCELOT_VARIANT_SIAMESE_CAT,
+    MCPR_OCELOT_VARIANT_WILD_OCELOT
+};
+
+enum mcpr_dragon_phase
+{
+    MCPR_DRAGON_PHASE_BREATH_ATTACK,
+    MCPR_DRAGON_PHASE_CHARGE_PLAYER,
+    MCPR_DRAGON_PHASE_CIRCLING,
+    MCPR_DRAGON_PHASE_DYING,
+    MCPR_DRAGON_PHASE_FLY_TO_PORTAL,
+    MCPR_DRAGON_PHASE_HOVER,
+    MCPR_DRAGON_PHASE_LAND_ON_PORTAL,
+    MCPR_DRAGON_PHASE_LEAVE_PORTAL,
+    MCPR_DRAGON_PHASE_ROAR_BEFORE_ATTACK,
+    MCPR_DRAGON_PHASE_SEARCH_BREATH_ATTACK_TARGET,
+    MCPR_DRAGON_PHASE_STRAFING,
+};
+
+enum mcpr_rabbit_variant
+{
+    MCPR_RABBIT_VARIANT_BLACK,
+    MCPR_RABBIT_VARIANT_BLACK_AND_WHITE,
+    MCPR_RABBIT_VARIANT_BROWN,
+    MCPR_RABBIT_VARIANT_GOLD,
+    MCPR_RABBIT_VARIANT_SALT_AND_PEPPER, // Salt and pepper colored, whatever that means.
+    MCPR_RABBIT_VARIANT_KILLER_BUNNY,
+    MCPR_RABBIT_VARIANT_WHITE,
+};
 
 enum mcpr_dye_color
 {
@@ -243,6 +359,31 @@ enum mcpr_object
     MCPR_OBJECT_DRAGON_FIREBALL
 };
 
+enum mcpr_boss_bar_color
+{
+    MCPR_BOSS_BAR_COLOR_PINK,
+    MCPR_BOSS_BAR_COLOR_BLUE,
+    MCPR_BOSS_BAR_COLOR_RED,
+    MCPR_BOSS_BAR_COLOR_GREEN,
+    MCPR_BOSS_BAR_COLOR_YELLOW,
+    MCPR_BOSS_BAR_COLOR_PURPLE,
+    MCPR_BOSS_BAR_COLOR_WHITE,
+};
+
+enum mcpr_game_state_effect
+{
+    MCPR_GAME_STATE_EFFECT_INVALID_BED,
+    MCPR_GAME_STATE_EFFECT_STOP_RAIN,
+    MCPR_GAME_STATE_EFFECT_START_RAIN,
+    MCPR_GAME_STATE_EFFECT_CHANGE_GAME_MODE,
+    MCPR_GAME_STATE_EFFECT_EXIT_END,
+    MCPR_GAME_STATE_EFFECT_DEMO_MESSAGE,
+    MCPR_GAME_STATE_EFFECT_ARROW_HIT_PLAYER,
+    MCPR_GAME_STATE_EFFECT_FADE_VALUE,
+    MCPR_GAME_STATE_EFFECT_FADE_TIME,
+    MCPR_GAME_STATE_EFFECT_ELDER_GUARDIAN_APPEARANCE,
+};
+
 enum mcpr_use_entity_type
 {
     MCPR_USE_ENTITY_TYPE_INTERACT,
@@ -300,15 +441,38 @@ enum mcpr_entity_action
     MCPR_ENTITY_ACTION_START_ELYTRA_FLYING
 };
 
-enum mcpr_player_digging_status
+enum mcpr_player_dig_status
 {
-    MCPR_PLAYER_DIGGING_STATUS_STARTED,
-    MCPR_PLAYER_DIGGING_STATUS_CANCELLED,
-    MCPR_PLAYER_DIGGING_STATUS_FINISHED,
-    MCPR_PLAYER_DIGGING_STATUS_DROP_ITEM_STACK,
-    MCPR_PLAYER_DIGGING_STATUS_DROP_ITEM,
-    MCPR_PLAYER_DIGGING_STATUS_SHOOT_ARROW_FINISH_EATING,
-    MCPR_PLAYER_DIGGING_STATUS_SWAP_ITEM_IN_HAND
+    MCPR_PLAYER_DIG_STATUS_STARTED,
+    MCPR_PLAYER_DIG_STATUS_CANCELLED,
+    MCPR_PLAYER_DIG_STATUS_FINISHED,
+    MCPR_PLAYER_DIG_STATUS_DROP_ITEM_STACK,
+    MCPR_PLAYER_DIG_STATUS_DROP_ITEM,
+    MCPR_PLAYER_DIG_STATUS_SHOOT_ARROW_FINISH_EATING,
+    MCPR_PLAYER_DIG_STATUS_SWAP_ITEM_IN_HAND
+};
+
+struct mcpr_block_action
+{
+    // TODO
+};
+
+enum mcpr_window
+{
+    MCPR_WINDOW_CONTAINER,
+    MCPR_WINDOW_CHEST,
+    MCPR_WINDOW_CRAFTING_TABLE,
+    MCPR_WINDOW_FURNACE,
+    MCPR_WINDOW_DISPENSER,
+    MCPR_WINDOW_ENCHANTING_TABLE,
+    MCPR_WINDOW_BREWING_STAND,
+    MCPR_WINDOW_VILLAGER,
+    MCPR_WINDOW_BEACON,
+    MCPR_WINDOW_ANVIL,
+    MCPR_WINDOW_HOPPER,
+    MCPR_WINDOW_DROPPER,
+    MCPR_WINDOW_SHULKER_BOX,
+    MCPR_WINDOW_HORSE,
 };
 
 enum mcpr_block_face
@@ -409,7 +573,7 @@ struct mcpr_entity_property_modifier
     enum mcpr_entity_property_modifier_operation operation;
 };
 
-struct mcpr_entity_property
+struct mcpr_entity_property_data
 {
     enum mcpr_entity_property key;
     double value;
@@ -525,6 +689,65 @@ struct mcpr_rotation
     // TODO
 };
 
+struct mcpr_window_property
+{
+    enum mcpr_window window_type;
+    int16_t property_index;
+    union
+    {
+        struct
+        {
+            union
+            {
+                int16_t fuel_left;              // 0
+                int16_t max_fuel_burn_time;     // 1
+                int16_t progress_arrow;         // 2
+                int16_t max_progress;           // 3
+            };
+        } furnace;
+
+        struct
+        {
+            union
+            {
+                int16_t required_level_top;         // 0
+                int16_t required_level_middle;      // 1
+                int16_t required_level_bottom;      // 2
+                int16_t enchantment_seed;           // 3
+                int16_t enchantment_id_shown_top;   // 4
+                int16_t enchantment_id_shown_mid;   // 5
+                int16_t enchantment_id_shown_bottom;// 6
+            };
+        } enchantment_table;
+
+        struct
+        {
+            union
+            {
+                int16_t power_level;                    // 0
+                enum mcpr_potion_effect first_effect;   // 1
+                enum mcpr_potion_effect second_effect;  // 2
+            };
+        } beacon;
+
+        struct
+        {
+            union
+            {
+                int16_t repair_cost;                    // 0
+            };
+        } anvil;
+
+        struct
+        {
+            union
+            {
+                int16_t brew_time;                      // 0
+            };
+        } brewing_stand;
+    };
+};
+
 struct mcpr_player_list_item_property
 {
     char *name;
@@ -559,6 +782,24 @@ struct mcpr_player_list_item_player
         bool has_display_name;
         char display_name; // Optional, only if has_display_name is true.
     } action_update_display_name;
+};
+
+enum mcpr_llama_variant
+{
+    MCPR_LLAMA_VARIANT_BROWN,
+    MCPR_LLAMA_VARIANT_CREAMY,
+    MCPR_LLAMA_VARIANT_GRAY,
+    MCPR_LLAMA_VARIANT_WHITE,
+};
+
+enum mcpr_boss_bar_action
+{
+    MCPR_BOSS_BAR_ACTION_ADD,
+    MCPR_BOSS_BAR_ACTION_REMOVE,
+    MCPR_BOSS_BAR_ACTION_UPDATE_HEALTH,
+    MCPR_BOSS_BAR_ACTION_UPDATE_TITLE,
+    MCPR_BOSS_BAR_ACTION_UPDATE_STYLE,
+    MCPR_BOSS_BAR_ACTION_UPDATE_FLAGS
 };
 
 enum mcpr_effect
@@ -1108,7 +1349,7 @@ struct mcpr_entity_metadata_entry
                                                 {
                                                     union
                                                     {
-                                                        enum mcpr_direction direction;
+                                                        int8_t direction;
                                                         struct mcpr_position *attachment_position; // or NULL
                                                         int8_t shield_height;
                                                         enum mcpr_dye_color color;
@@ -1155,7 +1396,7 @@ struct mcpr_entity_metadata_entry
                                                 {
                                                     union
                                                     {
-                                                        enum mcpr_evocation_illager_spell spell;
+                                                        enum mcpr_evocation_evoker_spell spell;
                                                     };
                                                 } evocation_illager;
 
@@ -1263,7 +1504,7 @@ struct mcpr_entity_metadata_entry
                                             {
                                                 bool is_attacking;
                                             };
-                                        } ghast
+                                        } ghast;
                                     };
                                 } flying;
 
@@ -1570,7 +1811,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    enum mcpr_player_digging_status status;
+                    enum mcpr_player_dig_status status;
                     struct mcpr_position block_position;
                     enum mcpr_block_face face;
                 } player_digging;
@@ -1726,8 +1967,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     struct mcpr_position location;
-                    enum mcpr_block_action action_param;
-                    enum mcpr_block block_type;
+                    struct mcpr_block_action action;
                 } block_action;
 
                 struct
@@ -1801,7 +2041,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     char *json_data;
-                    enum mcpr_chat_position;
+                    enum mcpr_chat_position position;
                 } chat_message;
 
                 struct
@@ -1842,7 +2082,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     uint8_t window_id;
-                    enum mcpr_window_property property;
+                    struct mcpr_window_property property;
                     int16_t value;
                 } window_property;
 
@@ -1902,7 +2142,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    enum mcpr_change_game_state_effect reason;
+                    enum mcpr_game_state_effect reason;
                     float value;
                 } change_game_state;
 
@@ -2185,7 +2425,7 @@ struct mcpr_abstract_packet
                 {
                     int32_t entity_id;
                     enum mcpr_equipment_slot slot;
-                    void * slot;
+                    void *slot_data;
                 } entity_equipment;
 
                 struct
@@ -2234,7 +2474,7 @@ struct mcpr_abstract_packet
                             int8_t color;
                             int32_t player_count;
                             char **players; // array of strings
-                        } action_create
+                        } action_create;
 
                         struct
                         {
@@ -2341,7 +2581,7 @@ struct mcpr_abstract_packet
                 {
                     int32_t entity_id;
                     int32_t number_of_properties;
-                    struct mcpr_entity_property *properties;
+                    struct mcpr_entity_property_data *properties;
                 } entity_properties;
 
                 struct
@@ -2361,7 +2601,7 @@ struct mcpr_abstract_packet
 struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(int in, bool use_compression, unsigned long compression_treshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
 struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
 void mcpr_free_abstract_packet(struct mcpr_abstract_packet);
-ssize_t mcpr_write_abstract_packet(FILE *out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
-ssize_t mcpr_fd_write_abstract_packet(int out, struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
+ssize_t mcpr_write_abstract_packet(FILE *out, const struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
+ssize_t mcpr_fd_write_abstract_packet(int out, const struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
 
 #endif // MCPR_PACKET_H

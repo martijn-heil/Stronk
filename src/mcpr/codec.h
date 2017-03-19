@@ -33,9 +33,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-
-#include <jansson/jansson.h>
-
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <openssl/sha.h>
@@ -46,6 +43,7 @@
 
 #include "mcpr/mcpr.h"
 
+static const size_t MCPR_ANGLE_SIZE     = 1;
 static const size_t MCPR_BOOL_SIZE      = 1;
 static const size_t MCPR_BYTE_SIZE      = 1;
 static const size_t MCPR_UBYTE_SIZE     = 1;
@@ -101,7 +99,7 @@ ssize_t mcpr_encode_string  (void *out, const char *utf8Str);
  *
  *   @returns the amount of bytes written.
  */
-ssize_t mcpr_encode_chat    (void *out, const json_t *in);
+ssize_t mcpr_encode_chat    (void *out, const char *in);
 
 
 ssize_t mcpr_encode_varint          (void *out, int32_t i);
@@ -232,7 +230,7 @@ ssize_t mcpr_decode_string          (char **out, const void *in, size_t maxlen);
  *
  * @returns The amount of bytes read, or < 0 upon error.
  */
-ssize_t mcpr_decode_chat            (json_t **out, const void *in, size_t maxlen);
+ssize_t mcpr_decode_chat            (char **out, const void *in, size_t maxlen);
 
 /*
  * Will decode a Minecraft VarInt from in. Will read no further than maxlen.

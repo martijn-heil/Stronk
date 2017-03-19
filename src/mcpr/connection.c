@@ -1,7 +1,7 @@
 /*
     MIT License
 
-    Copyright (c) 2016 Martijn Heil
+    Copyright (c) 2017 Martijn Heil
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -20,44 +20,48 @@
     SOFTWARE.
 */
 
-#ifndef STRONK_CONNECTION_H
-#define STRONK_CONNECTION_H
+#ifndef MCPR_CONNECTION_H
+#define MCPR_CONNECTION_H
 
-#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
-#include <stdint.h>
-
-#include <sys/types.h>
-
 #include <openssl/evp.h>
+#include <ninio/bstream.h>
+#include <mcpr/mcpr.h>
+#include <mcpr/connection.h>
 
-#include <mcpr/abstract_packet.h>
-
-
-struct connection
+typedef void* mcpr_connection;
+struct conn
 {
-    int fd;
-
+    int sockfd; // Not advised to read/write to the socket. May result in unwanted behaviour
+    struct bstream bstream;
     enum mcpr_state state;
     bool use_compression;
     unsigned long compression_threshold; // Not guaranteed to be initialized if use_compression is set to false.
-
     bool use_encryption;
-    EVP_CIPHER_CTX *ctx_encrypt;  // Will be initialized to NULL. Should be free'd
-    EVP_CIPHER_CTX *ctx_decrypt;  // Will be initialized to NULL. Should be free'd
+    EVP_CIPHER_CTX ctx_encrypt;
+    EVP_CIPHER_CTX ctx_decrypt;
     int encryption_block_size;  // Not guaranteed to be initialized if use_encryption is set to false
 };
 
-static inline ssize_t connection_write_abstract_packet(struct connection *conn, const struct mcpr_abstract_packet *pkt)
+mcpr_connection *mcpr_connection_new(int sockfd)
 {
-    return mcpr_fd_write_abstract_packet(conn->fd, pkt, conn->use_compression, false, conn->use_compression ? conn->compression_threshold : 0,
-        conn->use_encryption, conn->use_encryption ? conn->encryption_block_size : 0, conn->use_encryption ? conn->ctx_encrypt : NULL);
+    struct conn *conn = malloc(sizeof(struct conn));
+    if(conn == NULL) return NULL;
+    conn->sockfd = sockfd;
+    conn->state = MCPR_STATE_HANDSHAKE;
+    conn->use_compression = false;
+    conn->use_encryption = false;
 }
 
-static inline struct mcpr_abstract_packet *connection_read_abstract_packet(struct connection *conn)
+void mcpr_connection_delete(mcpr_connection *conn)
 {
-    return mcpr_fd_read_abstract_packet(conn->fd, conn->use_compression, conn->use_compression ? conn->compression_threshold : 0,
-         conn->use_encryption, conn->encryption_block_size, conn->ctx_decrypt);
+
+}
+
+struct bstream mcpr_connection_to_bstream(mcpr_connection *conn)
+{
+    return ((struct conn *) *conn)->bstream;
 }
 
 #endif

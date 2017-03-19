@@ -21,26 +21,55 @@
 */
 
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
-#include "server.h"
+#include <unistd.h>
+#include <sys/types.h>
 
+#include <ninio/bstream.h>
 
-/*
-    System & architecture requirements:
-
-    C11 (including variable length arrays)
-    POSIX (mainly the C library though)
-    Pthreads must be available.
-    Preferrably GCC, but other compilers should work too.
-
-    2's complement integers.
-    char and unsigned char should be exactly 8 bits wide.
-
-    endianness has to be either little endian or big endian, no middle endian.
-*/
-
-int main(void)
+ssize_t bstream_fd_read(struct bstream *stream, void *out, size_t bytes)
 {
-    server_start();
-    return EXIT_SUCCESS;
+    return read(*((int *) stream->cookie), out, bytes);
+}
+
+ssize_t bstream_fd_write(struct bstream *stream, void *in, size_t bytes)
+{
+    return write(*((int *) stream->cookie), in, bytes);
+}
+
+void bstream_fd_free(struct bstream *stream)
+{
+    close(*((int *) stream->cookie));
+    free(stream->cookie);
+    free(stream);
+}
+
+bool bstream_from_fd(struct bstream *stream, int fd)
+{
+    stream->cookie = malloc(sizeof(fd));
+    if(stream->cookie == NULL) { free(stream); return false; }
+    *((int *) stream->cookie) = fd;
+
+    stream->read = bstream_fd_read;
+    stream->write = bstream_fd_write;
+    stream->free = bstream_fd_free;
+
+    return true;
+}
+
+ssize_t bstream_read(struct bstream *stream, void *in, size_t bytes)
+{
+    return stream->read(stream, in, bytes);
+}
+
+ssize_t bstream_write(struct bstream *stream, void *out, size_t bytes)
+{
+    return stream->write(stream, out, bytes);
+}
+
+void bstream_free(struct bstream *stream)
+{
+    stream->free(stream);
 }

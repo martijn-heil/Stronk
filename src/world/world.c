@@ -1,3 +1,25 @@
+/*
+    MIT License
+
+    Copyright (c) 2016 Martijn Heil
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
+*/
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -14,11 +36,11 @@
 #include <logging/logging.h>
 #include <network/connection.h>
 
-#include "world.h"
+#include "world/world.h"
 
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
 struct block {
-    unsigned int type_id;
+    unsigned short type_id;
     unsigned char damage_value;
     void *extra_data;
 };
@@ -119,7 +141,7 @@ int world_manager_init(void)
     if(world == NULL) { nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
 
     world->chunks = hash_table_new(ull_hash, ull_equal);
-    if(chunks == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)) return -1; }
+    if(chunks == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)); return -1; }
 };
 
 static struct chunk *get_chunk(world *w, long x, long z)

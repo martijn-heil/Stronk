@@ -32,18 +32,27 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
+
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 #include <ninuuid/ninuuid.h>
 #include <safe_math.h>
 
 #include "mcpr/codec.h"
-#include "util.h"
-
-#ifdef MCPR_DO_LOGGING
-    #include "stronk.h"
-#endif
-
 #include "mcpr/mcpr.h"
+
+#define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
+#define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
+
+#define hton16(x) htons(x)
+#define hton32(x) htonl(x)
+#define hton64(x) htonll(x)
+
+#define ntoh16(x) ntohs(x)
+#define ntoh32(x) ntohl(x)
+#define ntoh64(x) ntohll(x)
 
 // TODO better logging
 
@@ -68,28 +77,28 @@ ssize_t mcpr_encode_ubyte(void *out, uint8_t byte)
 
 ssize_t mcpr_encode_short(void *out, int16_t i)
 {
-    hton(&i, sizeof(i));
+    i = hton16(i);
     memcpy(out, &i, sizeof(i));
     return sizeof(i);
 }
 
 ssize_t mcpr_encode_ushort(void *out, uint16_t i)
 {
-    hton(&i, sizeof(i));
+    i = hton16(i);
     memcpy(out, &i, sizeof(i));
     return sizeof(i);
 }
 
 ssize_t mcpr_encode_int(void *out, int32_t i)
 {
-    hton(&i, sizeof(i));
+    i = hton32(i);
     memcpy(out, &i, sizeof(i));
     return sizeof(i);
 }
 
 ssize_t mcpr_encode_long(void *out, int64_t i)
 {
-    hton(&i, sizeof(i));
+    i = hton64(i);
     memcpy(out, &i, sizeof(i));
     return sizeof(i);
 }
@@ -97,17 +106,13 @@ ssize_t mcpr_encode_long(void *out, int64_t i)
 
 ssize_t mcpr_encode_float(void *out, float f)
 {
-    hton(&f, sizeof(f));
     memcpy(out, &f, sizeof(f));
     return sizeof(f);
 }
 
 ssize_t mcpr_encode_double(void *out, double d)
 {
-    hton(&d, sizeof(d));
     memcpy(out, &d, sizeof(d));
-
-
     return sizeof(d);
 }
 
@@ -118,17 +123,11 @@ ssize_t mcpr_encode_string(void *out, const char *utf8Str)
 {
     size_t len = strlen(utf8Str);
     char *tmp = malloc(len * sizeof(char) + 1);
-    if(unlikely(tmp == NULL))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not allocate memory (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
+    if(tmp == NULL) return -1;
 
 
     strcpy(tmp, utf8Str);
-    if(len > INT32_MAX) { return -1; }
+    if(len > INT32_MAX) { mcpr_errno = MCPR_EINTERNAL; return -1; }
     int bytes_written = mcpr_encode_varint(out, (int32_t) len);
 
     memcpy(out + bytes_written, tmp, len); // doesn't copy the NUL byte, on purpose.
@@ -138,19 +137,9 @@ ssize_t mcpr_encode_string(void *out, const char *utf8Str)
     return bytes_written;
 }
 
-ssize_t mcpr_encode_chat(void *out, const json_t *root)
+ssize_t mcpr_encode_chat(void *out, const char *chat)
 {
-    char *chat = json_dumps(root, 0); // this should be free'd
-    if(unlikely(chat == NULL))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not dump JSON to string (%s ?)", strerror(errno));
-        #endif
-        return -1;
-    }
-    int bytes_written = mcpr_encode_string(out, chat);
-    free(chat);
-    return bytes_written;
+    return mcpr_encode_string(out, chat);
 }
 
 ssize_t mcpr_encode_varint(void *output, int32_t value)
@@ -172,7 +161,7 @@ ssize_t mcpr_encode_varint(void *output, int32_t value)
         i++;
     } while(value != 0);
 
-    return (ssize_t) i;
+    return i;
 }
 
 ssize_t mcpr_varint_bounds(int32_t value)
@@ -190,7 +179,7 @@ ssize_t mcpr_varint_bounds(int32_t value)
         i++;
     } while(value != 0);
 
-    return (ssize_t) i;
+    return i;
 }
 
 ssize_t mcpr_encode_varlong(void *output, int64_t value) {
@@ -258,42 +247,40 @@ ssize_t mcpr_decode_ubyte(uint8_t *out, const void *in)
 ssize_t mcpr_decode_short(int16_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int16_t));
-    ntoh(out, sizeof(int16_t));
+    *out = ntoh16(*out);
     return sizeof(int16_t);
 }
 
 ssize_t mcpr_decode_ushort(uint16_t *out, const void *in)
 {
     memcpy(out, in, sizeof(uint16_t));
-    ntoh(out, sizeof(uint16_t));
+    *out = ntoh16(*out);
     return sizeof(uint16_t);
 }
 
 ssize_t mcpr_decode_int(int32_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int32_t));
-    ntoh(out, sizeof(int32_t));
+    *out = ntoh32(*out);
     return sizeof(int32_t);
 }
 
 ssize_t mcpr_decode_long(int64_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int64_t));
-    ntoh(out, sizeof(int64_t));
+    *out = ntoh64(*out);
     return sizeof(int64_t);
 }
 
 ssize_t mcpr_decode_float(float *out, const void *in)
 {
     memcpy(out, in, sizeof(float));
-    ntoh(out, sizeof(float));
     return sizeof(float);
 }
 
 ssize_t mcpr_decode_double(double *out, const void *in)
 {
     memcpy(out, in, sizeof(double));
-    ntoh(out, sizeof(double));
     return sizeof(double);
 }
 
@@ -302,9 +289,9 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
 {
     int32_t len;
     ssize_t bytes_read = mcpr_decode_varint(&len, in, maxlen);
-    if(bytes_read < 0) return -1;
-    if(len < 0) return -1;
-    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { return -1; }
+    if(bytes_read < 0) { return -1; }
+    if(len < 0) { mcpr_errno = MCPR_EDECODE; return -1; }
+    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { mcpr_errno = MCPR_EINTERNAL; return -1; }
 
     memcpy(out, in, len);
     out[len] = '\0';
@@ -315,96 +302,69 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     return final_bytes_read;
 }
 
-ssize_t mcpr_decode_chat(json_t **out, const void *in, size_t maxsize)
+ssize_t mcpr_decode_chat(char **out, const void *in, size_t maxsize)
 {
-    char *buf;
-    ssize_t decode_string_result = mcpr_decode_string(&buf, in, maxsize);
-    if(decode_string_result < 0) return -1;
-
-    json_error_t err;
-    *out = json_loads(buf, 0, &err);
-    free(buf); // important we do this exactly here, we don't need buf anymore, but it has to be free'd in case of error return on the next line.
-    if(unlikely(*out == NULL))
-    {
-        #ifdef MCPR_DO_LOGGING
-            nlog_error("Could not load JSON string. (%s ?)", strerror(errno));
-        #endif
-
-        return -1;
-    }
-
-    return decode_string_result;
+    return mcpr_decode_string(out, in, maxsize);
 }
 
-// TODO fix
 ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
-{ // TODO add max read
-    unsigned int num_read = 0;
+{
+    size_t i = 0;
     int32_t result = 0;
-    uint8_t read;
+    uint8_t tmp;
+
     do
     {
-        DO_GCC_PRAGMA(GCC diagnostic push)
-        DO_GCC_PRAGMA(GCC diagnostic ignored "-Wpointer-arith")
-            memcpy(&read, in + num_read, 1);
-        DO_GCC_PRAGMA(GCC diagnostic pop)
+        memcpy(&tmp, in + i, 1);
 
-        int value = (read & 0x7F); // 0x7F == 0b01111111
-        result |= (value << (7 * num_read));
+        uint8_t value = (tmp & 0x7F); // 0x7F == 0b01111111
+        result |= (value << (7 * i));
 
-        num_read++;
-        if (unlikely(num_read > 5))
+        i++;
+        if (i > MCPR_VARINT_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("VarInt is longer than 5 bytes!");
-            #endif
+            mcpr_errno = MCPR_EDECODE;
             return -1;
         }
-        else if (unlikely((num_read - 1) >= max_len))
+        else if ((i - 1) >= max_len) // Max length exceeded whilst decoding VarInt
         {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Max length (%zu) exceeded whilst decoding VarInt", max_len);
-            #endif
+            mcpr_errno = MCPR_EMAXLEN;
             return -1;
         }
-    } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+    } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
 
-    ntoh(&result, sizeof(result));
     *out = result;
-    return num_read;
+    return i;
 }
 
-// TODO fix
 ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
 {
-    unsigned int num_read = 0;
+    size_t i = 0;
     int64_t result = 0;
-    uint8_t read;
-    do {
-        memcpy(&read, in + num_read, 1);
+    uint8_t tmp;
 
-        int64_t value = (read & 0x7F); // 0x7F == 0b01111111
-        result |= (value << (7 * num_read));
+    do
+    {
+        memcpy(&tmp, in + i, 1);
 
-        num_read++;
-        if (unlikely(num_read > 10))
+        uint8_t value = (tmp & 0x7F); // 0x7F == 0b01111111
+        result |= (value << (7 * i));
+
+        i++;
+        if (i > MCPR_VARLONG_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("VarLong is longer than 10 bytes!");
-            #endif
+            mcpr_errno = MCPR_EDECODE;
             return -1;
         }
-        else if (unlikely((num_read - 1) >= max_len))
+        else if ((i - 1) >= max_len) // Max length exceeded whilst decoding VarInt
         {
-            #ifdef MCPR_DO_LOGGING
-                nlog_error("Max length (%zu) exceeded whilst decoding VarLong", max_len);
-            #endif
+            mcpr_errno = MCPR_EMAXLEN;
             return -1;
         }
-    } while ((read & 0x80) != 0); // 0x80 == 0b10000000
+    } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
 
     *out = result;
-    return num_read;
+    return i;
 }
 
 ssize_t mcpr_decode_position(struct mcpr_position *out, const void *in)

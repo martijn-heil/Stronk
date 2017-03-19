@@ -52,17 +52,22 @@
     Received packet violated compression threshold rules.
     Remote party should be disconnected when this error is encountered.
  */
-#define MCPR_ECOMPRESSTHRESHOLD MCPR_ERRNO_BASE + 1
+#define MCPR_ECOMPRESSTHRESHOLD (MCPR_ERRNO_BASE + 1)
 
 /**
     Internal error occured, this happens with things like integer overflow and others.
 */
-#define MCPR_EINTERNAL MCPR_ERRNO_BASE + 2
+#define MCPR_EINTERNAL (MCPR_ERRNO_BASE + 2)
 
 /**
     Encountered invalid data whilst decoding protocol data.
 */
-#define MCPR_EDECODE MCPR_ERRNO_BASE + 3
+#define MCPR_EDECODE (MCPR_ERRNO_BASE + 3)
+
+/**
+    Max length exceeded.
+*/
+#define MCPR_EMAXLEN (MCPR_ERRNO_BASE + 4)
 
 
 int *mcpr_get_errno();

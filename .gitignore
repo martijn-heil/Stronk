@@ -6,7 +6,6 @@ cmake_install.cmake
 install_manifest.txt
 .gcc-flags.json
 cmake-build-debug
-# Change this to your program's executable
 Stronk.exe
 Stronk
 Stronk.cbp

@@ -20,12 +20,18 @@
     SOFTWARE.
 */
 
-#ifndef STRONK_SERVER_H
-#define STRONK_SERVER_H
+#ifndef MCPR_CONNECTION_H
+#define MCPR_CONNECTION_H
 
-#include <time.h>
+#include <stdbool.h>
+#include <openssl/evp.h>
+#include <ninio/bstream.h>
+#include <mcpr/mcpr.h>
 
-void server_start(void);
-struct timespec server_get_internal_clock_time(struct timespec *out);
+typedef void* mcpr_connection;
+
+mcpr_connection *mcpr_connection_new(int sockfd);
+void mcpr_connection_delete(mcpr_connection *conn);
+struct bstream mcpr_connection_to_bstream(mcpr_connection *conn);
 
 #endif
