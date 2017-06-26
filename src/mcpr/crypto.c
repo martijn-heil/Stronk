@@ -7,6 +7,8 @@
 #include "mcpr/crypto.h"
 #include "mcpr/mcpr.h"
 
+
+
 ssize_t mcpr_encrypt(void *out, const void *data, EVP_CIPHER_CTX *ctx_encrypt, size_t len) {
     if(len > INT_MAX) { mcpr_errno = MCPR_EINTERNAL; return -1; }
 

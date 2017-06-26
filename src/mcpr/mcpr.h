@@ -71,6 +71,10 @@
 */
 #define MCPR_EMAXLEN (MCPR_ERRNO_BASE + 4)
 
+#define MCPR_EUNSUPPORTED_PROTOCOL_VERSION (MCPR_ERRNO_BASE + 5)
+
+#define MCPR_ECLOSED (MCPR_ERRNO_BASE + 6)
+
 
 int *mcpr_get_errno();
 /**

@@ -37,17 +37,20 @@ struct bstream
     bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
     void (*incref)(struct bstream *stream); // may be NULL
     void (*decref)(struct bstream *stream); // may be NULL
-    size_t (*size)(struct bstream *stream); // May be NULL>
+    bool (*is_available)(struct bstream *stream, size_t amount); // may be NULL
 };
 
-
+/*
+    Returns a bstream for the given file descriptor.
+    All functionality will be available, none of the functions will be NULL.
+*/
 bool bstream_from_fd(struct bstream *stream, int fd);
 
-
+bool bstream_is_available(struct bstream *stream, size_t amount);
+size_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes);
 bool bstream_read(struct bstream *stream, void *buf, size_t bytes);
 bool bstream_write(struct bstream *stream, const void *buf, size_t bytes);
 void bstream_peek(struct bstream *stream, void *out, size_t bytes);
-size_t bstream_size(struct bstream *stream);
 void bstream_incref(struct bstream *stream);
 void bstream_decref(struct bstream *stream);
 

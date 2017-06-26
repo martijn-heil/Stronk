@@ -31,12 +31,13 @@
 
 typedef void mcpr_connection;
 
+// Calling any function on a closed connection is undefined behaviour.
 mcpr_connection *mcpr_connection_new(int sockfd);
 void mcpr_connection_incref(mcpr_connection *conn);
 void mcpr_connection_decref(mcpr_connection *conn);
-
-bool mcpr_connection_update(void);
-void mcpr_connection_set_packet_handler(void (*on_packet)(const struct mcpr_abstract_packet *pkt));
-void mcpr_connection_write_packet(const struct mcpr_abstract_packet *pkt);
+bool mcpr_connection_update(mcpr_connection *conn);
+void mcpr_connection_set_packet_handler(mcpr_connection *conn, void (*on_packet)(const struct mcpr_abstract_packet *pkt));
+bool mcpr_connection_is_closed(mcpr_connection *conn);
+bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_abstract_packet *pkt);
 
 #endif

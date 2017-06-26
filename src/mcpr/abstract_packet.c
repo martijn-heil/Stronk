@@ -30,7 +30,7 @@
 #include <ninuuid/ninuuid.h>
 
 
-static ssize_t encode_packet(void **buf, struct mcpr_abstract_packet *pkt)
+static ssize_t mcpr_encode_packet(void **buf, const struct mcpr_abstract_packet *pkt)
 {
     size_t data_size;
 

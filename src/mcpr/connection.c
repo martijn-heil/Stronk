@@ -24,7 +24,10 @@
 #define MCPR_CONNECTION_H
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <unistd.h>
 #include <openssl/evp.h>
 #include <ninio/bstream.h>
@@ -32,13 +35,16 @@
 #include <mcpr/mcpr.h>
 #include <mcpr/connection.h>
 #include <mcpr/crypto.h>
+#include <mcpr/abstract_packet.h>
+#include <mcpr/codec.h>
+#include <util.h>
 
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cfb8())
-
 
 typedef void mcpr_connection; // temporary.. should be removed when actually compiling TODO
 struct conn
 {
+    bool is_closed;
     struct bstream *io_stream;
     enum mcpr_state state;
     bool use_compression;
@@ -48,13 +54,39 @@ struct conn
     EVP_CIPHER_CTX ctx_decrypt;
     unsigned int reference_count;
     struct ninio_buffer receiving_buf;
+    void (*packet_handler)(const struct mcpr_abstract_packet *pkt);
+
+    bool tmp_encryption_state_available;
+    RSA *rsa;
+    int32_t verify_token_length;
+    uint8_t *verify_token;
 };
+
+bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_abstract_packet *pkt);
+
+static void mcpr_connection_close(struct conn *conn, const char *reason) {
+    if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) {
+        struct mcpr_abstract_packet pkt;
+        if(conn->state == MCPR_STATE_LOGIN) {
+            pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
+            pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+        } else if(conn->state == MCPR_STATE_PLAY) {
+            pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
+            pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+        }
+
+        mcpr_connection_write_packet(conn, &pkt);
+    }
+
+    conn->is_closed = true;
+}
 
 
 mcpr_connection *mcpr_connection_new(struct bstream *stream)
 {
     struct conn *conn = malloc(sizeof(struct conn));
     if(conn == NULL) { return NULL; }
+    bstream_incref(stream);
 
     conn->io_stream = stream;
     conn->state = MCPR_STATE_HANDSHAKE;
@@ -66,6 +98,7 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream)
     if(conn->receiving_buf.content == NULL) { free(conn); return NULL; }
     conn->receiving_buf.max_size = 32 * BLOCK_SIZE;
     conn->receiving_buf.size = 0;
+    conn->packet_handler = NULL;
 
     return conn;
 }
@@ -81,7 +114,7 @@ void mcpr_connection_decref(mcpr_connection *tmpconn)
     conn->reference_count--;
     if(conn->reference_count <= 0)
     {
-        bstream_decref(conn->io_stream);
+        mcpr_connection_close(conn, NULL);
         free(conn->receiving_buf.content);
         free(conn);
     }
@@ -114,9 +147,25 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
     return true;
 }
 
-void mcpr_connection_update(mcpr_connection *tmpconn)
+bool mcpr_connection_update(mcpr_connection *tmpconn)
 {
-    update_receiving_buffer(tmpconn);
+    struct conn *conn = (struct conn *) tmpconn;
+    if(!update_receiving_buffer(tmpconn)) return false;
+
+    while(true) {
+        int32_t pktlen;
+        ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
+        if(result == -1) return true;
+        if((conn->receiving_buf.size - 5) >= pktlen) {
+            struct mcpr_abstract_packet *pkt = mcpr_decode_abstract_packet(conn->receiving_buf.content, conn->receiving_buf.size);
+            if(pkt == NULL) return false;
+            conn->packet_handler(pkt);
+            free(pkt);
+            memmove(conn->receiving_buf.content + pktlen + 5, conn->receiving_buf.content, conn->receiving_buf.size - pktlen - 5);
+        }
+    }
+
+    return true;
 }
 
 static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t bytes)
@@ -128,7 +177,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         void *encrypted_data = malloc(bytes + BLOCK_SIZE - 1);
         if(encrypted_data == NULL) return false;
 
-        ssize_t bytes_written = mcpr_encrypt(encrypted_data, in, conn->ctx_encrypt, bytes);
+        ssize_t bytes_written = mcpr_crypto_encrypt(encrypted_data, in, &(conn->ctx_encrypt), bytes);
         if(bytes_written == -1) { free(encrypted_data); return false; }
 
         bool result = bstream_write(conn->io_stream, encrypted_data, bytes_written);
@@ -139,6 +188,20 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
     {
         return bstream_write(conn->io_stream, in, bytes);
     }
+}
+
+bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_abstract_packet *pkt) {
+    void *buf;
+    ssize_t result = mcpr_encode_abstract_packet(&buf, pkt);
+    if(result == -1) return false;
+    if(!mcpr_connection_write(tmpconn, buf, result)) { free(buf); return false; }
+    free(buf);
+    return true;
+}
+
+void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_abstract_packet *pkt)) {
+    struct conn *conn = (struct conn *) tmpconn;
+    conn->packet_handler = on_packet;
 }
 
 #endif

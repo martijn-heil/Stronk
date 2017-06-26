@@ -28,49 +28,182 @@
 #include <sys/types.h>
 
 #include <ninio/bstream.h>
+#include <ninio/ninio.h>
 #include "mcpr/streams.h"
 
-ssize_t bstream_fd_read(struct bstream *stream, void *out, size_t bytes)
+struct fd_bstream
 {
-    return read(*((int *) stream->cookie), out, bytes);
+    struct ninio_buffer buf;
+    int fd;
+    unsigned int reference_count;
+};
+
+static void bstream_fd_free(struct bstream *stream);
+
+static void attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size) {
+    if(buf->size < size)
+    {
+        size_t remaining = size - buf->size;
+
+        if(buf->max_size < buf->size + remaining)
+        {
+            void *tmp = realloc(buf->content, buf->size + remaining);
+            if(tmp == NULL)
+            {
+                size_t possible = buf->max_size - buf->size;
+                ssize_t result = read(fd, buf->content + buf->size, possible);
+                if(result <= 0) return;
+                buf->size += result;
+                return;
+            }
+
+            buf->content = tmp;
+            buf->max_size = buf->size + remaining;
+        }
+
+        ssize_t result = read(fd, buf->content + buf->size, remaining);
+        if(result <= 0) return;
+        buf->size += result;
+    }
 }
 
-ssize_t bstream_fd_write(struct bstream *stream, const void *in, size_t bytes)
+size_t bstream_fd_read_max(struct bstream *stream, void *out, size_t bytes)
 {
-    return write(*((int *) stream->cookie), in, bytes);
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
+
+    if(private->buf.size >= bytes)
+    {
+        ninio_buffer_read(&(private->buf), out, bytes);
+        return bytes;
+    }
+    else
+    {
+        size_t possible = private->buf.size;
+        ninio_buffer_read(&(private->buf), out, possible);
+        return possible;
+    }
 }
 
-void bstream_fd_free(struct bstream *stream)
+size_t bstream_fd_peek_max(struct bstream *stream, void *out, size_t bytes)
 {
-    close(*((int *) stream->cookie));
-    free(stream->cookie);
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
+
+    if(private->buf.size >= bytes)
+    {
+        memcpy(out, private->buf.content, bytes);
+        return bytes;
+    }
+    else
+    {
+        memcpy(out, private->buf.content, private->buf.size);
+        return private->buf.size;
+    }
+}
+
+bool bstream_fd_is_available(struct bstream *stream, size_t amount)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    attempt_fill_up_buffer(&(private->buf), private->fd, amount);
+    return private->buf.size >= amount;
+}
+
+bool bstream_fd_read(struct bstream *stream, void *out, size_t bytes)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
+    if(private->buf.size >= bytes)
+    {
+        ninio_buffer_read(&(private->buf), out, bytes);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool bstream_fd_peek(struct bstream *stream, void *out, size_t bytes)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
+    if(private->buf.size >= bytes)
+    {
+        memcpy(out, private->buf.content, bytes);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool bstream_fd_write(struct bstream *stream, const void *in, size_t bytes)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    return write(private->fd, in, bytes);
+}
+
+static void bstream_fd_incref(struct bstream *stream)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    private->reference_count++;
+}
+
+static void bstream_fd_decref(struct bstream *stream)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    private->reference_count--;
+
+    if(private->reference_count <= 0)
+    {
+        bstream_fd_free(stream);
+    }
+}
+
+static void bstream_fd_free(struct bstream *stream)
+{
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    close(private->fd);
+    free(stream->private);
     free(stream);
 }
 
-bool bstream_from_fd(struct bstream *stream, int fd)
-{
-    stream->cookie = malloc(sizeof(fd));
-    if(stream->cookie == NULL) { free(stream); return false; }
-    *((int *) stream->cookie) = fd;
-
-    stream->read = bstream_fd_read;
-    stream->write = bstream_fd_write;
-    stream->free = bstream_fd_free;
-
-    return true;
-}
-
-ssize_t bstream_read(struct bstream *stream, void *in, size_t bytes)
+bool bstream_read(struct bstream *stream, void *in, size_t bytes)
 {
     return stream->read(stream, in, bytes);
 }
 
-ssize_t bstream_write(struct bstream *stream, const void *out, size_t bytes)
+bool bstream_write(struct bstream *stream, const void *out, size_t bytes)
 {
     return stream->write(stream, out, bytes);
 }
 
-void bstream_free(struct bstream *stream)
+size_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes)
 {
-    stream->free(stream);
+    return stream->read_max(stream, buf, maxbytes);
+}
+
+bool bstream_from_fd(struct bstream *stream, int fd)
+{
+    stream->private = malloc(sizeof(struct fd_bstream));
+    if(stream->private == NULL) { free(stream); return false; }
+    struct fd_bstream *private = (struct fd_bstream *) stream->private;
+    private->fd = fd;
+    private->reference_count = 1;
+    private->buf.size = 0;
+    private->buf.max_size = 0;
+    private->buf.content = NULL;
+
+    stream->is_available = bstream_fd_is_available;
+    stream->peek_max = bstream_fd_peek_max;
+    stream->peek = bstream_fd_peek;
+    stream->read_max = bstream_fd_read_max;
+    stream->read = bstream_fd_read;
+    stream->write = bstream_fd_write;
+    stream->incref = bstream_fd_incref;
+    stream->decref = bstream_fd_decref;
+
+    return true;
 }
