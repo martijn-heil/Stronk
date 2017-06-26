@@ -27,11 +27,16 @@
 #include <openssl/evp.h>
 #include <ninio/bstream.h>
 #include <mcpr/mcpr.h>
+#include <mcpr/abstract_packet.h>
 
-typedef void* mcpr_connection;
+typedef void mcpr_connection;
 
 mcpr_connection *mcpr_connection_new(int sockfd);
-void mcpr_connection_delete(mcpr_connection *conn);
-struct bstream mcpr_connection_to_bstream(mcpr_connection *conn);
+void mcpr_connection_incref(mcpr_connection *conn);
+void mcpr_connection_decref(mcpr_connection *conn);
+
+bool mcpr_connection_update(void);
+void mcpr_connection_set_packet_handler(void (*on_packet)(const struct mcpr_abstract_packet *pkt));
+void mcpr_connection_write_packet(const struct mcpr_abstract_packet *pkt);
 
 #endif

@@ -89,7 +89,7 @@ ssize_t mcpr_encode_string  (void *out, const char *utf8Str);
 /**
  *  Encode chat.
  *
- *   @param [out] out Output buffer. Should be at least the size of (strlen(json_dumps(root, 0)) + 5).
+ *   @param [out] out Output buffer. Should be at least the size of (strlen(in) + 5).
  *   @param [in] in Input buffer.
  *
  *   @note This function is not guaranteed to write exactly (strlen(json_dumps(root, 0)) + 5) bytes,

@@ -33,7 +33,7 @@
 
 zlog_category_t *_zc;
 
-#if STANDARD_STREAMS_ASSIGNABLE
+#if STANDARD_STREAMS_ASSIGNABLE && defined(HAVE_FOPENCOOKIE)
     static ssize_t new_stdout_write(void *cookie, const char *buf, size_t size)
     {
         char *new_buf = malloc(size + 1);
@@ -93,7 +93,7 @@ int logging_init(void)
         nlog_warn("Could not set application locale to make sure we use UTF-8.");
     }
 
-    #if STANDARD_STREAMS_ASSIGNABLE
+    #if STANDARD_STREAMS_ASSIGNABLE && defined(HAVE_FOPENCOOKIE)
         nlog_info("Redirecting stderr and stdout to log..");
 
         cookie_io_functions_t new_stdout_funcs;

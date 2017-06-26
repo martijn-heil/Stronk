@@ -48,6 +48,8 @@
 
 #define MCPR_ERRNO_BASE = 2000
 
+#define MCPR_EUNKNOWN MCPR_ERRNO_BASE
+
 /**
     Received packet violated compression threshold rules.
     Remote party should be disconnected when this error is encountered.

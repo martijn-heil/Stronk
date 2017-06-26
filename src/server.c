@@ -45,10 +45,7 @@
 
 #include <jansson/jansson.h>
 
-#include <openssl/rsa.h>
-#include <openssl/x509.h>
-#include <openssl/evp.h>
-#include <openssl/sha.h>
+#include <openssl/opensslv.h>
 
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
@@ -59,6 +56,7 @@
 #include <mcpr/fdstreams.h>
 
 #include <logging/logging.h>
+#include <network/network.h>
 
 #include "server.h"
 #include "stronk.h"
@@ -105,16 +103,11 @@ static void init(void);
 
 
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
-static int server_socket;
 static char *motd = "A bloody stronk server.";
-static unsigned int max_players;
 static HashTable *players = NULL; // hash table indexed by strings of compressed UUIDs
-static size_t client_count = 0;
-static pthread_mutex_t *clients_delete_lock;
-static SListEntry *clients = NULL; // Clients which do not have a player object associated with them.
-static bool logging_init = false;
-static bool thread_pooling_init = false;
-static bool networking_init = false;
+static bool logging_init_done = false;
+static bool thread_pooling_init_done = false;
+static bool networking_init_done = false;
 threadpool main_threadpool;
 static struct timespec internal_clock; // Every time the clock ticks 50ms is added
 
@@ -195,8 +188,7 @@ static void secure_free(void *ptr)
 void server_shutdown(void)
 {
     nlog_info("Shutting down server..");
-
-
+    cleanup();
     exit(EXIT_SUCCESS);
 }
 
@@ -231,7 +223,7 @@ static void init_thread_pooling(void)
         exit(EXIT_FAILURE);
     }
 
-    thread_pooling_init = true;
+    thread_pooling_init_done = true;
 }
 
 void cleanup_thread_pooling(void)
@@ -240,15 +232,15 @@ void cleanup_thread_pooling(void)
     thpool_destroy(main_threadpool);
 }
 
-void cleanup_networking(void)
-{
-    nlog_info("Cleaning up networking..");
-    // TODO
-}
-
 static void init(void)
 {
     if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
+    log_info("Intializing OpenSSL..");\
+    // TODO
+    OpenSSL_add_all_algorithms();
+	SSL_load_error_strings();
+	SSL_library_init();
+
     init_thread_pooling();
     if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
 
@@ -274,7 +266,7 @@ void server_start(void)
    while(true)
    {
        struct timespec start; // TODO C11 timespec_get() isn't implemented anywhere but in glibc.
-       if(unlikely(!timespec_get(&start, TIME_UTC)))
+       if(!timespec_get(&start, TIME_UTC))
        {
            nlog_error("Could not get current time in main game loop!");
            server_crash();
@@ -287,10 +279,10 @@ void server_start(void)
 
 
        struct timespec should_stop_at;
-       timespec_addraw(&should_stop_at, &start, 0, tick_duration_ns_ns);
+       timespec_addraw(&should_stop_at, &start, 0, tick_duration_ns);
 
        struct timespec stop;
-       if(unlikely(!timespec_get(&stop, TIME_UTC)))
+       if(!timespec_get(&stop, TIME_UTC))
        {
            nlog_error("Could not get current time in main game loop!");
            server_crash();
@@ -310,11 +302,11 @@ void server_start(void)
 
 void cleanup(void)
 {
-    if(networking_init) net_cleanup();
-    if(thread_pooling_init) cleanup_thread_pooling();
+    if(networking_init_done) net_cleanup();
+    if(thread_pooling_init_done) cleanup_thread_pooling();
 
 
-    if(logging_init) logging_cleanup(); // Logging alwas as last.
+    if(logging_init_done) logging_cleanup(); // Logging alwas as last.
 }
 
 static void server_tick(void)
@@ -329,7 +321,7 @@ static void server_tick(void)
     timespec_add(&internal_clock, &internal_clock, &addend);
 }
 
-struct timespec server_get_internal_clock_time(struct timespec *out)
+void server_get_internal_clock_time(struct timespec *out)
 {
     out->tv_sec = internal_clock.tv_sec;
     out->tv_nsec = internal_clock.tv_nsec;

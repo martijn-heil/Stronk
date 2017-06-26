@@ -25,23 +25,30 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <sys/types.h>
 
 
 struct bstream
 {
-    void *cookie; // may be NULL
-    ssize_t (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    ssize_t (*write)(struct bstream *stream, void *in, size_t bytes); // May be NULL
-    void (*free)(struct bstream *stream); // may be NULL
+    void *private; // may be NULL
+    bool (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
+    size_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+    bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
+    size_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+    bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
+    void (*incref)(struct bstream *stream); // may be NULL
+    void (*decref)(struct bstream *stream); // may be NULL
+    size_t (*size)(struct bstream *stream); // May be NULL>
 };
 
 
 bool bstream_from_fd(struct bstream *stream, int fd);
 
 
-ssize_t bstream_read(struct bstream *stream, void *buf, size_t bytes);
-ssize_t bstream_write(struct bstream *stream, const void *buf, size_t bytes);
-void bstream_free(struct bstream *stream);
+bool bstream_read(struct bstream *stream, void *buf, size_t bytes);
+bool bstream_write(struct bstream *stream, const void *buf, size_t bytes);
+void bstream_peek(struct bstream *stream, void *out, size_t bytes);
+size_t bstream_size(struct bstream *stream);
+void bstream_incref(struct bstream *stream);
+void bstream_decref(struct bstream *stream);
 
 #endif

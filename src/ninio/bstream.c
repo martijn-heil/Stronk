@@ -28,13 +28,14 @@
 #include <sys/types.h>
 
 #include <ninio/bstream.h>
+#include "mcpr/streams.h"
 
 ssize_t bstream_fd_read(struct bstream *stream, void *out, size_t bytes)
 {
     return read(*((int *) stream->cookie), out, bytes);
 }
 
-ssize_t bstream_fd_write(struct bstream *stream, void *in, size_t bytes)
+ssize_t bstream_fd_write(struct bstream *stream, const void *in, size_t bytes)
 {
     return write(*((int *) stream->cookie), in, bytes);
 }
@@ -64,7 +65,7 @@ ssize_t bstream_read(struct bstream *stream, void *in, size_t bytes)
     return stream->read(stream, in, bytes);
 }
 
-ssize_t bstream_write(struct bstream *stream, void *out, size_t bytes)
+ssize_t bstream_write(struct bstream *stream, const void *out, size_t bytes)
 {
     return stream->write(stream, out, bytes);
 }

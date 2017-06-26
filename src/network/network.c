@@ -144,7 +144,6 @@ void net_cleanup(void) {
     // TODO
 }
 
-// TODO keep alive packets
 void net_tick(void) {
     accept_incoming_connections();
     serve_clients();
@@ -202,7 +201,7 @@ static void accept_incoming_connections(void)
         if(fcntl(newfd, F_SETFL, O_NONBLOCK) == -1)
         {
             nlog_fatal("Could not set O_NONBLOCK flag for incoming connection. (%s)", strerror(errno));
-            if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
+            if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", strerror(errno));
             continue;
         }
 
@@ -210,7 +209,7 @@ static void accept_incoming_connections(void)
         if(conn == NULL)
         {
             nlog_error("Could not allocate memory for connection. (%s)", strerror(errno));
-            if(close(newfd) == -1) nlog_error("Could not clean up socket after memory allocation failure. (%s)", strerror(errno));
+            if(close(newfd) == -1) nlog_error("Error closing socket after memory allocation failure. (%s)", strerror(errno));
             continue;
         }
 
@@ -224,7 +223,7 @@ static void accept_incoming_connections(void)
         if(slist_append(clients, conn) == NULL)
         {
             nlog_error("Could not add incoming connection to connection storage.");
-            if(close(newfd) == -1) nlog_error("Could not clean up socket after error. (%s)", strerror(errno));
+            if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", strerror(errno));
             free(conn);
             continue;
         }
@@ -311,7 +310,7 @@ static void serve_client_batch(void *arg)
             { \
                 struct mcpr_abstract_packet _response; \
                 _response.id = ((conn->state == MCPR_STATE_LOGIN) ? MCPR_PKT_LG_CB_DISCONNECT : MCPR_PKT_PL_CB_DISCONNECT); \
-                _response.data.login.clientbound.disconnect.reason = _reason; \
+                _response.data.login.clientbound.disconnect.reason = _reason; \ /* TODO reason should be chat json */
                 if(WRITE_PACKET(&_response) < 0) \
                 { \
                     nlog_error("Could not write packet to connection (%s ?), " \
@@ -491,7 +490,7 @@ static void serve_client_batch(void *arg)
                                 nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
                                 goto next_packet;
                             }
-                            if(buflen > INT32_MAX || buflen < INT32_MIX) // TODO is INT32_LEAST a thing?
+                            if(buflen > INT32_MAX || buflen < INT32_MIN)
                             {
                                 nlog_error("Integer overflow.");
                                 RSA_free(rsa);
@@ -517,7 +516,7 @@ static void serve_client_batch(void *arg)
 
                             struct mcpr_abstract_packet response;
                             response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
-                            response.data.login.clientbound.encryption_request.server_id = ""; // Yes that's supposed to be an empty string.
+                            response.data.login.clientbound.encryption_request.server_id = ""; // Yes, that's supposed to be an empty string.
                             response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
                             response.data.login.clientbound.encryption_request.public_key = buf;
                             response.data.login.clientbound.encryption_request.verify_token_length = verify_token_length;
@@ -534,7 +533,7 @@ static void serve_client_batch(void *arg)
                                 }
                                 else
                                 {
-                                    nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(errno));
+                                    nlog_error("Could not write packet to connection. (%s ?)", mcpr_strerror(errno));
                                     RSA_free(rsa);
                                     goto next_packet;
                                 }
@@ -543,7 +542,7 @@ static void serve_client_batch(void *arg)
                             struct tmp_encryption_state *tmp_state = malloc(sizeof(struct tmp_encryption_state))
                             if(tmp_state == NULL)
                             {
-                                nlog_error("Could not allocate memory (%s)", strerror(errno));
+                                nlog_error("Could not allocate memory. (%s)", strerror(errno));
                                 RSA_free(rsa);
                                 goto next_packet;
                             }

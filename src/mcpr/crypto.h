@@ -6,7 +6,9 @@
 #include <sys/types.h>
 
 #include <openssl/evp.h>
+
 #include <ninio/bstream.h>
+
 
 /**
  * Encrypt data for use in the Minecraft protocol.
@@ -17,7 +19,7 @@
  *
  * @returns The amount of bytes written to out, or a negative integer upon error.
  */
-ssize_t mcpr_crypto_encrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX ctx_encrypt, size_t len);
+ssize_t mcpr_crypto_encrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX *ctx_encrypt, size_t len);
 
 /**
  * Decrypt data for use in the Minecraft protocol.
@@ -27,7 +29,7 @@ ssize_t mcpr_crypto_encrypt(void *restrict out, const void *restrict in, EVP_CIP
  *
  * @returns The amount of bytes written to out, or a negative integer upon error.
  */
-ssize_t mcpr_crypto_decrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX ctx_decrypt, size_t len);
+ssize_t mcpr_crypto_decrypt(void *restrict out, const void *restrict in, EVP_CIPHER_CTX *ctx_decrypt, size_t len);
 
 
 ssize_t mcpr_crypto_generate_auth_hash(void *out, char *server_id, void *shared_secret, size_t shared_secret_len, void *server_pubkey, size_t server_pubkey_len);
