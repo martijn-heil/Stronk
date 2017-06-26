@@ -161,7 +161,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
             if(pkt == NULL) return false;
             conn->packet_handler(pkt);
             free(pkt);
-            memmove(conn->receiving_buf.content + pktlen + 5, conn->receiving_buf.content, conn->receiving_buf.size - pktlen - 5);
+            memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + 5, conn->receiving_buf.size - pktlen - 5);
         }
     }
 
