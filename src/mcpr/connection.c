@@ -204,4 +204,17 @@ void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_pack
     conn->packet_handler = on_packet;
 }
 
+void mcpr_connection_set_crypto(mcpr_connection *tmpconn, EVP_CIPHER_CTX ctx_encrypt, EVP_CIPHER_CTX ctx_decrypt)
+{
+    struct conn *conn = (struct conn *) tmpconn;
+    conn->ctx_encrypt = ctx_encrypt;
+    conn->ctx_decrypt = ctx_decrypt;
+}
+
+void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression)
+{
+    struct conn *conn = (struct conn *) tmpconn;
+    conn->use_compression = compression;
+}
+
 #endif

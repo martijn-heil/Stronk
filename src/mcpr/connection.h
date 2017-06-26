@@ -39,5 +39,7 @@ bool mcpr_connection_update(mcpr_connection *conn);
 void mcpr_connection_set_packet_handler(mcpr_connection *conn, void (*on_packet)(const struct mcpr_abstract_packet *pkt));
 bool mcpr_connection_is_closed(mcpr_connection *conn);
 bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_abstract_packet *pkt);
+void mcpr_connection_set_crypto(mcpr_connection *tmpconn, EVP_CIPHER_CTX ctx_encrypt, EVP_CIPHER_CTX ctx_decrypt);
+void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression);
 
 #endif
