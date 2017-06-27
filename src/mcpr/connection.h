@@ -36,10 +36,14 @@ mcpr_connection *mcpr_connection_new(int sockfd);
 void mcpr_connection_incref(mcpr_connection *conn);
 void mcpr_connection_decref(mcpr_connection *conn);
 bool mcpr_connection_update(mcpr_connection *conn);
-void mcpr_connection_set_packet_handler(mcpr_connection *conn, void (*on_packet)(const struct mcpr_abstract_packet *pkt));
+void mcpr_connection_set_packet_handler(mcpr_connection *conn, void (*on_packet)(const struct mcpr_abstract_packet *pkt, mcpr_connection *conn));
 bool mcpr_connection_is_closed(mcpr_connection *conn);
 bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_abstract_packet *pkt);
-void mcpr_connection_set_crypto(mcpr_connection *tmpconn, EVP_CIPHER_CTX ctx_encrypt, EVP_CIPHER_CTX ctx_decrypt);
+void mcpr_connection_set_crypto(mcpr_connection *conn, EVP_CIPHER_CTX *ctx_encrypt, EVP_CIPHER_CTX *ctx_decrypt);
+void mcpr_connection_set_use_encryption(mcpr_connection *conn, bool value);
 void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression);
+enum mcpr_state mcpr_connection_get_state(mcpr_connection *conn);
+void mcpr_connection_set_state(mcpr_connection *conn, enum mcpr_state state);
+void mcpr_connection_close(mcpr_connection *conn, const char *reason);
 
 #endif

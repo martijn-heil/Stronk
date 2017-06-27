@@ -1672,15 +1672,15 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    char *version_name;
+                    const char *version_name;
                     int protocol_version;
                     unsigned int max_players;
                     unsigned int online_players;
-                    char *description;
-                    char *favicon; // may be NULL.
+                    const char *description;
+                    const char *favicon; // may be NULL.
 
                     size_t online_players_size;
-                    struct mcpr_player_sample *player_sample; // or NULL.
+                    const struct mcpr_player_sample *player_sample; // or NULL.
                 } response;
             } clientbound;
         } status;
@@ -2273,7 +2273,7 @@ struct mcpr_abstract_packet
                 struct
                 {
                     bool invulnerable;
-                    bool flying;
+                    bool is_flying;
                     bool allow_flying;
                     bool creative_mode;
                     float flying_speed;

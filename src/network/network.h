@@ -31,6 +31,8 @@
 void net_tick(void);
 int net_init(void);
 void net_cleanup(void);
+unsigned int net_get_max_players(void);
+const char *net_get_motd(void);
 
 int net_on_packet(uint8_t pkt_id, enum mcpr_state state, void (*handle)(struct mcpr_abstract_packet *pkt));
 
