@@ -41,6 +41,7 @@
 
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cfb8())
 
+// TODO COMPRESSION!!!
 typedef void mcpr_connection; // temporary.. should be removed when actually compiling TODO
 struct conn
 {
@@ -177,16 +178,45 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         void *encrypted_data = malloc(bytes + BLOCK_SIZE - 1);
         if(encrypted_data == NULL) return false;
 
-        ssize_t bytes_written = mcpr_crypto_encrypt(encrypted_data, in, &(conn->ctx_encrypt), bytes);
-        if(bytes_written == -1) { free(encrypted_data); return false; }
+        ssize_t encrypted_data_length = mcpr_crypto_encrypt(encrypted_data, in, &(conn->ctx_encrypt), bytes);
+        if(encrypted_data_length == -1) { free(encrypted_data); return false; }
 
-        bool result = bstream_write(conn->io_stream, encrypted_data, bytes_written);
-        free(encrypted_data);
-        return result;
+        if(conn->use_compression) // TODO compression treshold
+        {
+            void *compressed_data = malloc(mcpr_compress_bounds(encrypted_data_length));
+            if(compressed_data == NULL) { free(encrypted_data); return false; }
+            ssize_t compression_result = mcpr_compress(compressed_data, encrypted_data, encrypted_data_length);
+            if(compression_result == -1) { free(encrypted_data); free(compressed_data); return false; }
+
+            bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
+            free(encrypted_data);
+            free(compressed_data);
+            return write_result;
+        }
+        else
+        {
+            bool write_result = bstream_write(conn->io_stream, encrypted_data, encrypted_data_length);
+            free(encrypted_data);
+            return write_result;
+        }
     }
     else
     {
-        return bstream_write(conn->io_stream, in, bytes);
+        if(conn->use_compression)
+        {
+            void *compressed_data = malloc(mcpr_compress_bounds(bytes));
+            if(compressed_data == NULL) return false;
+
+            ssize_t compression_result = mcpr_compress(compressed_data, in, bytes);
+            if(compression_result == -1) { free(compressed_data); return false; }
+            bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
+            free(compressed_data);
+            return write_result;
+        }
+        else
+        {
+            return bstream_write(conn->io_stream, in, bytes);
+        }
     }
 }
 
