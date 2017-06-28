@@ -44,9 +44,9 @@
 
 
 size_t mcpr_compress_bounds(size_t len) {
-    uLongf len = compressBound(len);
-    if(len > SIZE_MAX || len < 0) { fprintf(stderr, "Aborted at mcpr.c:48 in mcpr_compress_bounds function, calculated length does not fit within size_t"); abort(); }
-    return len;
+    uLongf calc_len = compressBound(len);
+    if(calc_len > SIZE_MAX || calc_len < 0) { fprintf(stderr, "Aborted at mcpr.c:48 in mcpr_compress_bounds function, calculated length does not fit within size_t"); abort(); }
+    return calc_len;
 }
 
 ssize_t mcpr_compress(void *out, const void *in, size_t n) {
