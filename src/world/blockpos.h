@@ -27,10 +27,12 @@
 
 #include "world/world.h"
 
-struct location
+struct blockpos
 {
-    world *w;
-    struct mcpr_position coordinates;
+    world *world;
+    long long x;
+    long long y;
+    long long z;
 };
 
 #endif

@@ -32,13 +32,13 @@
 #include <mcpr/abstract_packet.h>
 #include <mcpr/connection.h>
 
-#include <world/fposition.h>
+#include <world/entitypos.h>
 
 struct player {
     int32_t entity_id;
     struct ninuuid uuid;
     char *client_brand; // or NULL if unknown. Might be set to a non-NULL value when a MC|BRAND plugin message is received.
-    struct fposition pos;
+    struct entitypos pos;
     mcpr_connection *conn;
     struct mcpr_position compass_target;
 

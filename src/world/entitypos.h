@@ -25,7 +25,7 @@
 
 #include "world/world.h"
 
-struct fposition {
+struct entitypos {
     world *world;
     double x, y, z;
     float yaw;

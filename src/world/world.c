@@ -22,16 +22,20 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <stdbool.h>
 #include <errno.h>
 
 #include <sys/types.h>
 #include <pthread.h>
 
+#include <algo/hash-ull.h>
+#include <algo/compare-ull.h>
 #include <algo/hash-table.h>
 
 #include <mcpr/mcpr.h>
 #include <mcpr/abstract_packet.h>
+#include <mcpr/connection.h>
 
 #include <logging/logging.h>
 #include <network/connection.h>
@@ -41,7 +45,7 @@
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
 struct block {
     unsigned short type_id;
-    unsigned char damage_value;
+    unsigned char data;
     void *extra_data;
 };
 
@@ -111,6 +115,8 @@ West to east, north to south block changing is the fastest (as they are indexed 
 #define CHUNK_SECTIONS_PER_CHUNK 16
 #define BLOCKS_PER_CHUNK (BLOCKS_PER_CHUNK_SECTION * CHUNK_SECTIONS_PER_CHUNK)
 
+static struct chunk *load_chunk(world *world, long x, long z);
+
 struct chunk_section {
     pthread_rwlock_t lock;
 
@@ -122,7 +128,7 @@ struct chunk
     long x;
     long z;
     unsigned long long last_update;
-    struct chunk_section sections[16]; // 16 high indexed bottom to top.
+    struct chunk_section sections[CHUNK_SECTIONS_PER_CHUNK]; // 16 high indexed bottom to top.
 };
 
 #define get_chunk_key(x, z) ((unsigned long long) (((unsigned long long) x) << 32 | ((unsigned long long) z)))
@@ -131,23 +137,24 @@ struct world
     HashTable *chunks;
 };
 
-struct world *world;
+struct world *default_world = NULL;
 unsigned int server_view_distance = 15;
 
 
 int world_manager_init(void)
 {
-    world = malloc(sizeof(struct world));
-    if(world == NULL) { nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    default_world = malloc(sizeof(struct world));
+    if(default_world == NULL) { nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
 
-    world->chunks = hash_table_new(ull_hash, ull_equal);
-    if(chunks == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)); return -1; }
-};
+    default_world->chunks = hash_table_new(ull_hash, ull_equal);
+    if(default_world == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)); return -1; }
+    return 1;
+}
 
 static struct chunk *get_chunk(world *w, long x, long z)
 {
     unsigned long long key = get_chunk_key(x, z);
-    struct chunk *chunk1 = hash_table_lookup(world->chunks, &key);
+    struct chunk *chunk1 = hash_table_lookup(default_world->chunks, &key);
     if(chunk1 != HASH_TABLE_NULL)
     {
         return chunk1;
@@ -166,9 +173,6 @@ static struct chunk *load_chunk(world *world, long x, long z)
     struct chunk *chunk = malloc(sizeof(struct chunk));
     if(chunk == NULL) return NULL;
 
-    chunk->sections = malloc(CHUNK_SECTIONS_PER_CHUNK * sizeof(struct chunk_section));
-    if(chunk->sections == NULL) return NULL;
-
     chunk->x = x;
     chunk->z = z;
     chunk->last_update = 0; // TODO
@@ -176,33 +180,32 @@ static struct chunk *load_chunk(world *world, long x, long z)
     // Fill the bottom 8 chunk sections with solid stone.
     for(int i = 0; i < 8; i++)
     {
-        struct chunk_section *chunk_section = chunk->sections[i];
+        struct chunk_section *chunk_section = &(chunk->sections[i]);
 
         for(int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
         {
-            chunk_section->blocks[i]->type_id = 1;
-            chunk_section->blocks[i]->damage_value = 0;
+            chunk_section->blocks[i].type_id = 1;
+            chunk_section->blocks[i].data = 0;
         }
     }
 
     return chunk;
 }
 
-int world_send_chunk_data(player *p)
-{
-    struct player_client_settings *settings = player_get_client_settings(p);
-    int view_distance = settings->view_distance <= server_view_distance ? settings->view_distance : server_view_distance;
+//int world_send_chunk_data(struct player *p) // TODO
+//{
+    // int view_distance = p->client_settings.view_distance <= server_view_distance ? p->client_settings.view_distance : server_view_distance;
+    //
+    //
+    // while(true)
+    // {
+    //     unsigned long long key = get_chunk_key(x, z);
+    //     struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
+    //
+    // }
+//}
 
-
-    while(true)
-    {
-        unsigned long long key = get_chunk_key(x, z);
-        struct chunk *chunk = hash_table_lookup(world, &key);
-
-    }
-}
-
-static int send_chunk_data(player *p, const struct chunk *chunk)
+static int send_chunk_data(struct player *p, const struct chunk *chunk)
 {
     struct mcpr_abstract_packet pkt;
     pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
@@ -220,7 +223,7 @@ static int send_chunk_data(player *p, const struct chunk *chunk)
 
     for(int i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
     {
-        struct chunk_section *section = chunk->sections[i];
+        const struct chunk_section *section = &(chunk->sections[i]);
 
         struct mcpr_chunk_section mcpr_chunk_section;
         mcpr_chunk_section.bits_per_block = 13;
@@ -252,9 +255,9 @@ static int send_chunk_data(player *p, const struct chunk *chunk)
         size_t block_data_index = 0;
         for(int i2 = 0; i2 < BLOCKS_PER_CHUNK_SECTION; i++)
         {
-            struct block *block = section->blocks[i2];
+            struct block *block = &(section->blocks[i2]);
 
-            uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->damage_value));
+            uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->data));
             tmp_result = tmp_result | (current_block_data << bits_used);
             bits_used += 13;
 
@@ -267,7 +270,7 @@ static int send_chunk_data(player *p, const struct chunk *chunk)
                 if(bits_used > 64) // It overflowed, we need to continue the last block in the next long.
                 {
                     unsigned char overflowed_bits = bits_used - 64;
-                    tmp_result = block_data >> (13 - overflowed_bits);
+                    tmp_result = current_block_data >> (13 - overflowed_bits);
                     bits_used = overflowed_bits;
                 }
                 else
@@ -281,18 +284,19 @@ static int send_chunk_data(player *p, const struct chunk *chunk)
     }
 
     struct connection *conn = player_get_connection(p);
-    ssize_t result = connection_write_abstract_packet(conn, &pkt);
+    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
     if(result < 0)
     {
-        nlog_error("Could not send chunk data packet. (%s)", mcpr_strerror(errno));
+        nlog_error("Could not send chunk data packet. (%s)", mcpr_strerror(mcpr_errno));
         return -1;
     }
 
     // Clean up..
     for(int i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
     {
-        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].blocks)
-        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].block_light)
+        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].blocks);
+        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].block_light);
     }
     free(pkt.data.play.clientbound.chunk_data.chunk_sections);
+    return 1;
 }

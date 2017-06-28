@@ -30,7 +30,7 @@
 #include <ninuuid/ninuuid.h>
 
 
-static ssize_t mcpr_encode_packet(void **buf, const struct mcpr_abstract_packet *pkt)
+ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packet *pkt)
 {
     size_t data_size;
 
@@ -193,7 +193,7 @@ static ssize_t mcpr_encode_packet(void **buf, const struct mcpr_abstract_packet 
         {
             case MCPR_PKT_PL_CB_DISCONNECT:
             {
-                char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
+                const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
                 *buf = malloc(5 + strlen(reason));
                 if(*buf == NULL) return -1;
 
@@ -327,7 +327,7 @@ static ssize_t mcpr_encode_packet(void **buf, const struct mcpr_abstract_packet 
 
                 int8_t flags = 0;
                 if(pkt->data.play.clientbound.player_abilities.invulnerable)    flags = flags | 0x01;
-                if(pkt->data.play.clientbound.player_abilities.flying)          flags = flags | 0x02;
+                if(pkt->data.play.clientbound.player_abilities.is_flying)          flags = flags | 0x02;
                 if(pkt->data.play.clientbound.player_abilities.allow_flying)    flags = flags | 0x04;
                 if(pkt->data.play.clientbound.player_abilities.creative_mode)   flags = flags | 0x08;
                 ssize_t bytes_written_1 = mcpr_encode_byte(bufpointer, flags);
