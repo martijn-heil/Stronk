@@ -436,7 +436,7 @@ struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, si
 
     struct mcpr_packet *pkt = malloc(sizeof(pkt));
     if(pkt == NULL) { mcpr_errno = errno; return NULL; }
-    pkt->id = packet_id;
+    pkt->id = mcpr_get_packet_type(packet_id, state);
 
     switch(state)
     {
@@ -466,5 +466,20 @@ struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, si
             pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
             return pkt;
         }
+
+        case MCPR_STATE_LOGIN:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_LG_SB_LOGIN_START:
+                {
+                    ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.login.serverbound.login_start.name), ptr, len_left);
+                    if(bytes_read_2 < 0) { free(pkt); mcpr_errno = errno; return NULL; }
+                    return pkt;
+                }
+            }
+        }
     }
+
+    abort(); // Shouldn't be reached anyway
 }

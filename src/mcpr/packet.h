@@ -163,6 +163,7 @@ enum mcpr_packet_type
     MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT,
     MCPR_PKT_PL_SB_USE_ITEM
 };
+enum mcpr_packet_type mcpr_get_packet_type(int8_t id, enum mcpr_state state);
 
 enum mcpr_painting
 {
@@ -1583,7 +1584,7 @@ struct mcpr_entity_metadata
 
 struct mcpr_packet
 {
-    int8_t id;
+    enum mcpr_packet_type id;
     enum mcpr_state state;
     union
     {
