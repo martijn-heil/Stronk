@@ -9,7 +9,7 @@
 #include <world/world.h>
 #include <logging/logging.h>
 
-struct hp_result handle_pl_keep_alive(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_pl_keep_alive(const struct mcpr_packet *pkt, struct connection *conn)
 {
     // We currently ignore keep alive ID's, we may need change that in the future.
     server_get_internal_clock_time(&(conn->player->last_keepalive_received));
@@ -21,7 +21,7 @@ struct hp_result handle_pl_keep_alive(const struct mcpr_abstract_packet *pkt, st
     return result;
 }
 
-struct hp_result handle_pl_plugin_message(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_pl_plugin_message(const struct mcpr_packet *pkt, struct connection *conn)
 {
     if(strcmp(pkt->data.play.serverbound.plugin_message.channel, "MC|BRAND") == 0)
     {
@@ -52,7 +52,7 @@ struct hp_result handle_pl_plugin_message(const struct mcpr_abstract_packet *pkt
     }
 }
 
-struct hp_result handle_pl_client_settings(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_pl_client_settings(const struct mcpr_packet *pkt, struct connection *conn)
 {
     struct player *player = conn->player;
     // We don't know how the locale in the packet is allocated, so we need to copy the string to ensure
@@ -90,7 +90,7 @@ struct hp_result handle_pl_client_settings(const struct mcpr_abstract_packet *pk
         goto fatal_err;
     }
 
-    struct mcpr_abstract_packet response;
+    struct mcpr_packet response;
     response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
     response.data.play.clientbound.player_position_and_look.x = player->pos.x;
     response.data.play.clientbound.player_position_and_look.y = player->pos.y;
@@ -143,12 +143,12 @@ struct hp_result handle_pl_client_settings(const struct mcpr_abstract_packet *pk
     }
 }
 
-struct hp_result handle_pl_teleport_confirm(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struct connection *conn)
 {
     struct player *player = conn->player;
     if(player->last_teleport_id == 0)
     {
-        struct mcpr_abstract_packet response;
+        struct mcpr_packet response;
         response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
         response.data.play.clientbound.player_position_and_look.x = player->pos.x;
         response.data.play.clientbound.player_position_and_look.y = player->pos.y;

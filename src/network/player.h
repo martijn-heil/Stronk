@@ -29,7 +29,6 @@
 
 #include <ninuuid/ninuuid.h>
 #include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
 #include <mcpr/connection.h>
 
 #include <world/entitypos.h>

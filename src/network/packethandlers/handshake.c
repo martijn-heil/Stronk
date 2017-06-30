@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <network/connection.h>
 #include <network/packethandlers/packethandlers.h>
 
-struct hp_result handle_hs_handshake(const struct mcpr_abstract_packet *pkt, struct connection *conn)\
+struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct connection *conn)\
 {
     int32_t protocol_version = pkt->data.handshake.serverbound.handshake.protocol_version;
     mcpr_connection_set_state(conn->conn, pkt->data.handshake.serverbound.handshake.next_state);

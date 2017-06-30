@@ -48,7 +48,7 @@
 #include <algo/compare-string.h>
 
 #include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <mcpr/fdstreams.h>
 #include <mcpr/codec.h>
 #include <mcpr/connection.h>
@@ -155,7 +155,7 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     mcpr_connection_decref(conn);
 }
 
-static void packet_handler(const struct mcpr_abstract_packet *pkt, mcpr_connection *conn)
+static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
 {
     struct connection *conn2 = NULL;
     for(int i = 0; i < client_count; i++)
@@ -372,7 +372,7 @@ static void serve_client_batch(void *arg)
 
             if(diff.tv_sec >= 10)
             {
-                struct mcpr_abstract_packet keep_alive;
+                struct mcpr_packet keep_alive;
 
                 keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
                 keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;

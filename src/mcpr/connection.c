@@ -35,7 +35,7 @@
 #include <mcpr/mcpr.h>
 #include <mcpr/connection.h>
 #include <mcpr/crypto.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <mcpr/codec.h>
 #include <util.h>
 
@@ -55,7 +55,7 @@ struct conn
     EVP_CIPHER_CTX *ctx_decrypt;
     unsigned int reference_count;
     struct ninio_buffer receiving_buf;
-    void (*packet_handler)(const struct mcpr_abstract_packet *pkt, mcpr_connection *conn);
+    void (*packet_handler)(const struct mcpr_packet *pkt, mcpr_connection *conn);
 
     bool tmp_encryption_state_available;
     RSA *rsa;
@@ -63,7 +63,7 @@ struct conn
     uint8_t *verify_token;
 };
 
-bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_abstract_packet *pkt);
+bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_packet *pkt);
 
 enum mcpr_state mcpr_connection_get_state(mcpr_connection *conn)
 {
@@ -74,7 +74,7 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
 {
     struct conn *conn = (struct conn *) tmpconn;
     if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) {
-        struct mcpr_abstract_packet pkt;
+        struct mcpr_packet pkt;
         if(conn->state == MCPR_STATE_LOGIN) {
             pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
             pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
@@ -175,7 +175,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
         if(result == -1) return true;
         if((conn->receiving_buf.size - 5) >= pktlen) {
-            struct mcpr_abstract_packet *pkt = mcpr_decode_abstract_packet(conn->receiving_buf.content, conn->receiving_buf.size);
+            struct mcpr_packet *pkt = mcpr_decode_packet(conn->receiving_buf.content, conn->state, conn->receiving_buf.size);
             if(pkt == NULL) return false;
             conn->packet_handler(pkt, conn);
             free(pkt);
@@ -242,16 +242,16 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
     }
 }
 
-bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_abstract_packet *pkt) {
+bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt) {
     void *buf;
-    ssize_t result = mcpr_encode_abstract_packet(&buf, pkt);
+    ssize_t result = mcpr_encode_packet(&buf, pkt);
     if(result == -1) return false;
     if(!mcpr_connection_write(tmpconn, buf, result)) { free(buf); return false; }
     free(buf);
     return true;
 }
 
-void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_abstract_packet *pkt, mcpr_connection *conn)) {
+void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn)) {
     struct conn *conn = (struct conn *) tmpconn;
     conn->packet_handler = on_packet;
 }

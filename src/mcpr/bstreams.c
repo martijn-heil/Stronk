@@ -104,7 +104,7 @@ ssize_t mcpr_bstream_read_int(int32_t *out, struct bstream *in)
 ssize_t mcpr_bstream_read_long(int64_t *out, struct bstream *in)
 {
     int64_t tmp;
-    if(bstream_read(in, &tmp, 8) == -1)
+    if(!bstream_read(in, &tmp, 8))
     {
         mcpr_errno = errno;
         return -1;

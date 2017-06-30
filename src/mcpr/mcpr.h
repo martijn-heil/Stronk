@@ -125,12 +125,6 @@ enum mcpr_connection_type {
     MCPR_CONNECTION_TYPE_CLIENTBOUND
 };
 
-struct mcpr_packet {
-    uint8_t id;
-    void *data;
-    size_t data_len;
-};
-
 struct mcpr_position {
     long long int x;
     long long int y;

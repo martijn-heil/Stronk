@@ -25,12 +25,12 @@
 
 #include <mcpr/mcpr.h>
 #include <mcpr/codec.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 
 #include <ninuuid/ninuuid.h>
 
 
-ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packet *pkt)
+ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
 {
     size_t data_size;
 
@@ -123,7 +123,7 @@ ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packe
                     void *bufpointer = *buf;
 
                     char uuid_string[37];
-                    ninuuid_to_string(&(pkt->data.login.clientbound.login_success.uuid), uuid_string);
+                    ninuuid_to_string(&(pkt->data.login.clientbound.login_success.uuid), uuid_string, LOWERCASE, false);
 
                     ssize_t bytes_written_1 = mcpr_encode_string(bufpointer, uuid_string);
                     if(bytes_written_1 < 0) { free(*buf); return -1; }
@@ -327,7 +327,7 @@ ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packe
 
                 int8_t flags = 0;
                 if(pkt->data.play.clientbound.player_abilities.invulnerable)    flags = flags | 0x01;
-                if(pkt->data.play.clientbound.player_abilities.is_flying)          flags = flags | 0x02;
+                if(pkt->data.play.clientbound.player_abilities.is_flying)       flags = flags | 0x02;
                 if(pkt->data.play.clientbound.player_abilities.allow_flying)    flags = flags | 0x04;
                 if(pkt->data.play.clientbound.player_abilities.creative_mode)   flags = flags | 0x08;
                 ssize_t bytes_written_1 = mcpr_encode_byte(bufpointer, flags);
@@ -422,4 +422,49 @@ ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packe
     }
 
     return data_size;
+}
+
+struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, size_t maxlen)
+{
+    const void *ptr;
+    size_t len_left = maxlen;
+    int32_t packet_id;
+    ssize_t bytes_read_1 = mcpr_decode_varint(&packet_id, ptr, len_left);
+    if(bytes_read_1 < -1) return NULL;
+    len_left -= bytes_read_1;
+    ptr += bytes_read_1;
+
+    struct mcpr_packet *pkt = malloc(sizeof(pkt));
+    if(pkt == NULL) { mcpr_errno = errno; return NULL; }
+    pkt->id = packet_id;
+
+    switch(state)
+    {
+        case MCPR_STATE_HANDSHAKE:
+        {
+            ssize_t bytes_read_2 = mcpr_decode_varint(&(pkt->data.handshake.serverbound.handshake.protocol_version), ptr, len_left);
+            if(bytes_read_2 < 0) { free(pkt); return NULL; }
+            len_left -= bytes_read_2;
+            ptr += bytes_read_2;
+
+            // Dont forget to free server_address
+            ssize_t bytes_read_3 = mcpr_decode_string(&(pkt->data.handshake.serverbound.handshake.server_address), ptr, len_left);
+            if(bytes_read_3 < 0) { free(pkt); return NULL; }
+            len_left -= bytes_read_3;
+            ptr += bytes_read_3;
+
+            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); mcpr_errno = MCPR_EDECODE; return NULL; }
+            ssize_t bytes_read_4 = mcpr_decode_ushort(&(pkt->data.handshake.serverbound.handshake.server_port), ptr);
+            if(bytes_read_4 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return NULL; }
+            len_left -= bytes_read_4;
+            ptr += bytes_read_4;
+
+            int32_t next_state;
+            ssize_t bytes_read_5 = mcpr_decode_varint(&next_state, ptr, len_left);
+            if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return NULL;  }
+            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); mcpr_errno = MCPR_EDECODE; return NULL; }
+            pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
+            return pkt;
+        }
+    }
 }

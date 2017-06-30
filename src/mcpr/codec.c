@@ -123,7 +123,7 @@ ssize_t mcpr_encode_string(void *out, const char *utf8Str)
 {
     size_t len = strlen(utf8Str);
     char *tmp = malloc(len * sizeof(char) + 1);
-    if(tmp == NULL) return -1;
+    if(tmp == NULL) { mcpr_errno = errno; return -1; }
 
 
     strcpy(tmp, utf8Str);

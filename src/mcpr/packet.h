@@ -20,8 +20,8 @@
     SOFTWARE.
 */
 
-#ifndef MCPR_ABSTRACT_PACKET_H
-#define MCPR_ABSTRACT_PACKET_H
+#ifndef MCPR_packet_H
+#define MCPR_packet_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -1581,7 +1581,7 @@ struct mcpr_entity_metadata
     size_t entry_count;
 };
 
-struct mcpr_abstract_packet
+struct mcpr_packet
 {
     int8_t id;
     enum mcpr_state state;
@@ -1623,7 +1623,7 @@ struct mcpr_abstract_packet
             {
                 struct
                 {
-                    const char *reason; // Chat
+                    char *reason; // Chat
                 } disconnect;
 
                 struct
@@ -1672,15 +1672,15 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    const char *version_name;
+                    char *version_name;
                     int protocol_version;
                     unsigned int max_players;
                     unsigned int online_players;
-                    const char *description;
-                    const char *favicon; // may be NULL.
+                    char *description;
+                    char *favicon; // may be NULL.
 
                     size_t online_players_size;
-                    const struct mcpr_player_sample *player_sample; // or NULL.
+                    struct mcpr_player_sample *player_sample; // or NULL.
                 } response;
             } clientbound;
         } status;
@@ -2123,7 +2123,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    enum mcpr_sound sound;
+                    char *sound_id; // TODO enum
                     enum mcpr_sound_category sound_category;
                     int32_t effect_position_x, effect_position_y, effect_position_z;
                     float volume;
@@ -2132,7 +2132,7 @@ struct mcpr_abstract_packet
 
                 struct
                 {
-                    const char *reason; // should be JSON chat
+                    char *reason; // should be JSON chat
                 } disconnect;
 
                 struct
@@ -2613,13 +2613,10 @@ struct mcpr_abstract_packet
     } data;
 };
 
-//struct mcpr_abstract_packet *mcpr_fd_read_abstract_packet(int in, bool use_compression, unsigned long compression_treshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
-//struct mcpr_abstract_packet *mcpr_read_abstract_packet(FILE *in, bool use_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_decrypt);
-//void mcpr_free_abstract_packet(struct mcpr_abstract_packet);
-//ssize_t mcpr_fp_write_abstract_packet(FILE *out, const struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
-//ssize_t mcpr_fd_write_abstract_packet(int out, const struct mcpr_abstract_packet *pkt, bool use_compression, bool force_no_compression, unsigned long compression_threshold, bool use_encryption, size_t encryption_block_size, EVP_CIPHER_CTX *ctx_encrypt);
-struct mcpr_abstract_packet *mcpr_decode_abstract_packet(const void *in, size_t maxlen);
-ssize_t mcpr_encode_abstract_packet(void **buf, const struct mcpr_abstract_packet *pkt);
+
+struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, size_t maxlen);
+void mcpr_free_decoded_packet(struct mcpr_packet *pkt);
+ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt);
 
 
 #endif // MCPR_PACKET_H

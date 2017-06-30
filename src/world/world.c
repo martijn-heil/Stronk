@@ -34,7 +34,7 @@
 #include <algo/hash-table.h>
 
 #include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <mcpr/connection.h>
 
 #include <logging/logging.h>
@@ -207,7 +207,7 @@ static struct chunk *load_chunk(world *world, long x, long z)
 
 static int send_chunk_data(struct player *p, const struct chunk *chunk)
 {
-    struct mcpr_abstract_packet pkt;
+    struct mcpr_packet pkt;
     pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
     pkt.data.play.clientbound.chunk_data.chunk_x = chunk->x;
     pkt.data.play.clientbound.chunk_data.chunk_z = chunk->z;

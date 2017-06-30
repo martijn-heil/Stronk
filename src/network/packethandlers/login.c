@@ -14,7 +14,7 @@
 #include <algo/compare-pointer.h>
 
 #include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <mcpr/crypto.h>
 #include <mcpr/codec.h>
 
@@ -62,7 +62,7 @@ static bool ensure_init(void)
     return true;
 }
 
-struct hp_result handle_lg_login_start(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct connection *conn)
 {
     if(!ensure_init())
     {
@@ -133,7 +133,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_abstract_packet *pkt, s
     }
 
 
-    struct mcpr_abstract_packet response;
+    struct mcpr_packet response;
     response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
     response.data.login.clientbound.encryption_request.server_id = ""; // Yes, that's supposed to be an empty string.
     response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
@@ -207,7 +207,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_abstract_packet *pkt, s
     return result;
 }
 
-struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_lg_encryption_response(const struct mcpr_packet *pkt, struct connection *conn)
 {
     if(!ensure_init())
     {
@@ -339,7 +339,7 @@ struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet
     }
 
 
-    struct mcpr_abstract_packet response;
+    struct mcpr_packet response;
     response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
     response.data.login.clientbound.login_success.uuid = mapi_result->id;
     response.data.login.clientbound.login_success.username = username;
@@ -388,7 +388,7 @@ struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet
 
     player->entity_id = generate_new_entity_id();
 
-    struct mcpr_abstract_packet join_game_pkt;
+    struct mcpr_packet join_game_pkt;
     join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
     join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
     join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
@@ -422,7 +422,7 @@ struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet
     }
 
 
-    struct mcpr_abstract_packet pm_brand;
+    struct mcpr_packet pm_brand;
     pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
     pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
     pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
@@ -441,7 +441,7 @@ struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet
         }
     }
 
-    struct mcpr_abstract_packet spawn_position_pkt;
+    struct mcpr_packet spawn_position_pkt;
     spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
     spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
 
@@ -458,7 +458,7 @@ struct hp_result handle_lg_encryption_response(const struct mcpr_abstract_packet
         }
     }
 
-    struct mcpr_abstract_packet player_abilities_pkt;
+    struct mcpr_packet player_abilities_pkt;
     player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
     player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
     player_abilities_pkt.data.play.clientbound.player_abilities.allow_flying = player->allow_flying;

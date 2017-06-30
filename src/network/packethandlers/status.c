@@ -1,11 +1,11 @@
 #include <logging/logging.h>
 #include <network/network.h>
-#include <mcpr/abstract_packet.h>
+#include <mcpr/packet.h>
 #include <network/packethandlers/packethandlers.h>
 
-struct hp_result handle_st_request(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connection *conn)
 {
-    struct mcpr_abstract_packet response;
+    struct mcpr_packet response;
     response.id = MCPR_PKT_ST_CB_RESPONSE;
     response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
     response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
@@ -45,9 +45,9 @@ struct hp_result handle_st_request(const struct mcpr_abstract_packet *pkt, struc
     return hp_result;
 }
 
-struct hp_result handle_st_ping(const struct mcpr_abstract_packet *pkt, struct connection *conn)
+struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection *conn)
 {
-    struct mcpr_abstract_packet response;
+    struct mcpr_packet response;
     response.id = MCPR_PKT_ST_CB_PONG;
     response.data.status.clientbound.pong.payload = pkt->data.status.serverbound.ping.payload;
 

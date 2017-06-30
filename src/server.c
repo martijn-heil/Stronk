@@ -28,6 +28,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <string.h>
 #include <time.h>
 #include <errno.h>
@@ -50,10 +51,6 @@
 #include <algo/hash-table.h>
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
-
-#include <mcpr/mcpr.h>
-#include <mcpr/abstract_packet.h>
-#include <mcpr/fdstreams.h>
 
 #include <logging/logging.h>
 #include <network/network.h>
