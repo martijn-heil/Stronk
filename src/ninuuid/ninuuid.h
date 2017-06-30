@@ -25,18 +25,26 @@
 
 #include <stdbool.h>
 
+enum ccase
+{
+    UPPERCASE,
+    LOWERCASE
+};
+
 struct ninuuid
 {
     unsigned char bytes[16];
 };
 
+void ninuuid_load(struct ninuuid *out, const char *in);
+void ninuuid_unload(const struct ninuuid *in, char *out);
 bool ninuuid_generate(struct ninuuid *out, unsigned char version);
 bool ninuuid_equals(const struct ninuuid *first, const struct ninuuid *second);
-void ninuuid_to_string(const struct ninuuid *self, char *out);
-void ninuuid_to_compressed_string(const struct ninuuid *self, char *out);
+void ninuuid_to_string(const struct ninuuid *self, char *out, enum ccase ccase, bool compressed);
 void ninuuid_from_string(struct ninuuid *out, const char *in);
 void ninuuid_from_compressed_string(struct ninuuid *out, const char *in);
 unsigned char ninuuid_get_version(struct ninuuid *uuid);
 void ninuuid_copy(struct ninuuid *out, struct ninuuid *in);
+bool ninuuid_is_null(const struct ninuuid *in);
 
 #endif
