@@ -12,7 +12,7 @@ struct ninio_buffer {
 };
 
 static void ninio_buffer_read(struct ninio_buffer *in, void *out, size_t bytes) {
-    if(in->content == NULL) return;
+    if(in->content == NULL) abort();
     if(in->size < bytes) abort();
 
     memcpy(out, in->content, bytes);

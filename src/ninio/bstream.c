@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 
+#include <ninerr/ninerr.h>
 #include <ninio/bstream.h>
 #include <ninio/ninio.h>
 #include "mcpr/streams.h"
@@ -67,7 +68,7 @@ static void attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size
     }
 }
 
-size_t bstream_fd_read_max(struct bstream *stream, void *out, size_t bytes)
+ssize_t bstream_fd_read_max(struct bstream *stream, void *out, size_t bytes)
 {
     struct fd_bstream *private = (struct fd_bstream *) stream->private;
     attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
@@ -85,7 +86,7 @@ size_t bstream_fd_read_max(struct bstream *stream, void *out, size_t bytes)
     }
 }
 
-size_t bstream_fd_peek_max(struct bstream *stream, void *out, size_t bytes)
+ssize_t bstream_fd_peek_max(struct bstream *stream, void *out, size_t bytes)
 {
     struct fd_bstream *private = (struct fd_bstream *) stream->private;
     attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
@@ -120,6 +121,7 @@ bool bstream_fd_read(struct bstream *stream, void *out, size_t bytes)
     }
     else
     {
+        ninerr_set_err(ninerr_new("Not enough bytes available.", false));
         return false;
     }
 }
@@ -180,7 +182,7 @@ bool bstream_write(struct bstream *stream, const void *out, size_t bytes)
     return stream->write(stream, out, bytes);
 }
 
-size_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes)
+ssize_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes)
 {
     return stream->read_max(stream, buf, maxbytes);
 }

@@ -21,7 +21,10 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+
+#include <ninerr/ninerr.h>
 
 #include <mcpr/mcpr.h>
 #include <mcpr/codec.h>
@@ -30,7 +33,7 @@
 #include <ninuuid/ninuuid.h>
 
 
-ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
+bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
 {
     size_t data_size;
 
@@ -43,31 +46,31 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                 case MCPR_PKT_HS_SB_HANDSHAKE:
                 {
                     *buf = malloc(12 + strlen(pkt->data.handshake.serverbound.handshake.server_address));
-                    if(buf == NULL) return -1;
+                    if(buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                     void *bufpointer = *buf;
 
                     ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, MCPR_PKT_HS_SB_HANDSHAKE);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
                     ssize_t bytes_written_2 = mcpr_encode_varint(bufpointer, MCPR_PROTOCOL_VERSION);
-                    if(bytes_written_2 < 0) { free(*buf); return -1; }
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_2;
 
                     ssize_t bytes_written_3 = mcpr_encode_string(bufpointer, pkt->data.handshake.serverbound.handshake.server_address);
-                    if(bytes_written_3 < 0) { free(*buf); return -1; }
+                    if(bytes_written_3 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_3;
 
                     ssize_t bytes_written_4 = mcpr_encode_ushort(bufpointer, pkt->data.handshake.serverbound.handshake.server_port);
-                    if(bytes_written_4 < 0) { free(*buf); return -1; }
+                    if(bytes_written_4 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_4;
 
                     ssize_t bytes_written_5 = mcpr_encode_varint(bufpointer, pkt->data.handshake.serverbound.handshake.next_state);
-                    if(bytes_written_5 < 0) { free(*buf); return -1; }
+                    if(bytes_written_5 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_5;
 
-                    data_size = bufpointer - *buf;
-                    return data_size;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
                 }
             }
         }
@@ -79,85 +82,87 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                 case MCPR_PKT_LG_CB_DISCONNECT:
                 {
                     *buf = malloc(5 + strlen(pkt->data.login.clientbound.disconnect.reason));
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                     ssize_t bytes_written_1 = mcpr_encode_chat(buf, pkt->data.login.clientbound.disconnect.reason);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
-                    data_size = bytes_written_1;
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
 
-                    return data_size;
+                    *out_bytes_written = bytes_written_1;
+                    return true;
                 }
 
                 case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:
                 {
                     *buf = malloc(15 + strlen(pkt->data.login.clientbound.encryption_request.server_id) + pkt->data.login.clientbound.encryption_request.public_key_length + pkt->data.login.clientbound.encryption_request.verify_token_length);
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                     void *bufpointer = *buf;
 
                     ssize_t bytes_written_1 = mcpr_encode_string(bufpointer, pkt->data.login.clientbound.encryption_request.server_id);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
                     ssize_t bytes_written_2 = mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.encryption_request.public_key_length);
-                    if(bytes_written_2 < 0) { free(*buf); return -1; }
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_2;
 
                     memcpy(bufpointer, pkt->data.login.clientbound.encryption_request.public_key, pkt->data.login.clientbound.encryption_request.public_key_length);
                     bufpointer += pkt->data.login.clientbound.encryption_request.public_key_length;
 
                     ssize_t bytes_written_3 = mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.encryption_request.verify_token_length);
-                    if(bytes_written_3 < 0) { free(*buf); return -1; }
+                    if(bytes_written_3 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_3;
 
                     memcpy(bufpointer, pkt->data.login.clientbound.encryption_request.verify_token, pkt->data.login.clientbound.encryption_request.verify_token_length);
                     bufpointer += pkt->data.login.clientbound.encryption_request.verify_token_length;
 
-                    data_size = bufpointer - *buf;
-                    return data_size;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
                 }
 
                 case MCPR_PKT_LG_CB_LOGIN_SUCCESS:
                 {
                     *buf = malloc(46 + strlen(pkt->data.login.clientbound.login_success.username));
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                     void *bufpointer = *buf;
 
                     char uuid_string[37];
                     ninuuid_to_string(&(pkt->data.login.clientbound.login_success.uuid), uuid_string, LOWERCASE, false);
 
                     ssize_t bytes_written_1 = mcpr_encode_string(bufpointer, uuid_string);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.login.clientbound.login_success.username);
-                    if(bytes_written_2 < 0) { free(*buf); return -1; }
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_2;
 
-                    data_size = bufpointer - *buf;
-                    return data_size;
+                    *out_bytes_written = bufpointer - *buf;;
+                    return true;
                 }
 
                 case MCPR_PKT_LG_CB_SET_COMPRESSION:
                 {
                     *buf = malloc(5);
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                     ssize_t bytes_written_1 = mcpr_encode_varint(*buf, pkt->data.login.clientbound.set_compression.threshold);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
-                    data_size = bytes_written_1;
-                    return data_size;
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+
+                    *out_bytes_written = bytes_written_1;
+                    return true;
                 }
 
                 case MCPR_PKT_LG_SB_LOGIN_START:
                 {
                     *buf = malloc(5 + strlen(pkt->data.login.serverbound.login_start.name));
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                     ssize_t bytes_written_1 = mcpr_encode_string(*buf ,pkt->data.login.serverbound.login_start.name);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
 
                     data_size = bytes_written_1;
-                    return data_size;
+                    *out_bytes_written = data_size;
+                    return true;
                 }
 
                 case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
@@ -165,19 +170,19 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                     int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
                     int32_t verify_token_length = pkt->data.login.serverbound.encryption_response.verify_token_length;
                     *buf = malloc(10 + shared_secret_length + verify_token_length);
-                    if(*buf == NULL) return -1;
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                     void *bufpointer = *buf;
 
                     ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, shared_secret_length);
-                    if(bytes_written_1 < 0) { free(*buf); return -1; }
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.shared_secret, shared_secret_length);
                     bufpointer += shared_secret_length;
 
                     ssize_t bytes_written_2 = mcpr_encode_varint(bufpointer, verify_token_length);
-                    if(bytes_written_2 < 0) { free(*buf); return -1; }
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_2;
 
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.verify_token, verify_token_length);
@@ -195,10 +200,10 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             {
                 const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
                 *buf = malloc(5 + strlen(reason));
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                 ssize_t bytes_written_1 = mcpr_encode_string(*buf, reason);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
 
                 data_size = bytes_written_1;
                 return data_size;
@@ -207,10 +212,10 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_KEEP_ALIVE:
             {
                 *buf = malloc(5);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                 ssize_t bytes_written_1 = mcpr_encode_varint(*buf, pkt->data.play.clientbound.keep_alive.keep_alive_id);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
 
                 data_size = bytes_written_1;
                 return data_size;
@@ -219,12 +224,12 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_JOIN_GAME:
             {
                 *buf = malloc(28);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                 void *bufpointer = *buf;
 
                 ssize_t bytes_written_1 = mcpr_encode_int(bufpointer, pkt->data.play.clientbound.join_game.entity_id);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 uint8_t gamemode;
@@ -237,7 +242,7 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                 }
                 if(pkt->data.play.clientbound.join_game.hardcore) gamemode = gamemode | 0x08;
                 ssize_t bytes_written_2 = mcpr_encode_ubyte(bufpointer, gamemode);
-                if(bytes_written_2 < 0) { free(*buf); return -1; }
+                if(bytes_written_2 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_2;
 
                 int32_t dimension;
@@ -248,7 +253,7 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                     case MCPR_DIMENSION_END:        dimension = 1;  break;
                 }
                 ssize_t bytes_written_3 = mcpr_encode_int(bufpointer, dimension);
-                if(bytes_written_3 < 0) { free(*buf); return -1; }
+                if(bytes_written_3 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_3;
 
                 uint8_t difficulty;
@@ -260,11 +265,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                     case MCPR_DIFFICULTY_HARD:      difficulty = 3; break;
                 }
                 ssize_t bytes_written_4 = mcpr_encode_ubyte(bufpointer, difficulty);
-                if(bytes_written_4 < 0) { free(*buf); return -1; }
+                if(bytes_written_4 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_4;
 
                 ssize_t bytes_written_5 = mcpr_encode_ubyte(bufpointer, pkt->data.play.clientbound.join_game.max_players);
-                if(bytes_written_5 < 0) { free(*buf); return -1; }
+                if(bytes_written_5 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_5;
 
                 char *level_type;
@@ -277,11 +282,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                     case MCPR_LEVEL_DEFAULT_1_1:    level_type = "default_1_1"; break;
                 }
                 ssize_t bytes_written_6 = mcpr_encode_string(bufpointer, level_type);
-                if(bytes_written_6 < 0) { free(*buf); return -1; }
+                if(bytes_written_6 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_6;
 
                 ssize_t bytes_written_7 = mcpr_encode_bool(bufpointer, pkt->data.play.clientbound.join_game.reduced_debug_info);
-                if(bytes_written_7 < 0) { free(*buf); return -1; }
+                if(bytes_written_7 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_7;
 
                 data_size = bufpointer - *buf;
@@ -291,11 +296,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
             {
                 *buf = malloc(5 + strlen(pkt->data.play.clientbound.plugin_message.channel) + pkt->data.play.clientbound.plugin_message.data_length);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                 void *bufpointer = *buf;
 
                 ssize_t bytes_written_1 = mcpr_encode_string(bufpointer, pkt->data.play.clientbound.plugin_message.channel);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 memcpy(bufpointer, pkt->data.play.clientbound.plugin_message.data, pkt->data.play.clientbound.plugin_message.data_length);
@@ -308,11 +313,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_SPAWN_POSITION:
             {
                 *buf = malloc(MCPR_POSITION_SIZE);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                 void *bufpointer = *buf;
 
                 ssize_t bytes_written_1 = mcpr_encode_position(bufpointer, &(pkt->data.play.clientbound.spawn_position.location));
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 data_size = bufpointer - *buf;
@@ -322,7 +327,7 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
             {
                 *buf = malloc(MCPR_BYTE_SIZE + MCPR_FLOAT_SIZE + MCPR_FLOAT_SIZE);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                 void *bufpointer = *buf;
 
                 int8_t flags = 0;
@@ -331,15 +336,15 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                 if(pkt->data.play.clientbound.player_abilities.allow_flying)    flags = flags | 0x04;
                 if(pkt->data.play.clientbound.player_abilities.creative_mode)   flags = flags | 0x08;
                 ssize_t bytes_written_1 = mcpr_encode_byte(bufpointer, flags);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 ssize_t bytes_written_2 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.flying_speed);
-                if(bytes_written_2 < 0) { free(*buf); return -1; }
+                if(bytes_written_2 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_2;
 
                 ssize_t bytes_written_3 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.field_of_view_modifier);
-                if(bytes_written_3 < 0) { free(*buf); return -1; }
+                if(bytes_written_3 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_3;
 
                 data_size = bufpointer - *buf;
@@ -349,27 +354,27 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
             {
                 *buf = malloc(MCPR_DOUBLE_SIZE * 3 + MCPR_FLOAT_SIZE * 2 + MCPR_BYTE_SIZE + MCPR_VARINT_SIZE_MAX);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                 void *bufpointer = *buf;
 
                 ssize_t bytes_written_1 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.x);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 ssize_t bytes_written_2 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.y);
-                if(bytes_written_2 < 0) { free(*buf); return -1; }
+                if(bytes_written_2 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_2;
 
                 ssize_t bytes_written_3 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.z);
-                if(bytes_written_3 < 0) { free(*buf); return -1; }
+                if(bytes_written_3 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_3;
 
                 ssize_t bytes_written_4 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.yaw);
-                if(bytes_written_4 < 0) { free(*buf); return -1; }
+                if(bytes_written_4 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_4;
 
                 ssize_t bytes_written_5 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.pitch);
-                if(bytes_written_5 < 0) { free(*buf); return -1; }
+                if(bytes_written_5 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_5;
 
                 int8_t flags = 0;
@@ -379,11 +384,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
                 if(pkt->data.play.clientbound.player_position_and_look.pitch_is_relative)   flags = flags | 0x08;
                 if(pkt->data.play.clientbound.player_position_and_look.yaw_is_relative)     flags = flags | 0x10;
                 ssize_t bytes_written_6 = mcpr_encode_byte(bufpointer, flags);
-                if(bytes_written_6 < 0) { free(*buf); return -1; }
+                if(bytes_written_6 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_6;
 
                 ssize_t bytes_written_7 = mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.player_position_and_look.teleport_id);
-                if(bytes_written_7 < 0) { free(*buf); return -1; }
+                if(bytes_written_7 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_7;
 
                 data_size = bufpointer - *buf;
@@ -393,10 +398,10 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_SB_KEEP_ALIVE:
             {
                 *buf = malloc(5);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
                 ssize_t bytes_written_1 = mcpr_encode_varint(*buf, pkt->data.play.serverbound.keep_alive.keep_alive_id);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
 
                 data_size = bytes_written_1;
                 return data_size;
@@ -405,11 +410,11 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
             case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
             {
                 *buf = malloc(5 + strlen(pkt->data.play.serverbound.plugin_message.channel) + pkt->data.play.serverbound.plugin_message.data_length);
-                if(*buf == NULL) return -1;
+                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                 void *bufpointer = *buf;
 
                 ssize_t bytes_written_1 = mcpr_encode_string(bufpointer, pkt->data.play.serverbound.plugin_message.channel);
-                if(bytes_written_1 < 0) { free(*buf); return -1; }
+                if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
                 memcpy(bufpointer, pkt->data.play.serverbound.plugin_message.data, pkt->data.play.serverbound.plugin_message.data_length);
@@ -424,18 +429,19 @@ ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt)
     return data_size;
 }
 
-struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, size_t maxlen)
+bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen)
 {
     const void *ptr;
     size_t len_left = maxlen;
     int32_t packet_id;
     ssize_t bytes_read_1 = mcpr_decode_varint(&packet_id, ptr, len_left);
-    if(bytes_read_1 < -1) return NULL;
+    if(bytes_read_1 < -1) return false;
     len_left -= bytes_read_1;
     ptr += bytes_read_1;
 
-    struct mcpr_packet *pkt = malloc(sizeof(pkt));
-    if(pkt == NULL) { mcpr_errno = errno; return NULL; }
+    struct mcpr_packet *pkt = *out;
+    pkt = malloc(sizeof(struct mcpr_packet));
+    if(pkt == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
     pkt->id = mcpr_get_packet_type(packet_id, state);
 
     switch(state)
@@ -443,26 +449,26 @@ struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, si
         case MCPR_STATE_HANDSHAKE:
         {
             ssize_t bytes_read_2 = mcpr_decode_varint(&(pkt->data.handshake.serverbound.handshake.protocol_version), ptr, len_left);
-            if(bytes_read_2 < 0) { free(pkt); return NULL; }
+            if(bytes_read_2 < 0) { free(pkt); return false; }
             len_left -= bytes_read_2;
             ptr += bytes_read_2;
 
             // Dont forget to free server_address
             ssize_t bytes_read_3 = mcpr_decode_string(&(pkt->data.handshake.serverbound.handshake.server_address), ptr, len_left);
-            if(bytes_read_3 < 0) { free(pkt); return NULL; }
+            if(bytes_read_3 < 0) { free(pkt); return false; }
             len_left -= bytes_read_3;
             ptr += bytes_read_3;
 
-            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); mcpr_errno = MCPR_EDECODE; return NULL; }
+            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(NULL); return false; }
             ssize_t bytes_read_4 = mcpr_decode_ushort(&(pkt->data.handshake.serverbound.handshake.server_port), ptr);
-            if(bytes_read_4 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return NULL; }
+            if(bytes_read_4 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false; }
             len_left -= bytes_read_4;
             ptr += bytes_read_4;
 
             int32_t next_state;
             ssize_t bytes_read_5 = mcpr_decode_varint(&next_state, ptr, len_left);
-            if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return NULL;  }
-            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); mcpr_errno = MCPR_EDECODE; return NULL; }
+            if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false;  }
+            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(NULL); return false; }
             pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
             return pkt;
         }
@@ -474,12 +480,14 @@ struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, si
                 case MCPR_PKT_LG_SB_LOGIN_START:
                 {
                     ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.login.serverbound.login_start.name), ptr, len_left);
-                    if(bytes_read_2 < 0) { free(pkt); mcpr_errno = errno; return NULL; }
+                    if(bytes_read_2 < 0) { free(pkt); return false; }
                     return pkt;
                 }
             }
         }
     }
 
-    abort(); // Shouldn't be reached anyway
+    // Shouldn't be reached anyway
+    fprintf(stderr, "Aborting in mcpr/packet.c:%i", __LINE__);
+    exit(EXIT_FAILURE);
 }

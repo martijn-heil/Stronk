@@ -33,12 +33,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <openssl/rsa.h>
-#include <openssl/x509.h>
-#include <openssl/sha.h>
-
-#include <curl/curl.h>
-
 #include <ninuuid/ninuuid.h>
 
 #include "mcpr/mcpr.h"
@@ -65,6 +59,7 @@ static const size_t MCPR_VARLONG_SIZE_MAX = 10;
 
 // Encoding/decoding functions return the amount of bytes written for encode, and amount of
 // bytes read for decode. On error; they return -1
+// When an error occurs, they will set ninerr
 
 ssize_t mcpr_encode_bool    (void *out, bool b);         // writes 1 byte
 ssize_t mcpr_encode_byte    (void *out, int8_t byte);    // writes 1 byte

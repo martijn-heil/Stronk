@@ -46,45 +46,6 @@
 #define MCPR_PROTOCOL_VERSION 316
 #define MCPR_MINECRAFT_VERSION "1.11.2"
 
-#define MCPR_ERRNO_BASE = 2000
-
-#define MCPR_EUNKNOWN MCPR_ERRNO_BASE
-
-/**
-    Received packet violated compression threshold rules.
-    Remote party should be disconnected when this error is encountered.
- */
-#define MCPR_ECOMPRESSTHRESHOLD (MCPR_ERRNO_BASE + 1)
-
-/**
-    Internal error occured, this happens with things like integer overflow and others.
-*/
-#define MCPR_EINTERNAL (MCPR_ERRNO_BASE + 2)
-
-/**
-    Encountered invalid data whilst decoding protocol data.
-*/
-#define MCPR_EDECODE (MCPR_ERRNO_BASE + 3)
-
-/**
-    Max length exceeded.
-*/
-#define MCPR_EMAXLEN (MCPR_ERRNO_BASE + 4)
-
-#define MCPR_EUNSUPPORTED_PROTOCOL_VERSION (MCPR_ERRNO_BASE + 5)
-
-#define MCPR_ECLOSED (MCPR_ERRNO_BASE + 6)
-
-
-int *mcpr_get_errno();
-/**
- * mapi_errno is guaranteed to be thread local.
- *
- */
-#define mcpr_errno (*mcpr_get_errno())
-
-const char *mcpr_strerror(int mcpr_errno);
-
 
 /**
  * Compress data for use in the Minecraft protocol.

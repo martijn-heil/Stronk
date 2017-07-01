@@ -32,6 +32,7 @@
 #include <openssl/evp.h>
 #include <ninio/bstream.h>
 #include <ninio/ninio.h>
+#include <ninerr/ninerr.h>
 #include <mcpr/mcpr.h>
 #include <mcpr/connection.h>
 #include <mcpr/crypto.h>
@@ -93,7 +94,7 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
 mcpr_connection *mcpr_connection_new(struct bstream *stream)
 {
     struct conn *conn = malloc(sizeof(struct conn));
-    if(conn == NULL) { return NULL; }
+    if(conn == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
     bstream_incref(stream);
 
     conn->io_stream = stream;
@@ -103,7 +104,7 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream)
     conn->reference_count = 1;
 
     conn->receiving_buf.content = malloc(32 * BLOCK_SIZE);
-    if(conn->receiving_buf.content == NULL) { free(conn); return NULL; }
+    if(conn->receiving_buf.content == NULL) { free(conn); ninerr_set_err(ninerr_from_errno()); return NULL; }
     conn->receiving_buf.max_size = 32 * BLOCK_SIZE;
     conn->receiving_buf.size = 0;
     conn->packet_handler = NULL;
@@ -146,13 +147,13 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
         if(conn->receiving_buf.max_size < conn->receiving_buf.size + BLOCK_SIZE)
         {
             void *tmp = realloc(conn->receiving_buf.content, conn->receiving_buf.size + BLOCK_SIZE * 32);
-            if(tmp == NULL) { return false; }
+            if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
             conn->receiving_buf.content = tmp;
         }
 
         // Read a single block.
         void *tmpbuf = malloc(BLOCK_SIZE);
-        if(tmpbuf == NULL) { return false; }
+        if(tmpbuf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
         bool result = bstream_read(conn->io_stream, tmpbuf, BLOCK_SIZE);
         if(!result) { free(tmpbuf); return false; }
 
@@ -175,8 +176,8 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
         if(result == -1) return true;
         if((conn->receiving_buf.size - 5) >= pktlen) {
-            struct mcpr_packet *pkt = mcpr_decode_packet(conn->receiving_buf.content, conn->state, conn->receiving_buf.size);
-            if(pkt == NULL) return false;
+            struct mcpr_packet *pkt;
+             if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content, conn->state, conn->receiving_buf.size)) return false;
             conn->packet_handler(pkt, conn);
             free(pkt);
             memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + 5, conn->receiving_buf.size - pktlen - 5);
@@ -193,7 +194,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
     if(conn->use_encryption)
     {
         void *encrypted_data = malloc(bytes + BLOCK_SIZE - 1);
-        if(encrypted_data == NULL) return false;
+        if(encrypted_data == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
         ssize_t encrypted_data_length = mcpr_crypto_encrypt(encrypted_data, in, conn->ctx_encrypt, bytes);
         if(encrypted_data_length == -1) { free(encrypted_data); return false; }
@@ -201,21 +202,19 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         if(conn->use_compression) // TODO compression treshold
         {
             void *compressed_data = malloc(mcpr_compress_bounds(encrypted_data_length));
-            if(compressed_data == NULL) { free(encrypted_data); mcpr_errno = errno; return false; }
+            if(compressed_data == NULL) { free(encrypted_data); ninerr_set_err(ninerr_from_errno()); return false; }
             ssize_t compression_result = mcpr_compress(compressed_data, encrypted_data, encrypted_data_length);
             if(compression_result == -1) { free(encrypted_data); free(compressed_data); return false; }
 
             bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
             free(encrypted_data);
             free(compressed_data);
-            mcpr_errno = errno;
             return write_result;
         }
         else
         {
             bool write_result = bstream_write(conn->io_stream, encrypted_data, encrypted_data_length);
             free(encrypted_data);
-            mcpr_errno = errno;
             return write_result;
         }
     }
@@ -224,19 +223,17 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         if(conn->use_compression)
         {
             void *compressed_data = malloc(mcpr_compress_bounds(bytes));
-            if(compressed_data == NULL) return false;
+            if(compressed_data == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
             ssize_t compression_result = mcpr_compress(compressed_data, in, bytes);
             if(compression_result == -1) { free(compressed_data); return false; }
             bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
             free(compressed_data);
-            mcpr_errno = errno;
             return write_result;
         }
         else
         {
             bool result = bstream_write(conn->io_stream, in, bytes);
-            mcpr_errno = errno;
             return result;
         }
     }
@@ -244,9 +241,9 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
 bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt) {
     void *buf;
-    ssize_t result = mcpr_encode_packet(&buf, pkt);
-    if(result == -1) return false;
-    if(!mcpr_connection_write(tmpconn, buf, result)) { free(buf); return false; }
+    size_t bytes_written;
+    if(!mcpr_encode_packet(&buf, &bytes_written, pkt)) return false;
+    if(!mcpr_connection_write(tmpconn, buf, bytes_written)) { free(buf); return false; }
     free(buf);
     return true;
 }

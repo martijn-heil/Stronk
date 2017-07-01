@@ -1,3 +1,6 @@
+#ifndef STRONK_PACKETHANDLERS_H
+#define STRONK_PACKETHANDLERS_H
+
 #include <stdbool.h>
 #include <mcpr/packet.h>
 #include <network/connection.h>
@@ -55,3 +58,5 @@ struct hp_result handle_pl_animation                    (const struct mcpr_packe
 struct hp_result handle_pl_spectate                     (const struct mcpr_packet *pkt, struct connection *conn);
 struct hp_result handle_pl_player_block_placement       (const struct mcpr_packet *pkt, struct connection *conn);
 struct hp_result handle_pl_use_item                     (const struct mcpr_packet *pkt, struct connection *conn);
+
+#endif

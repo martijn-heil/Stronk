@@ -37,6 +37,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include <ninerr/ninerr.h>
 #include <ninuuid/ninuuid.h>
 #include <safe_math.h>
 
@@ -123,11 +124,11 @@ ssize_t mcpr_encode_string(void *out, const char *utf8Str)
 {
     size_t len = strlen(utf8Str);
     char *tmp = malloc(len * sizeof(char) + 1);
-    if(tmp == NULL) { mcpr_errno = errno; return -1; }
+    if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }
 
 
     strcpy(tmp, utf8Str);
-    if(len > INT32_MAX) { mcpr_errno = MCPR_EINTERNAL; return -1; }
+    if(len > INT32_MAX) { ninerr_set_err(ninerr_artihmetic_new()); return -1; }
     int bytes_written = mcpr_encode_varint(out, (int32_t) len);
 
     memcpy(out + bytes_written, tmp, len); // doesn't copy the NUL byte, on purpose.
@@ -290,8 +291,8 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     int32_t len;
     ssize_t bytes_read = mcpr_decode_varint(&len, in, maxlen);
     if(bytes_read < 0) { return -1; }
-    if(len < 0) { mcpr_errno = MCPR_EDECODE; return -1; }
-    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { mcpr_errno = MCPR_EINTERNAL; return -1; }
+    if(len < 0) { ninerr_set_err(NULL); return -1; }
+    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_artihmetic_new()); return -1; }
 
     memcpy(out, in, len);
     out[len] = '\0';
@@ -323,12 +324,12 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
         i++;
         if (i > MCPR_VARINT_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
-            mcpr_errno = MCPR_EDECODE;
+            ninerr_set_err(NULL);
             return -1;
         }
         else if ((i - 1) >= max_len) // Max length exceeded whilst decoding VarInt
         {
-            mcpr_errno = MCPR_EMAXLEN;
+            ninerr_set_err(NULL);
             return -1;
         }
     } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
@@ -353,12 +354,12 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
         i++;
         if (i > MCPR_VARLONG_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
-            mcpr_errno = MCPR_EDECODE;
+            ninerr_set_err(NULL);
             return -1;
         }
         else if ((i - 1) >= max_len) // Max length exceeded whilst decoding VarInt
         {
-            mcpr_errno = MCPR_EMAXLEN;
+            ninerr_set_err(NULL);
             return -1;
         }
     } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000

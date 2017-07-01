@@ -52,12 +52,6 @@
 #define ntoh64(x) ntohll(x)
 
 
-FILE *mcpr_open_packet(struct mcpr_packet *pkt)
-{
-    return fmemopen(pkt->data, pkt->data_len, "r");
-}
-
-
 ssize_t mcpr_fpstream_read_byte(int8_t *out, FILE *in)
 {
     char c = getc(in);

@@ -25,15 +25,16 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <sys/types.h>
 
 
 struct bstream
 {
     void *private; // may be NULL
     bool (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    size_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+    ssize_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
     bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    size_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+    ssize_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
     bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
     void (*incref)(struct bstream *stream); // may be NULL
     void (*decref)(struct bstream *stream); // may be NULL
@@ -47,10 +48,11 @@ struct bstream
 bool bstream_from_fd(struct bstream *stream, int fd);
 
 bool bstream_is_available(struct bstream *stream, size_t amount);
-size_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes);
+ssize_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes);
 bool bstream_read(struct bstream *stream, void *buf, size_t bytes);
 bool bstream_write(struct bstream *stream, const void *buf, size_t bytes);
 void bstream_peek(struct bstream *stream, void *out, size_t bytes);
+ssize_t bstream_peek_max(struct bstream *stream, void *out, size_t maxbytes);
 void bstream_incref(struct bstream *stream);
 void bstream_decref(struct bstream *stream);
 

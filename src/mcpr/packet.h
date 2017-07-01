@@ -2615,9 +2615,9 @@ struct mcpr_packet
 };
 
 
-struct mcpr_packet *mcpr_decode_packet(const void *in, enum mcpr_state state, size_t maxlen);
+bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen);
 void mcpr_free_decoded_packet(struct mcpr_packet *pkt);
-ssize_t mcpr_encode_packet(void **buf, const struct mcpr_packet *pkt);
+bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt);
 
 
 #endif // MCPR_PACKET_H

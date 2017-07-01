@@ -55,12 +55,14 @@ ssize_t mcpr_compress(void *out, const void *in, size_t n) {
 
 
     if(result == Z_MEM_ERROR) {
+        ninerr = &ninerr_out_of_memory_struct;
         return -1;
     } else if(result == Z_BUF_ERROR) {
+        ninerr = NULL;
         return -1;
     } else {
-        if(dest_len > INT_MAX) { return -1; }
-        return (int) dest_len; // Compressed out size.
+        if(dest_len > SIZE_MAX || dest_len < 0) { ninerr = NULL; return -1; }
+        return dest_len; // Compressed out size.
     }
 }
 
@@ -70,13 +72,16 @@ ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t i
 
 
     if(result == Z_MEM_ERROR) {
+        ninerr = &ninerr_out_of_memory_struct;
         return -1;
     } else if(result == Z_BUF_ERROR) {
+        ninerr = NULL;
         return -1;
     } else if(result == Z_DATA_ERROR) {
+        ninerr = NULL;
         return -1;
     } else {
-        if(dest_len > INT_MAX) { return -1; }
-        return (int) dest_len;
+        if(dest_len > SIZE_MAX || dest_len < 0) { ninerr = NULL; return -1; }
+        return dest_len;
     }
 }
