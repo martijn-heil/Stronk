@@ -37,6 +37,10 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 {
     size_t data_size;
 
+    #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wswitch"
+    #endif
     switch(pkt->state)
     {
         case MCPR_STATE_HANDSHAKE:
@@ -425,13 +429,18 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
             }
         }
     }
+    #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+    #endif
 
-    return data_size;
+    // Shouldn't be reached anyway
+    fprintf(stderr, "Aborting in mcpr/packet.c:%i", __LINE__);
+    exit(EXIT_FAILURE);
 }
 
 bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen)
 {
-    const void *ptr;
+    const void *ptr = in;
     size_t len_left = maxlen;
     int32_t packet_id;
     ssize_t bytes_read_1 = mcpr_decode_varint(&packet_id, ptr, len_left);
@@ -444,6 +453,10 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
     if(pkt == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
     pkt->id = mcpr_get_packet_type(packet_id, state);
 
+    #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wswitch"
+    #endif
     switch(state)
     {
         case MCPR_STATE_HANDSHAKE:
@@ -486,8 +499,16 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
             }
         }
     }
+    #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+    #endif
 
     // Shouldn't be reached anyway
     fprintf(stderr, "Aborting in mcpr/packet.c:%i", __LINE__);
     exit(EXIT_FAILURE);
+}
+
+enum mcpr_packet_type mcpr_get_packet_type(int8_t id, enum mcpr_state state)
+{
+    return MCPR_PKT_HS_SB_HANDSHAKE; // TODO implement
 }

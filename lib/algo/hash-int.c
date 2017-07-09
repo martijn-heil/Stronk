@@ -22,7 +22,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Hash function for a pointer to an integer */
 
-unsigned long int_hash(void *vlocation)
+unsigned long long int_hash(void *vlocation)
 {
-	return (unsigned long long) *((int *) location);
+	return (unsigned long long) *((int *) vlocation);
 }

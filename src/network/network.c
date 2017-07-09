@@ -47,9 +47,10 @@
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
 
+#include <ninerr/ninerr.h>
+
 #include <mcpr/mcpr.h>
 #include <mcpr/packet.h>
-#include <mcpr/fdstreams.h>
 #include <mcpr/codec.h>
 #include <mcpr/connection.h>
 
@@ -75,7 +76,7 @@ static void serve_clients(void);
 
 
 int net_init(void) {
-    int port = 25565; // TODO configuration of port.
+    uint16_t port = 25565; // TODO configuration of port.
 
     nlog_info("Creating server socket on port %i..", port);
     server_socket = make_server_socket(port);
@@ -147,12 +148,15 @@ static int make_server_socket (uint16_t port)
 
 void connection_close(struct connection *conn, const char *disconnect_message)
 {
+    // TODO should we free player here?
     nlog_info("Connection closed.");
-    mcpr_connection_close(conn, disconnect_message);
     pthread_mutex_lock(clients_delete_lock);
     slist_remove_entry(&clients, (void *) conn);
     pthread_mutex_unlock(clients_delete_lock);
-    mcpr_connection_decref(conn);
+    mcpr_connection_close(conn->conn, disconnect_message);
+    mcpr_connection_decref(conn->conn);
+    free(conn->server_address_used);
+    free(conn);
 }
 
 static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
@@ -179,6 +183,10 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     }
 
     struct hp_result result;
+    #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wswitch"
+    #endif
     switch(mcpr_connection_get_state(conn))
     {
         case MCPR_STATE_HANDSHAKE:
@@ -248,6 +256,9 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
             break;
         }
     }
+    #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+    #endif
 
     finish:
         if(result.result == HP_RESULT_FATAL)
@@ -295,7 +306,7 @@ static void accept_incoming_connections(void)
         mcpr_connection *conn = mcpr_connection_new(newfd);
         if(conn == NULL)
         {
-            nlog_error("Could not create new connection object. (%s)", mcpr_strerror(mcpr_errno));
+            nlog_error("Could not create new connection object. (%s)", ninerr->message);
             continue;
         }
         mcpr_connection_set_packet_handler(conn, packet_handler);
@@ -381,14 +392,14 @@ static void serve_client_batch(void *arg)
 
                 if(mcpr_connection_write_packet(conn->conn, &keep_alive) < 0)
                 {
-                    if(mcpr_errno == ECONNRESET)
+                    if(strcmp(ninerr->type, "ninerr_closed") == 0)
                     {
                         connection_close(conn, NULL);
                         continue;
                     }
                     else
                     {
-                        nlog_error("Could not send keep alive packet. (%s)", mcpr_strerror(mcpr_errno));
+                        nlog_error("Could not send keep alive packet. (%s)", ninerr->message);
                     }
                 }
                 else
@@ -415,7 +426,7 @@ static void serve_client_batch(void *arg)
             if(diff.tv_sec >= 30)
             {
                 char uuid[37];
-                ninuuid_to_string(&(player->uuid), uuid);
+                ninuuid_to_string(&(player->uuid), uuid, LOWERCASE, false);
                 nlog_error("Player with UUID %s timed out. (server-side)", uuid);
 
                 char *reason = mcpr_as_chat("Timed out. (server-side)");

@@ -33,6 +33,8 @@
 #include <algo/compare-ull.h>
 #include <algo/hash-table.h>
 
+#include <ninerr/ninerr.h>
+
 #include <mcpr/mcpr.h>
 #include <mcpr/packet.h>
 #include <mcpr/connection.h>
@@ -41,6 +43,9 @@
 #include <network/connection.h>
 
 #include "world/world.h"
+
+int32_t entity_id_counter = INT32_MIN;
+pthread_mutex_t entity_id_counter_mutex;
 
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
 struct block {
@@ -148,7 +153,19 @@ int world_manager_init(void)
 
     default_world->chunks = hash_table_new(ull_hash, ull_equal);
     if(default_world == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)); return -1; }
+
+    if(pthread_mutex_init(&entity_id_counter_mutex, NULL) != 0)
+    {
+        nlog_fatal("Could not initialize entity id counter mutex.");
+        return -1;
+    }
     return 1;
+}
+
+void world_manager_cleanup(void)
+{
+    pthread_mutex_destroy(&entity_id_counter_mutex);
+    // TODO free memory from world
 }
 
 static struct chunk *get_chunk(world *w, long x, long z)
@@ -192,18 +209,18 @@ static struct chunk *load_chunk(world *world, long x, long z)
     return chunk;
 }
 
-//int world_send_chunk_data(struct player *p) // TODO
-//{
-    // int view_distance = p->client_settings.view_distance <= server_view_distance ? p->client_settings.view_distance : server_view_distance;
-    //
-    //
-    // while(true)
-    // {
-    //     unsigned long long key = get_chunk_key(x, z);
-    //     struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
-    //
-    // }
-//}
+bool world_send_chunk_data(const struct player *p) // TODO
+{
+    int view_distance = 10; // TODO proper view distance
+
+
+    while(true)
+    {
+        unsigned long long key = get_chunk_key(x, z);
+        struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
+
+    }
+}
 
 static int send_chunk_data(struct player *p, const struct chunk *chunk)
 {
@@ -287,7 +304,16 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
     ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
     if(result < 0)
     {
-        nlog_error("Could not send chunk data packet. (%s)", mcpr_strerror(mcpr_errno));
+        if(ninerr != NULL && ninerr->message != NULL)
+        {
+            nlog_error("Could not send chunk data packet. (%s)", ninerr->message);
+        }
+        else
+        {
+            nlog_error("Could not send chunk data packet.");
+        }
+
+
         return -1;
     }
 
@@ -299,4 +325,11 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
     }
     free(pkt.data.play.clientbound.chunk_data.chunk_sections);
     return 1;
+}
+
+
+
+int32_t generate_new_entity_id(void)
+{
+    pthread_mutex_lock(&entity_id_counter_mutex);
 }

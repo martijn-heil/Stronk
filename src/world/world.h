@@ -27,13 +27,15 @@ typedef void * world;
 typedef void * block;
 
 #include <network/player.h>
-#include <world/entity_position.h>
+#include <world/entitypos.h>
 
+int world_manager_init(void);
+void world_manager_cleanup(void);
 void world_do_tick(world *world);
 size_t world_manager_get_world_count();
 world **world_manager_get_worlds();
-struct entity_position world_manager_get_init_spawn_pos(void);
-int world_send_chunk_data(struct player *p);
+struct entitypos world_manager_get_init_spawn_pos(void);
+bool world_send_chunk_data(const struct player *p);
 
 
 #endif

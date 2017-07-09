@@ -17,12 +17,31 @@ bool ninerr_init(void)
     return true;
 }
 
-struct ninerr *ninerr_artihmetic_new(void)
+struct ninerr *ninerr_arithmetic_new(void)
 {
     struct ninerr *err = ninerr_new("Arithmetic error", false);
     err->type = "ninerr_artihmetic";
     return err;
 }
+
+static void ninerr_free(struct ninerr *err)
+{
+    free(err->message);
+    free(err);
+}
+
+struct ninerr *ninerr_new(char *message, bool free_message)
+{
+    struct ninerr *err = malloc(sizeof(struct ninerr));
+    if(err == NULL) return NULL;
+    err->message = message;
+    err->type = "ninerr";
+    err->child = NULL;
+    err->cause = NULL;
+    if(free_message) err->free = ninerr_free; else err->free = NULL;
+    return err;
+}
+
 
 void ninerr_finish(void)
 {

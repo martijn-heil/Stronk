@@ -209,3 +209,13 @@ bool bstream_from_fd(struct bstream *stream, int fd)
 
     return true;
 }
+
+void bstream_incref(struct bstream *stream)
+{
+    stream->incref(stream);
+}
+
+void bstream_decref(struct bstream *stream)
+{
+    stream->decref(stream);
+}

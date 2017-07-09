@@ -24,5 +24,5 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 unsigned long long ull_hash(void *location)
 {
-	return *((unsigned long long *) location)
+	return *((unsigned long long *) location);
 }

@@ -23,7 +23,6 @@
 #ifndef STRONK_CONNECTION_H
 #define STRONK_CONNECTION_H
 
-#include <mcpr/abstract_packet.h>
 #include <mcpr/connection.h>
 
 #include <network/player.h>
@@ -31,6 +30,7 @@
 
 struct connection
 {
+    char *server_address_used; // Will only be initialized after having switched to a different state from HANDSHAKE
     mcpr_connection *conn;
     struct player *player; // may be NULL
 };

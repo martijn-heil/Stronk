@@ -28,6 +28,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <stdarg.h>
 
 #include <sys/types.h>
 
@@ -37,6 +39,7 @@
 
 #include <zlib.h>
 
+#include <ninerr/ninerr.h>
 #include "codec.h"
 #include "mcpr.h"
 #include "../util.h"
@@ -45,7 +48,7 @@
 
 size_t mcpr_compress_bounds(size_t len) {
     uLongf calc_len = compressBound(len);
-    if(calc_len > SIZE_MAX || calc_len < 0) { fprintf(stderr, "Aborted at mcpr.c:" __LINE__ " in mcpr_compress_bounds function, calculated length does not fit within size_t"); abort(); }
+    if(calc_len > SIZE_MAX || calc_len < 0) { fprintf(stderr, "Aborted at mcpr.c:%i in mcpr_compress_bounds function, calculated length does not fit within size_t", __LINE__); abort(); }
     return calc_len;
 }
 
@@ -55,10 +58,10 @@ ssize_t mcpr_compress(void *out, const void *in, size_t n) {
 
 
     if(result == Z_MEM_ERROR) {
-        ninerr = &ninerr_out_of_memory_struct;
+        ninerr_set_err(&ninerr_out_of_memory_struct);
         return -1;
     } else if(result == Z_BUF_ERROR) {
-        ninerr = NULL;
+        ninerr_set_err(NULL);
         return -1;
     } else {
         if(dest_len > SIZE_MAX || dest_len < 0) { ninerr = NULL; return -1; }
@@ -72,16 +75,52 @@ ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t i
 
 
     if(result == Z_MEM_ERROR) {
-        ninerr = &ninerr_out_of_memory_struct;
+        ninerr_set_err(&ninerr_out_of_memory_struct);
         return -1;
     } else if(result == Z_BUF_ERROR) {
-        ninerr = NULL;
+        ninerr_set_err(NULL);
         return -1;
     } else if(result == Z_DATA_ERROR) {
-        ninerr = NULL;
+        ninerr_set_err(NULL);
         return -1;
     } else {
         if(dest_len > SIZE_MAX || dest_len < 0) { ninerr = NULL; return -1; }
         return dest_len;
     }
+}
+
+char *mcpr_as_chat(const char *message_fmt, ...)
+{
+    va_list args;
+    va_start(args, message_fmt);
+
+    char tmp;
+    int bytes_required = vsnprintf(&tmp, 1, message_fmt, args);
+    if(bytes_required < 0) { va_end(args); ninerr_set_err(ninerr_new("vsnprintf failed.", false)); return NULL; }
+    bytes_required++; // For the NUL byte
+
+    char *message;
+    bool free_message = false;
+    if(bytes_required <= 256)
+    {
+        char buf[bytes_required];
+        message = buf;
+    }
+    else
+    {
+        message = malloc(bytes_required);
+        if(message == NULL) { va_end(args); ninerr_set_err(ninerr_from_errno()); return NULL; }
+        free_message = true;
+    }
+    int message_length = vsprintf(message, message_fmt, args);
+    if(message_length < 0) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("vsprintf failed.", false)); }
+
+    char *fmt = "{\"text\":\"%s\"}";
+    char *buf = malloc(12 + message_length); // Important! Change 12 if you change the fmt above.
+    if(buf == NULL) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_from_errno()); }
+    int result = sprintf(buf, fmt, message);
+    if(result < 0) { free(buf); if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("sprintf failed.", false)); }
+
+    va_end(args);
+    return buf;
 }

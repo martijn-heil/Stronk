@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+// TODO maybe line & file at which error occurred?
 struct ninerr
 {
     char *message; // may be NULL
@@ -19,7 +20,7 @@ bool ninerr_init(void);
 void ninerr_finish(void);
 struct ninerr *ninerr_from_errno(void); // may return NULL
 struct ninerr *ninerr_new(char *message, bool free_message);
-struct ninerr *ninerr_artihmetic_new(void);
+struct ninerr *ninerr_arithmetic_new(void);
 
 
 

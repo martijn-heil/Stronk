@@ -24,7 +24,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 int ull_equal(void *location1, void *location2)
 {
-    return (*((unsigned long long *) location1)) == (*((unsigned long long *) location2))
+    return (*((unsigned long long *) location1)) == (*((unsigned long long *) location2));
 }
 
 int ull_compare(void *location1, void *location2)
@@ -32,9 +32,9 @@ int ull_compare(void *location1, void *location2)
     unsigned long long int1 = *((unsigned long long *) location1);
     unsigned long long int2 = *((unsigned long long *) location2);
 
-	if (int1 < int1) {
+	if (int1 < int2) {
 		return -1;
-	} else if (int1 > int1) {
+	} else if (int1 > int2) {
 		return 1;
 	} else {
 		return 0;

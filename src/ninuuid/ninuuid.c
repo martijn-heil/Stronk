@@ -96,7 +96,7 @@ void ninuuid_to_string(const struct ninuuid *self, char *out, enum ccase ccase, 
     }
 }
 
-void ninuuid_from_string(struct ninuuid *out, const char *in)
+bool ninuuid_from_string(struct ninuuid *out, const char *in)
 {
     bool compressed = in[8] != '-';
 
@@ -110,7 +110,7 @@ void ninuuid_from_string(struct ninuuid *out, const char *in)
         fmt = "%hhX%hhX%hhX%hhX-%hhX%hhX-%hhX%hhX-%hhX%hhX-%hhX%hhX%hhX%hhX%hhX%hhX";
     }
 
-    sscanf(in, fmt,
+    int result = sscanf(in, fmt,
         out->bytes[0],
         out->bytes[1],
         out->bytes[2],
@@ -128,6 +128,7 @@ void ninuuid_from_string(struct ninuuid *out, const char *in)
         out->bytes[14],
         out->bytes[15]
     );
+    if(result == EOF || result < 16) return false;
 }
 
 unsigned char ninuuid_get_version(struct ninuuid *uuid)

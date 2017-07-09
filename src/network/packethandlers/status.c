@@ -1,5 +1,9 @@
-#include <logging/logging.h>
+#include <string.h>
+
+#include <ninerr/ninerr.h>
+
 #include <network/network.h>
+#include <logging/logging.h>
 #include <mcpr/packet.h>
 #include <network/packethandlers/packethandlers.h>
 
@@ -11,7 +15,14 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
     response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
     response.data.status.clientbound.response.max_players = net_get_max_players();
     response.data.status.clientbound.response.online_players_size = 0;
-    response.data.status.clientbound.response.description = net_get_motd();
+    #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+    #endif
+        response.data.status.clientbound.response.description = net_get_motd();
+    #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+    #endif
     response.data.status.clientbound.response.online_players = -1;
     response.data.status.clientbound.response.player_sample = NULL;
     response.data.status.clientbound.response.favicon = NULL;
@@ -19,7 +30,7 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
 
     if(mcpr_connection_write_packet(conn->conn, &response) < 0)
     {
-        if(mcpr_errno == ECONNRESET)
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_CLOSED;
@@ -29,7 +40,15 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
         }
         else
         {
-            nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(mcpr_errno));
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not write packet to connection (%s ?)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not write packet to connection.");
+            }
+
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_ERR;
             hp_result.disconnect_message = NULL;
@@ -53,7 +72,7 @@ struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection
 
     if(mcpr_connection_write_packet(conn->conn, &response) < 0)
     {
-        if(mcpr_errno == ECONNRESET)
+        if(ninerr != NULL && ninerr->message != NULL)
         {
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_CLOSED;
@@ -63,7 +82,15 @@ struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection
         }
         else
         {
-            nlog_error("Could not write packet to connection (%s ?)", mcpr_strerror(mcpr_errno));
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not write packet to connection (%s ?)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not write packet to connection.");
+            }
+
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_ERR;
             hp_result.disconnect_message = NULL;

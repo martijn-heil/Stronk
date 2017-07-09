@@ -32,6 +32,7 @@
 #include <string.h>
 #include <time.h>
 #include <errno.h>
+#include <limits.h>
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -46,6 +47,7 @@
 
 #include <jansson/jansson.h>
 
+#include <openssl/ssl.h>
 #include <openssl/opensslv.h>
 
 #include <algo/hash-table.h>
@@ -54,6 +56,7 @@
 
 #include <logging/logging.h>
 #include <network/network.h>
+#include <world/world.h>
 
 #include "server.h"
 #include "stronk.h"
@@ -102,12 +105,17 @@ static void init(void);
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
 static char *motd = "A bloody stronk server.";
 static HashTable *players = NULL; // hash table indexed by strings of compressed UUIDs
+static bool world_manager_init_done = false;
 static bool logging_init_done = false;
 static bool thread_pooling_init_done = false;
 static bool networking_init_done = false;
-threadpool main_threadpool;
 static struct timespec internal_clock; // Every time the clock ticks 50ms is added
 
+unsigned int main_threadpool_threadcount;
+threadpool main_threadpool;
+
+unsigned int async_threadpool_threadcount;
+threadpool async_threadpool;
 
 
 // returns 0 if unable to detect.
@@ -219,6 +227,7 @@ static void init_thread_pooling(void)
         cleanup();
         exit(EXIT_FAILURE);
     }
+    main_threadpool_threadcount = planned_thread_count;
 
     thread_pooling_init_done = true;
 }
@@ -239,7 +248,8 @@ static void init(void)
 	SSL_library_init();
 
     init_thread_pooling();
-    if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
+    if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }               networking_init_done = true;
+    if(world_manager_init() < 0) { cleanup(); exit(EXIT_FAILURE); }     world_manager_init_done = true;
 
 
     nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
@@ -301,7 +311,7 @@ void cleanup(void)
 {
     if(networking_init_done) net_cleanup();
     if(thread_pooling_init_done) cleanup_thread_pooling();
-
+    if(world_manager_init_done) world_manager_cleanup();
 
     if(logging_init_done) logging_cleanup(); // Logging alwas as last.
 }

@@ -1,13 +1,16 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <inttypes.h>
 #include <mcpr/mcpr.h>
 #include <mcpr/packet.h>
 #include <network/connection.h>
 #include <network/packethandlers/packethandlers.h>
+#include <logging/logging.h>
 
 struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct connection *conn)\
 {
+    nlog_info("Received a handshake packet.");
     int32_t protocol_version = pkt->data.handshake.serverbound.handshake.protocol_version;
     mcpr_connection_set_state(conn->conn, pkt->data.handshake.serverbound.handshake.next_state);
 
@@ -23,6 +26,26 @@ struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct conne
             return hp_result;
         }
     }
+    size_t server_address_len = strlen(pkt->data.handshake.serverbound.handshake.server_address);
+    conn->server_address_used = malloc(server_address_len + 1);
+    if(conn->server_address_used == NULL)
+    {
+        nlog_error("Could not allocate memory for conn->server_address (%s)", strerror(errno));
+        struct hp_result hp_result;
+        hp_result.result = HP_RESULT_FATAL;
+        if(mcpr_connection_get_state(conn->conn) == MCPR_STATE_LOGIN)
+        {
+            hp_result.disconnect_message = mcpr_as_chat("A fatal error occurred whilst logging in.");
+            hp_result.free_disconnect_message = true;
+        }
+        else
+        {
+            hp_result.disconnect_message = NULL;
+            hp_result.free_disconnect_message = false;
+        }
+        return hp_result;
+    }
+    memcpy(conn->server_address_used, pkt->data.handshake.serverbound.handshake.server_address, server_address_len + 1);
 
     struct hp_result hp_result;
     hp_result.result = HP_RESULT_OK;

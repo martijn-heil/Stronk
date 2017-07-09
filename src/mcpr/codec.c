@@ -128,10 +128,17 @@ ssize_t mcpr_encode_string(void *out, const char *utf8Str)
 
 
     strcpy(tmp, utf8Str);
-    if(len > INT32_MAX) { ninerr_set_err(ninerr_artihmetic_new()); return -1; }
+    if(len > INT32_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
     int bytes_written = mcpr_encode_varint(out, (int32_t) len);
 
-    memcpy(out + bytes_written, tmp, len); // doesn't copy the NUL byte, on purpose.
+    #ifdef __GNUC__
+        #pragma GCC diagnostic push
+        #pragma GCC diagnostic ignored "-Wpedantic"
+    #endif
+        memcpy(out + bytes_written, tmp, len); // doesn't copy the NUL byte, on purpose.
+    #ifdef __GNUC__
+        #pragma GCC diagnostic pop
+    #endif
 
     free(tmp);
     bytes_written += len;
@@ -292,13 +299,13 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     ssize_t bytes_read = mcpr_decode_varint(&len, in, maxlen);
     if(bytes_read < 0) { return -1; }
     if(len < 0) { ninerr_set_err(NULL); return -1; }
-    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_artihmetic_new()); return -1; }
+    if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
 
     memcpy(out, in, len);
     out[len] = '\0';
 
     size_t final_bytes_read;
-    if(!safe_add(&final_bytes_read, bytes_read, len)) return -1;
+    if(!psnip_safe_add(&final_bytes_read, bytes_read, len)) return -1;
 
     return final_bytes_read;
 }

@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <ninerr/ninerr.h>
+
 #include <mcpr/codec.h>
 #include <mcpr/connection.h>
 
@@ -108,13 +110,21 @@ struct hp_result handle_pl_client_settings(const struct mcpr_packet *pkt, struct
 
     if(mcpr_connection_write_packet(conn->conn, &response) < 0)
     {
-        if(mcpr_errno == ECONNRESET)
+        if(ninerr != NULL && strcmp(ninerr->message, "ninerr_closed") == 0)
         {
             goto closed;
         }
         else
         {
-            nlog_error("Could not send player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not send player position and look packet for login sequence. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not send player position and look packet for login sequence.");
+            }
+
             goto fatal_err;
         }
     }
@@ -166,13 +176,20 @@ struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struc
 
         if(mcpr_connection_write_packet(conn->conn, &response) < 0)
         {
-            if(mcpr_errno == ECONNRESET)
+            if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
             {
                 goto closed;
             }
             else
             {
-                nlog_error("Could not send confirmation player position and look packet for login sequence. (%s)", mcpr_strerror(mcpr_errno));
+                if(ninerr != NULL && ninerr->message != NULL)
+                {
+                    nlog_error("Could not send confirmation player position and look packet for login sequence. (%s)", ninerr->message);
+                }
+                else
+                {
+                    nlog_error("Could not send confirmation player position and look packet for login sequence.");
+                }
                 goto fatal_err;
             }
         }
@@ -200,4 +217,160 @@ struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struc
         result.free_disconnect_message = false;
         return result;
     }
+}
+
+struct hp_result handle_pl_tab_complete(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_chat_message(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_client_status(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_confirm_transaction(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_enchant_item(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_click_window(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_close_window(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_use_entity(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_position(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_position_and_look(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_look(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_vehicle_move(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_steer_boat(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_abilities(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_digging(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_entity_action(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_steer_vehicle(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_resource_pack_status(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_held_item_change(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_creative_inventory_action(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_update_sign(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_animation(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_spectate(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_player_block_placement(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
+}
+
+struct hp_result handle_pl_use_item(const struct mcpr_packet *pkt, struct connection *conn)
+{
+    struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
+    return result;
 }
