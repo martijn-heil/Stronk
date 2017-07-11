@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include <ninerr/ninerr.h>
 
@@ -88,6 +89,6 @@ struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
         case ECONNRESET: // fallthrough
             return ninerr_closed_new(NULL, false);
 
-        default: return NULL;
+        default: return ninerr_new(strerror(errno), false);
     }
 }
