@@ -211,18 +211,24 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
     struct conn *conn = (struct conn *) tmpconn;
     if(!update_receiving_buffer(tmpconn)) return false;
 
-    while(true)
+    while(conn->receiving_buf.size > 0)
     {
         int32_t pktlen;
         ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
         if(result == -1) return true;
         if(pktlen < 0) { ninerr_set_err(ninerr_new("Received invalid packet length", false)); }
-        if((conn->receiving_buf.size - result) >= (uint32_t) pktlen) {
+        if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
+        {
             struct mcpr_packet *pkt;
-             if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content, conn->state, conn->receiving_buf.size)) return false;
+            if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content, conn->state, conn->receiving_buf.size)) return false;
             conn->packet_handler(pkt, conn);
             free(pkt);
             memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + result, conn->receiving_buf.size - pktlen - result);
+            conn->receiving_buf.size -= pktlen + result;
+        }
+        else
+        {
+            return true;
         }
     }
 

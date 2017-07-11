@@ -53,7 +53,18 @@ static bool attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size
             {
                 size_t possible = buf->max_size - buf->size;
                 ssize_t result = read(fd, buf->content + buf->size, possible);
-                if(result < 0) { ninerr_set_err(ninerr_from_errno()); return false; }
+                if(result < 0)
+                {
+                    if(errno == EAGAIN || errno == EWOULDBLOCK)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        ninerr_set_err(ninerr_from_errno());
+                        return false;
+                    }
+                }
                 buf->size += result;
                 return true;
             }
@@ -63,7 +74,18 @@ static bool attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size
         }
 
         ssize_t result = read(fd, buf->content + buf->size, remaining);
-        if(result < 0) { ninerr_set_err(ninerr_from_errno()); return false; }
+        if(result < 0)
+        {
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                return true;
+            }
+            else
+            {
+                ninerr_set_err(ninerr_from_errno());
+                return false;
+            }
+        }
         buf->size += result;
         return true;
     }

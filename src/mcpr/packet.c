@@ -447,9 +447,9 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
     len_left -= bytes_read_1;
     ptr += bytes_read_1;
 
+    *out = malloc(sizeof(struct mcpr_packet));
+    if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
     struct mcpr_packet *pkt = *out;
-    pkt = malloc(sizeof(struct mcpr_packet));
-    if(pkt == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
     pkt->id = mcpr_get_packet_type(packet_id, state);
 
     IGNORE("-Wswitch")
@@ -468,7 +468,7 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
             len_left -= bytes_read_3;
             ptr += bytes_read_3;
 
-            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(NULL); return false; }
+            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(ninerr_new("Max length exceeded.", false)); return false; }
             ssize_t bytes_read_4 = mcpr_decode_ushort(&(pkt->data.handshake.serverbound.handshake.server_port), ptr);
             if(bytes_read_4 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false; }
             len_left -= bytes_read_4;
@@ -477,9 +477,9 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
             int32_t next_state;
             ssize_t bytes_read_5 = mcpr_decode_varint(&next_state, ptr, len_left);
             if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false;  }
-            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(NULL); return false; }
+            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false; }
             pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
-            return pkt;
+            return true;
         }
 
         case MCPR_STATE_LOGIN:
@@ -490,7 +490,7 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
                 {
                     ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.login.serverbound.login_start.name), ptr, len_left);
                     if(bytes_read_2 < 0) { free(pkt); return false; }
-                    return pkt;
+                    return true;
                 }
             }
         }
