@@ -38,11 +38,6 @@ struct ninerr_file_not_found
 };
 
 struct ninerr *ninerr_closed_new(char *message, bool free_message); // message can be NULL
-
-
-struct ninerr_wouldblock
-{
-    struct ninerr_io *super;
-};
+struct ninerr *ninerr_wouldblock_new(void);
 
 #endif

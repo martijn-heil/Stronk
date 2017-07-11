@@ -77,17 +77,27 @@ struct ninerr *ninerr_closed_new(char *message, bool free_message)
     return err;
 }
 
+struct ninerr *ninerr_wouldblock_new(void)
+{
+    struct ninerr *err = ninerr_new("Operation would block.", false);
+    if(err == NULL) return NULL;
+    err->type = "ninerr_wouldblock";
+    return err;
+}
+
 struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
 {
     switch(errno)
     {
         case ENOMEM:
-        {
             return &ninerr_out_of_memory_struct;
-        }
 
-        case ECONNRESET: // fallthrough
+        case ECONNRESET:
             return ninerr_closed_new(NULL, false);
+
+        case EAGAIN: // fallthrough
+//        case EWOULDBLOCK:
+            return ninerr_wouldblock_new();
 
         default: return ninerr_new(strerror(errno), false);
     }
