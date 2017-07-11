@@ -58,7 +58,7 @@ void ninerr_set_err(struct ninerr *err)
 
 void ninerr_cleanup_latest(void)
 {
-    if(ninerr != NULL) ninerr->free(ninerr);
+    if(ninerr != NULL && ninerr->free != NULL) ninerr->free(ninerr);
 }
 
 struct ninerr *ninerr_closed_new(char *message, bool free_message)
