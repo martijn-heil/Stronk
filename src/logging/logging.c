@@ -6,6 +6,7 @@
 #include <locale.h>
 
 #include <sys/types.h>
+#include <features.h>
 
 #include <zlog.h>
 
@@ -25,7 +26,7 @@
     Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
 */
 
-#ifdef __GNU_LIBRARY__
+#if defined(__GNU_LIBRARY__) || defined(__GLIBC__)
     #define STANDARD_STREAMS_ASSIGNABLE 1
 #else
     #define STANDARD_STREAMS_ASSIGNABLE 0
