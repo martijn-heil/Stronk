@@ -32,12 +32,16 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
+#include "warnings.h"
 
 
-#ifdef __GNUC__
-    #define DO_PRAGMA(x) _Pragma (#x)
-#else
-    #define DO_PRAGMA(x)
+
+#ifndef DO_PRAGMA
+    #ifdef __GNUC__
+        #define DO_PRAGMA(x) _Pragma (#x)
+    #else
+        #define DO_PRAGMA(x)
+    #endif
 #endif
 
 
@@ -45,9 +49,6 @@
     #ifndef likely
         #define likely(x)       __builtin_expect(!!(x), 1)
     #endif
-
-
-
 
     #ifndef unlikely
         #define unlikely(x)     __builtin_expect(!!(x), 0)
@@ -63,16 +64,23 @@
 #endif
 
 #ifdef __GNUC__
-
-    #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
+    #ifndef DO_GCC_PRAGMA
+        #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
+    #endif
 #else
-    #define DO_GCC_PRAGMA(x)
+    #ifndef DO_GCC_PRAGMA
+        #define DO_GCC_PRAGMA(x)
+    #endif
 #endif
 
 #ifdef __GNUC__
-    #define IF_GCC(x) (x)
+    #ifndef IF_GCC
+        #define IF_GCC(x) (x)
+    #endif
 #else
-    #define IF_GCC(x)
+    #ifndef IF_GCC
+        #define IF_GCC(x)
+    #endif
 #endif
 
 

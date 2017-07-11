@@ -33,7 +33,7 @@
     Pthreads must be available.
     Preferrably GCC, but other compilers should work too.
 
-    2's complement integers.
+    two's complement integers.
     char and unsigned char should be exactly 8 bits wide.
 
     endianness has to be either little endian or big endian, no middle endian.

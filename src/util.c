@@ -140,12 +140,12 @@ void ms_to_timespec(struct timespec *ts, unsigned long long ms)
     ts->tv_nsec = (ms % 1000) * 1000000;
 }
 
-void timespec_to_timeval(struct timeval *tv, const struct timespec *ts)
-{
-    // TODO implement
-}
-
-void timeval_to_timespec(struct timespec *ts, const struct timeval *tv)
-{
-    // TODO implement
-}
+// void timespec_to_timeval(struct timeval *tv, const struct timespec *ts)
+// {
+//     // TODO implement
+// }
+//
+// void timeval_to_timespec(struct timespec *ts, const struct timeval *tv)
+// {
+//     // TODO implement
+// }

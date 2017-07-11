@@ -20,14 +20,17 @@
     SOFTWARE.
 */
 
-#ifndef WORLD_H
-#define WORLD_H
+#ifndef STRONK_WORLD_H
+#define STRONK_WORLD_H
 
-typedef void * world;
-typedef void * block;
+typedef void world;
+typedef void block;
+
+#include <stdlib.h>
+#include <stdbool.h>
 
 #include <network/player.h>
-#include <world/entitypos.h>
+#include <world/positions.h>
 
 int world_manager_init(void);
 void world_manager_cleanup(void);
@@ -35,7 +38,7 @@ void world_do_tick(world *world);
 size_t world_manager_get_world_count();
 world **world_manager_get_worlds();
 struct entitypos world_manager_get_init_spawn_pos(void);
-bool world_send_chunk_data(const struct player *p);
+bool world_send_chunk_data1(const struct player *p);
 
 
 #endif

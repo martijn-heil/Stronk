@@ -1,7 +1,7 @@
 /*
     MIT License
 
-    Copyright (c) 2016 Martijn Heil
+    Copyright (c) 2017 Martijn Heil
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
@@ -20,16 +20,32 @@
     SOFTWARE.
 */
 
-#ifndef LOCATION_H
-#define LOCATION_H
+#ifndef STRONK_WARNINGS_H
+#define STRONK_WARNINGS_H
 
-#include "world/world.h"
+#ifndef DO_PRAGMA
+    #ifdef __GNUC__
+        #define DO_PRAGMA(x) _Pragma (#x)
+    #else
+        #define DO_PRAGMA(x)
+    #endif
+#endif
 
-struct entitypos {
-    world *world;
-    double x, y, z;
-    float yaw;
-    float pitch;
-};
+#ifdef __GNUC__
+    #ifndef DO_GCC_PRAGMA
+        #define DO_GCC_PRAGMA(x) DO_PRAGMA(x)
+    #endif
+#else
+    #ifndef DO_GCC_PRAGMA
+        #define DO_GCC_PRAGMA(x)
+    #endif
+#endif
+
+#define IGNORE(x) \
+    DO_GCC_PRAGMA(GCC diagnostic push) \
+    DO_GCC_PRAGMA(GCC diagnostic ignored x)
+
+#define END_IGNORE() \
+    DO_GCC_PRAGMA(GCC diagnostic pop)
 
 #endif

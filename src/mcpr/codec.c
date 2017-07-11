@@ -43,17 +43,10 @@
 
 #include "mcpr/codec.h"
 #include "mcpr/mcpr.h"
+#include "mcpr/util.h"
 
-#define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
-#define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
-#define hton16(x) htons(x)
-#define hton32(x) htonl(x)
-#define hton64(x) htonll(x)
 
-#define ntoh16(x) ntohs(x)
-#define ntoh32(x) ntohl(x)
-#define ntoh64(x) ntohll(x)
 
 // TODO better logging
 
@@ -293,6 +286,7 @@ ssize_t mcpr_decode_double(double *out, const void *in)
 }
 
 // TODO detect len automatically
+IGNORE("-Wtype-limits")
 ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
 {
     int32_t len;
@@ -309,6 +303,7 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
 
     return final_bytes_read;
 }
+END_IGNORE()
 
 ssize_t mcpr_decode_chat(char **out, const void *in, size_t maxsize)
 {

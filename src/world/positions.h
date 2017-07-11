@@ -20,12 +20,10 @@
     SOFTWARE.
 */
 
-#ifndef STRONK_LOCATION_H
-#define STRONK_LOCATION_H
+#ifndef STRONK_WORLD_POSITIONS_H
+#define STRONK_WORLD_POSITIONS_H
 
-#include <mcpr/mcpr.h>
-
-#include "world/world.h"
+#include <world/world.h>
 
 struct blockpos
 {
@@ -33,6 +31,19 @@ struct blockpos
     long long x;
     long long y;
     long long z;
+};
+
+struct entitypos {
+    world *world;
+    double x, y, z;
+    float yaw;
+    float pitch;
+};
+
+struct chunkpos
+{
+    long long x;
+    long long y;
 };
 
 #endif

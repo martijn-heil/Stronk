@@ -183,10 +183,7 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     }
 
     struct hp_result result;
-    #ifdef __GNUC__
-        #pragma GCC diagnostic push
-        #pragma GCC diagnostic ignored "-Wswitch"
-    #endif
+    IGNORE("-Wswitch")
     switch(mcpr_connection_get_state(conn))
     {
         case MCPR_STATE_HANDSHAKE:
@@ -256,9 +253,7 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
             break;
         }
     }
-    #ifdef __GNUC__
-        #pragma GCC diagnostic pop
-    #endif
+    END_IGNORE()
 
     finish:
         if(result.result == HP_RESULT_FATAL)

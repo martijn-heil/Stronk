@@ -41,18 +41,17 @@
 
 #include <logging/logging.h>
 #include <network/connection.h>
+#include <network/player.h>
 
 #include "world/world.h"
+#include "world/block.h"
+#include <util.h>
 
 int32_t entity_id_counter = INT32_MIN;
 pthread_mutex_t entity_id_counter_mutex;
 
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
-struct block {
-    unsigned short type_id;
-    unsigned char data;
-    void *extra_data;
-};
+
 
 /*
         This is a bottom layer of 16x16 blocks of a chunk section, a chunk contains 256 layers of these.
@@ -114,13 +113,14 @@ West to east, north to south block changing is the fastest (as they are indexed 
 
 */
 
-#define xz_to_index(x, z)
+//#define xz_to_index(x, z)
 
 #define BLOCKS_PER_CHUNK_SECTION 4096
 #define CHUNK_SECTIONS_PER_CHUNK 16
 #define BLOCKS_PER_CHUNK (BLOCKS_PER_CHUNK_SECTION * CHUNK_SECTIONS_PER_CHUNK)
 
 static struct chunk *load_chunk(world *world, long x, long z);
+static bool send_chunk_data(const struct player *p, const struct chunk *chunk);
 
 struct chunk_section {
     pthread_rwlock_t lock;
@@ -184,6 +184,7 @@ static struct chunk *get_chunk(world *w, long x, long z)
     }
 }
 
+IGNORE("Wunused-parameter")
 static struct chunk *load_chunk(world *world, long x, long z)
 {
     // TODO later we need to read a chunk from disk, but for now we just use dummy chunks filled with stone up to a certain level.
@@ -208,21 +209,25 @@ static struct chunk *load_chunk(world *world, long x, long z)
 
     return chunk;
 }
+END_IGNORE()
 
-bool world_send_chunk_data(const struct player *p) // TODO
+bool world_send_chunk_data1(const struct player *p) // TODO
 {
     int view_distance = 10; // TODO proper view distance
-
-
-    while(true)
+    long long base_x = p->pos.x / 16;
+    long long base_z = p->pos.z / 16;
+    for(int mod_x = -view_distance; mod_x <= view_distance; mod_x++)
     {
-        unsigned long long key = get_chunk_key(x, z);
-        struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
-
+        for(int mod_z = -view_distance; mod_z <= view_distance; mod_z++)
+        {
+            send_chunk_data(p, get_chunk(default_world, base_x + mod_x, base_z + mod_z));
+        }
     }
+
+    return true;
 }
 
-static int send_chunk_data(struct player *p, const struct chunk *chunk)
+static bool send_chunk_data(const struct player *p, const struct chunk *chunk)
 {
     struct mcpr_packet pkt;
     pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
@@ -235,44 +240,44 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
     if(pkt.data.play.clientbound.chunk_data.chunk_sections == NULL)
     {
         nlog_error("Could not allocate memory. (%s)", strerror(errno));
-        return -1;
+        return false;
     }
 
     for(int i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
     {
         const struct chunk_section *section = &(chunk->sections[i]);
 
-        struct mcpr_chunk_section mcpr_chunk_section;
-        mcpr_chunk_section.bits_per_block = 13;
-        mcpr_chunk_section.palette_length = 0;
-        mcpr_chunk_section.palette = NULL;
-        mcpr_chunk_section.sky_light = NULL;
-        mcpr_chunk_section.block_light = malloc(BLOCKS_PER_CHUNK_SECTION / 2);
-        if(mcpr_chunk_section.block_light == NULL)
+        struct mcpr_chunk_section *mcpr_chunk_section = pkt.data.play.clientbound.chunk_data.chunk_sections + i;
+        mcpr_chunk_section->bits_per_block = 13;
+        mcpr_chunk_section->palette_length = 0;
+        mcpr_chunk_section->palette = NULL;
+        mcpr_chunk_section->sky_light = NULL;
+        mcpr_chunk_section->block_light = malloc(BLOCKS_PER_CHUNK_SECTION / 2);
+        if(mcpr_chunk_section->block_light == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
-            return -1;
+            return false;
         }
-        memset(mcpr_chunk_section.block_light, 0, BLOCKS_PER_CHUNK_SECTION / 2); // TODO block light.
+        memset(mcpr_chunk_section->block_light, 0, BLOCKS_PER_CHUNK_SECTION / 2); // TODO block light.
 
         // 823 longs, the formula used to get at that number is as follows: BLOCKS_PER_CHUNK_SECTION / (64 / 13)
         // Where BLOCKS_PER_CHUNK_SECTION is obviously 4096 with the current setup.
         // Note that this formula requires floating point.
-        mcpr_chunk_section.blocks = malloc(823 * sizeof(uint64_t));
-        if(mcpr_chunk_section.blocks == NULL)
+        mcpr_chunk_section->blocks = malloc(823 * sizeof(uint64_t));
+        if(mcpr_chunk_section->blocks == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
-            free(mcpr_chunk_section.block_light);
-            return -1;
+            free(mcpr_chunk_section->block_light);
+            return false;
         }
-        mcpr_chunk_section.block_array_length = 823;
+        mcpr_chunk_section->block_array_length = 823;
 
         unsigned char bits_used = 0;
         uint64_t tmp_result = 0;
         size_t block_data_index = 0;
         for(int i2 = 0; i2 < BLOCKS_PER_CHUNK_SECTION; i++)
         {
-            struct block *block = &(section->blocks[i2]);
+            const struct block *block = &(section->blocks[i2]);
 
             uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->data));
             tmp_result = tmp_result | (current_block_data << bits_used);
@@ -280,7 +285,7 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
 
             if(bits_used >= 64 || i2 == BLOCKS_PER_CHUNK_SECTION - 1)
             {
-                mcpr_chunk_section.blocks[block_data_index] = tmp_result;
+                mcpr_chunk_section->blocks[block_data_index] = tmp_result;
                 block_data_index++;
                 tmp_result = 0;
 
@@ -296,8 +301,6 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
                 }
             }
         }
-
-        pkt.data.play.clientbound.chunk_data.chunk_sections[i] = mcpr_chunk_section;
     }
 
     struct connection *conn = player_get_connection(p);
@@ -314,7 +317,7 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
         }
 
 
-        return -1;
+        return false;
     }
 
     // Clean up..
@@ -324,12 +327,106 @@ static int send_chunk_data(struct player *p, const struct chunk *chunk)
         free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].block_light);
     }
     free(pkt.data.play.clientbound.chunk_data.chunk_sections);
-    return 1;
+    return true;
 }
 
+// section_y from 0 to 15 (inclusive)
+IGNORE("-Wpointer-arith")
+static bool send_chunk_section_data(const struct player *p, const struct chunk_section *section, long long chunk_x, long long chunk_z, unsigned char section_y)
+{
+    struct mcpr_packet pkt;
+    pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
+    pkt.data.play.clientbound.chunk_data.chunk_x = chunk_x;
+    pkt.data.play.clientbound.chunk_data.chunk_z = chunk_z;
+    pkt.data.play.clientbound.chunk_data.ground_up_continuous = false;
+    pkt.data.play.clientbound.chunk_data.primary_bit_mask = 0xFFFF;
+    pkt.data.play.clientbound.chunk_data.block_entity_count = 0;
+    pkt.data.play.clientbound.chunk_data.block_entities = NULL;
+
+    // 823 longs, the formula used to get at that number is as follows: BLOCKS_PER_CHUNK_SECTION / (64 / 13)
+    // Where BLOCKS_PER_CHUNK_SECTION is obviously 4096 with the current setup.
+    // Note that this formula requires floating point.
+    void *membuf = malloc(sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2 + 823 * sizeof(uint64_t));
+    if(membuf == NULL)
+    {
+        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+        return false;
+    }
+
+    pkt.data.play.clientbound.chunk_data.chunk_sections = (struct mcpr_chunk_section *) membuf;
+
+
+    struct mcpr_chunk_section mcpr_chunk_section;
+    mcpr_chunk_section.bits_per_block = 13;
+    mcpr_chunk_section.palette_length = 0;
+    mcpr_chunk_section.palette = NULL;
+    mcpr_chunk_section.sky_light = NULL;
+    mcpr_chunk_section.block_light = membuf + sizeof(struct mcpr_chunk_section);
+    memset(mcpr_chunk_section.block_light, 0, BLOCKS_PER_CHUNK_SECTION / 2); // TODO block light.
+
+    mcpr_chunk_section.blocks = membuf + sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2;
+    mcpr_chunk_section.block_array_length = 823;
+
+    unsigned char bits_used = 0;
+    uint64_t tmp_result = 0;
+    size_t block_data_index = 0;
+    for(int i2 = 0; i2 < BLOCKS_PER_CHUNK_SECTION; i2++)
+    {
+        const struct block *block = &(section->blocks[i2]);
+
+        uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->data));
+        tmp_result = tmp_result | (current_block_data << bits_used);
+        bits_used += 13;
+
+        if(bits_used >= 64 || i2 == BLOCKS_PER_CHUNK_SECTION - 1)
+        {
+            mcpr_chunk_section.blocks[block_data_index] = tmp_result;
+            block_data_index++;
+            tmp_result = 0;
+
+            if(bits_used > 64) // It overflowed, we need to continue the last block in the next long.
+            {
+                unsigned char overflowed_bits = bits_used - 64;
+                tmp_result = current_block_data >> (13 - overflowed_bits);
+                bits_used = overflowed_bits;
+            }
+            else
+            {
+                bits_used = 0;
+            }
+        }
+    }
+
+    pkt.data.play.clientbound.chunk_data.chunk_sections[section_y] = mcpr_chunk_section;
+
+    struct connection *conn = p->conn;
+    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
+    if(result < 0)
+    {
+        if(ninerr != NULL && ninerr->message != NULL)
+        {
+            nlog_error("Could not send chunk data packet. (%s)", ninerr->message);
+        }
+        else
+        {
+            nlog_error("Could not send chunk data packet.");
+        }
+
+
+        return false;
+    }
+
+    // Clean up..
+    free(membuf);
+    return 1;
+}
+END_IGNORE()
 
 
 int32_t generate_new_entity_id(void)
 {
     pthread_mutex_lock(&entity_id_counter_mutex);
+    int32_t tmp = ++entity_id_counter;
+    pthread_mutex_unlock(&entity_id_counter_mutex);
+    return tmp;
 }

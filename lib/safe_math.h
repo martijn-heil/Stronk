@@ -7,9 +7,11 @@
  *   details, see the Creative Commons Zero 1.0 Universal license at
  *   https://creativecommons.org/publicdomain/zero/1.0/
  */
-
 #if !defined(PSNIP_SAFE_H)
 #define PSNIP_SAFE_H
+
+#include <warnings.h>
+IGNORE("-Wpedantic")
 
 #define PSNIP_SAFE_NO_FIXED
 
@@ -993,4 +995,5 @@ PSNIP_SAFE_DEFINE_UNSIGNED_MOD(psnip_uint64_t, uint64, 0xffffffffffffffffULL)
 #  define __builtin_umulll_overflow(a, b, res) psnip_safe_ullong_mul(res, a, b)
 #endif
 
+END_IGNORE()
 #endif /* !defined(PSNIP_SAFE_H) */

@@ -20,26 +20,30 @@
     SOFTWARE.
 */
 
-#ifndef PLAYER_H
-#define PLAYER_H
+#ifndef STRONK_NETWORK_PLAYER_H
+#define STRONK_NETWORK_PLAYER_H
 
 #include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
 
+#include <algo/hash-table.h>
+
 #include <ninuuid/ninuuid.h>
 #include <mcpr/mcpr.h>
 #include <mcpr/connection.h>
 
-#include <world/entitypos.h>
+#include <world/positions.h>
+#include "network/connection.h"
 
 struct player {
     int32_t entity_id;
     struct ninuuid uuid;
     char *client_brand; // or NULL if unknown. Might be set to a non-NULL value when a MC|BRAND plugin message is received.
     struct entitypos pos;
-    mcpr_connection *conn;
+    struct connection *conn;
     struct mcpr_position compass_target;
+    //HashTable *loaded_chunks; TODO maybe
 
     bool invulnerable;
     bool is_flying;
@@ -74,8 +78,8 @@ struct player {
 };
 
 
-struct fposition *player_get_position(struct player *p);
-struct connection *player_get_connection(struct player *p);
-struct ninuuid *player_get_uuid(struct player *p);
+struct fposition *player_get_position(const struct player *p);
+struct connection *player_get_connection(const struct player *p);
+struct ninuuid *player_get_uuid(const struct player *p);
 
 #endif

@@ -4,7 +4,7 @@ project(Stronk C)
 
 
 # -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"' -std=c11 -pedantic -ggdb -ftrapv -pipe -Wall -Wextra -Wno-unused-function -D_POSIX_C_SOURCE -DUSE_GCC_UNION_CAST -DHAVE_LIBUUID -DMCPR_DO_LOGGING -DNANOSLEEP_HACKY_FIX -DFORCE_C11_THREAD_EMULATION -D_REENTRANT -D_POSIX_C_SOURCE -D_GNU_SOURCE -pthread -Wl,--no-as-needed -lcrypto -lssl -lz -lcurl -lzlog") # -Wl,--no-as-needed
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"' -std=c11 -pedantic -ggdb -ftrapv -pipe -Wall -Wextra -Wno-unused-function -Wno-pointer-arith -D_POSIX_C_SOURCE -DUSE_GCC_UNION_CAST -DHAVE_LIBUUID -DMCPR_DO_LOGGING -DNANOSLEEP_HACKY_FIX -DFORCE_C11_THREAD_EMULATION -D_REENTRANT -D_POSIX_C_SOURCE -D_GNU_SOURCE -pthread -Wl,--no-as-needed -lcrypto -lssl -lz -lcurl -lzlog") # -Wl,--no-as-needed
 
 include_directories(
     lib/

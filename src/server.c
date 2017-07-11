@@ -103,7 +103,7 @@ static void init(void);
 
 
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
-static char *motd = "A bloody stronk server.";
+//static char *motd = "A bloody stronk server.";
 static HashTable *players = NULL; // hash table indexed by strings of compressed UUIDs
 static bool world_manager_init_done = false;
 static bool logging_init_done = false;
@@ -169,6 +169,10 @@ static int count_cores(void)
 
 // Used for jansson, as it is used alot for sensitive things.
 // Even here at Stronk, security is more important than performance :P
+#ifdef __GNUC__
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wpointer-arith"
+#endif
 static void *secure_malloc(size_t size)
 {
     /* Store the memory area size in the beginning of the block */
@@ -189,6 +193,9 @@ static void secure_free(void *ptr)
     memset(ptr, 0, size + sizeof(size_t));
     free(ptr);
 }
+#ifdef __GNUC__
+    #pragma GCC diagnostic pop
+#endif
 
 void server_shutdown(void)
 {
@@ -241,7 +248,7 @@ void cleanup_thread_pooling(void)
 static void init(void)
 {
     if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
-    log_info("Intializing OpenSSL..");\
+    nlog_info("Intializing OpenSSL..");\
     // TODO
     OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
