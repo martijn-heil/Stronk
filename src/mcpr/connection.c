@@ -185,8 +185,6 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
             ssize_t result = bstream_read_max(conn->io_stream, conn->receiving_buf.content, BLOCK_SIZE);
             if(result < 0)
             {
-                struct ninerr *err = ninerr;
-                printf("rikt\n");
                 if(ninerr != NULL && strcmp(ninerr->type, "ninerr_wouldblock") == 0)
                 {
                     return true;

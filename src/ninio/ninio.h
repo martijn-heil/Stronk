@@ -36,8 +36,8 @@ struct ninio_buffer {
 };
 IGNORE("-Wpointer-arith")
 static void ninio_buffer_read(struct ninio_buffer *in, void *out, size_t bytes) {
-    if(in->content == NULL) abort();
-    if(in->size < bytes) abort();
+    assert(in->content != NULL);
+    assert(in->size < bytes);
 
     memcpy(out, in->content, bytes);
     if(in->size - bytes > 0)
