@@ -125,22 +125,23 @@ int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1
 // Returns <0 upon error.
 #ifndef HAVE_SECURE_RANDOM
 #define HAVE_SECURE_RANDOM
-static int secure_random(void *buf, size_t len) {
+static ssize_t secure_random(void *buf, size_t len) {
     int urandomfd = open("/dev/urandom", O_RDONLY);
-    if(urandomfd == -1) {
+    if(urandomfd < 0) {
         return -1;
     }
 
     ssize_t urandomread = read(urandomfd, buf, len);
-    if(urandomread == -1) {
+    if(urandomread < 0) {
         return -1;
     }
-    if(((size_t) urandomread) != len) {
+    if((size_t) urandomread != len) {
         return -1;
     }
 
     close(urandomfd);
-    return 0;
+
+    return len;
 }
 #endif
 

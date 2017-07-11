@@ -30,4 +30,4 @@ struct mcpr_err_unsupported_protocol_version *mcpr_err_unsupported_protocol_vers
     tmp->super->free = mcpr_free_err_unsupported_protocol_version;
     tmp->super->cause = NULL;
     return tmp;
-};
+}

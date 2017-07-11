@@ -45,7 +45,7 @@
 #include "../util.h"
 
 
-
+IGNORE("-Wtype-limits")
 size_t mcpr_compress_bounds(size_t len) {
     uLongf calc_len = compressBound(len);
     if(calc_len > SIZE_MAX || calc_len < 0) { fprintf(stderr, "Aborted at mcpr.c:%i in mcpr_compress_bounds function, calculated length does not fit within size_t", __LINE__); abort(); }
@@ -88,6 +88,7 @@ ssize_t mcpr_decompress(void *out, const void *in, size_t max_out_size, size_t i
         return dest_len;
     }
 }
+END_IGNORE()
 
 char *mcpr_as_chat(const char *message_fmt, ...)
 {

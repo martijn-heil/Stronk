@@ -57,6 +57,7 @@
 #include <logging/logging.h>
 #include <network/network.h>
 #include <world/world.h>
+#include <ninerr/ninerr.h>
 
 #include "server.h"
 #include "stronk.h"
@@ -247,6 +248,7 @@ void cleanup_thread_pooling(void)
 
 static void init(void)
 {
+    ninerr_init();
     if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
     nlog_info("Intializing OpenSSL..");\
     // TODO

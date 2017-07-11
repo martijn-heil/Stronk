@@ -294,12 +294,14 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     if(bytes_read < 0) { return -1; }
     if(len < 0) { ninerr_set_err(NULL); return -1; }
     if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
+    *out = malloc(len + 1);
+    if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }
 
-    memcpy(out, in, len);
-    out[len] = '\0';
+    memcpy(*out, in, len);
+    (*out)[len] = '\0';
 
     size_t final_bytes_read;
-    if(!psnip_safe_add(&final_bytes_read, bytes_read, len)) return -1;
+    if(!psnip_safe_add(&final_bytes_read, bytes_read, len)) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
 
     return final_bytes_read;
 }
@@ -318,7 +320,8 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
 
     do
     {
-        memcpy(&tmp, in + i, 1);
+        tmp = *((uint8_t *) (in + i));
+        //memcpy(&tmp, in + i, 1);
 
         uint8_t value = (tmp & 0x7F); // 0x7F == 0b01111111
         result |= (value << (7 * i));

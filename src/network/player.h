@@ -34,7 +34,7 @@
 #include <mcpr/connection.h>
 
 #include <world/positions.h>
-#include "network/connection.h"
+#include "connection.h"
 
 struct player {
     int32_t entity_id;
@@ -78,8 +78,19 @@ struct player {
 };
 
 
-struct fposition *player_get_position(const struct player *p);
-struct connection *player_get_connection(const struct player *p);
-struct ninuuid *player_get_uuid(const struct player *p);
+static const struct entitypos *player_get_position(const struct player *p)
+{
+    return &(p->pos);
+}
+
+static const struct connection *player_get_connection(const struct player *p)
+{
+    return p->conn;
+}
+
+static const struct ninuuid *player_get_uuid(const struct player *p)
+{
+    return &(p->uuid);
+}
 
 #endif

@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <ninerr/ninerr.h>
 
-struct ninerr *ninerr = NULL;
+struct ninerr *ninerr;
 
 struct ninerr ninerr_out_of_memory_struct;
 
@@ -20,6 +20,7 @@ bool ninerr_init(void)
 struct ninerr *ninerr_arithmetic_new(void)
 {
     struct ninerr *err = ninerr_new("Arithmetic error", false);
+    if(err == NULL) return NULL;
     err->type = "ninerr_artihmetic";
     return err;
 }
@@ -59,6 +60,22 @@ void ninerr_cleanup_latest(void)
     if(ninerr != NULL) ninerr->free(ninerr);
 }
 
+struct ninerr *ninerr_closed_new(char *message, bool free_message)
+{
+    struct ninerr *err;
+    if(message != NULL)
+    {
+        err = ninerr_new(message, free_message);
+    }
+    else
+    {
+        err = ninerr_new("Connection closed.", false);
+    }
+    if(err == NULL) return NULL;
+    err->type = "ninerr_closed";
+    return err;
+}
+
 struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
 {
     switch(errno)
@@ -68,9 +85,9 @@ struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
             return &ninerr_out_of_memory_struct;
         }
 
-        default:
-        {
-            return NULL;
-        }
+        case ECONNRESET: // fallthrough
+            return ninerr_closed_new(NULL, false);
+
+        default: return NULL;
     }
 }

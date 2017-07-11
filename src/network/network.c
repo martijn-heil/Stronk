@@ -65,7 +65,7 @@
 
 static int server_socket;
 static size_t client_count = 0;
-static pthread_mutex_t *clients_delete_lock;
+static pthread_mutex_t clients_delete_lock;
 static SListEntry *clients = NULL; // List of clients.
 
 
@@ -101,7 +101,14 @@ int net_init(void) {
     new_actn.sa_flags = 0;
     sigaction (SIGPIPE, &new_actn, &old_actn);
 
-    if(pthread_mutex_init(clients_delete_lock, NULL) != 0)
+    nlog_info("Setting backlog for server socket to 5..");
+    if(listen(server_socket, 5) == -1)
+    {
+        nlog_fatal("Could not set backlog for server socket.");
+        return -1;
+    }
+
+    if(pthread_mutex_init(&clients_delete_lock, NULL) != 0)
     {
         nlog_fatal("Could not initialize mutex.");
         return -1;
@@ -150,9 +157,9 @@ void connection_close(struct connection *conn, const char *disconnect_message)
 {
     // TODO should we free player here?
     nlog_info("Connection closed.");
-    pthread_mutex_lock(clients_delete_lock);
+    pthread_mutex_lock(&clients_delete_lock);
     slist_remove_entry(&clients, (void *) conn);
-    pthread_mutex_unlock(clients_delete_lock);
+    pthread_mutex_unlock(&clients_delete_lock);
     mcpr_connection_close(conn->conn, disconnect_message);
     mcpr_connection_decref(conn->conn);
     free(conn->server_address_used);
@@ -162,7 +169,7 @@ void connection_close(struct connection *conn, const char *disconnect_message)
 static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
 {
     struct connection *conn2 = NULL;
-    for(int i = 0; i < client_count; i++)
+    for(unsigned int i = 0; i < client_count; i++)
     {
         struct connection *tmp = (struct connection *) slist_nth_entry(clients, i);
         if(tmp == NULL)
@@ -265,7 +272,9 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
         {
             connection_close(conn2, result.disconnect_message);
         }
+        IGNORE("-Wdiscarded-qualifiers")
         if(result.free_disconnect_message) free(result.disconnect_message);
+        END_IGNORE()
         return;
 }
 
@@ -298,7 +307,19 @@ static void accept_incoming_connections(void)
             continue;
         }
 
-        mcpr_connection *conn = mcpr_connection_new(newfd);
+        struct bstream *stream = bstream_from_fd(newfd);
+        if(stream == NULL)
+        {
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not create bstream from new file descriptor. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not create bstream from new file descriptor.");
+            }
+        }
+        mcpr_connection *conn = mcpr_connection_new(stream);
         if(conn == NULL)
         {
             nlog_error("Could not create new connection object. (%s)", ninerr->message);
@@ -332,7 +353,7 @@ static void serve_clients(void)
     unsigned int conns_per_thread = client_count / main_threadpool_threadcount;
     unsigned int rest = client_count % main_threadpool_threadcount;
 
-    int index = 1;
+    unsigned int index = 0;
 
     for(unsigned int i = 0; i < main_threadpool_threadcount; i++)
     {
@@ -340,8 +361,15 @@ static void serve_clients(void)
         if(i == (main_threadpool_threadcount - 1)) amount += rest;
 
         SListEntry *arg1 = slist_nth_entry(clients, index);
+        if(arg1 == NULL) continue;
         unsigned int arg2 = amount;
         void *args = malloc(sizeof(SListEntry *) + sizeof(unsigned int));
+        if(args == NULL)
+        {
+            nlog_error("Could not serve client. Could not allocate memory. (%s)", strerror(errno));
+            free(args);
+            continue;
+        }
         memcpy(args, &arg1, sizeof(arg1));
         memcpy(args + sizeof(arg1), &arg2, sizeof(arg2));
         thpool_add_work(main_threadpool, serve_client_batch, args);
@@ -357,15 +385,15 @@ static void serve_client_batch(void *arg)
     unsigned int amount = *((unsigned int *) (arg + sizeof(SListEntry *)));
 
 
-    for(int i = 0; i < amount; i++)
+    for(unsigned int i = 0; i < amount; i++)
     {
         SListEntry *current_entry = slist_nth_entry(first, i);
-        struct connection *conn = slist_data(current_entry);
-        if(conn == NULL)
+        if(current_entry == NULL)
         {
-            nlog_error("Bad slist index.");
+            nlog_error("Bad slist index %i. (amount: %u)", i, amount);
             break;
         }
+        struct connection *conn = slist_data(current_entry);
 
         struct player *player = conn->player; // Will be NULL if there is no player associated with this connection.
         if(player != NULL)
@@ -406,7 +434,15 @@ static void serve_client_batch(void *arg)
 
         if(!mcpr_connection_update(conn->conn))
         {
-            nlog_error("Error whilst updating connection.");
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Error whilst updating connection. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Error whilst updating connection.");
+            }
+
             continue;
         }
 
@@ -433,4 +469,14 @@ static void serve_client_batch(void *arg)
 
 
     free(arg);
+}
+
+unsigned int net_get_max_players(void)
+{
+    return 99; // TODO
+}
+
+const char *net_get_motd(void)
+{
+    return "A bloody stronk server";
 }

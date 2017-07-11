@@ -40,6 +40,7 @@
 #include <c11threads.h>
 
 #include "mapi.h"
+#include "util.h"
 
 #ifndef __FILENAME__
     #ifdef defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
@@ -71,15 +72,15 @@
 #define HAVE_SECURE_RANDOM
 static ssize_t secure_random(void *buf, size_t len) {
     int urandomfd = open("/dev/urandom", O_RDONLY);
-    if(urandomfd == -1) {
+    if(urandomfd < 0) {
         return -1;
     }
 
     ssize_t urandomread = read(urandomfd, buf, len);
-    if(urandomread == -1) {
+    if(urandomread < 0) {
         return -1;
     }
-    if(urandomread != len) {
+    if((size_t) urandomread != len) {
         return -1;
     }
 
@@ -364,7 +365,7 @@ void mapi_auth_response_destroy(struct mapi_auth_response *response)
     free(response->access_token);
     free(response->client_token);
 
-    for(int i = 0; i < response->available_profiles_amount; i++)
+    for(unsigned int i = 0; i < response->available_profiles_amount; i++)
     {
         free(response->available_profiles + i);
     }
@@ -452,12 +453,12 @@ struct mapi_err_authserver_err *mapi_err_authserver_err_new(const char *error, c
     if(cause_message != NULL)
     {
         message_fmt = "%s: %s. Cause: %s";
-        message_required = snprintf(&tmpbuf, message_fmt, error, friendly_error_message, cause_message);
+        message_required = snprintf(&tmpbuf, 1, message_fmt, error, friendly_error_message, cause_message);
     }
     else
     {
         message_fmt = "%s: %s.";
-        message_required = snprintf(&tmpbuf, message_fmt, error, friendly_error_message);
+        message_required = snprintf(&tmpbuf, 1, message_fmt, error, friendly_error_message);
     }
     if(message_required < 0) return NULL;
     required_size += message_required;
@@ -617,7 +618,8 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
             return -1;
         }
 
-        ninerr_set_err(mapi_err_authserver_err_from_json(error_response, http_code));
+        struct mapi_err_authserver_err *err = mapi_err_authserver_err_from_json(error_response, http_code);
+        ninerr_set_err(&(err->super));
         json_decref(error_response);
         free(curl_buf.content);
         curl_easy_cleanup(curl);
@@ -652,7 +654,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
 
     struct curl_slist *chunk = NULL;
     if(headers != NULL) {
-        for(int i = 0; i < header_count; i++) {
+        for(unsigned int i = 0; i < header_count; i++) {
             chunk = curl_slist_append(chunk, headers[i]);
         }
     }
@@ -677,7 +679,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_buf);
     }
 
-
+    IGNORE("-Wswitch")
     switch(http_method) {
         case MAPI_HTTP_HEAD:
             curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
@@ -691,6 +693,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
             curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "delete");
             break;
     }
+    END_IGNORE()
 
     CURLcode res = curl_easy_perform(curl);
     if(res != CURLE_OK)
@@ -869,7 +872,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         return NULL;
     }
 
-    for(int i = 0; i < res->available_profiles_amount; i++)
+    for(unsigned int i = 0; i < res->available_profiles_amount; i++)
     {
         json_t *available_profile_json = json_array_get(available_profile_json, i);
         if(available_profile_json == NULL)
@@ -1001,7 +1004,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1016,7 +1019,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1030,7 +1033,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1043,7 +1046,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1058,7 +1061,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1072,7 +1075,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1087,7 +1090,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1107,7 +1110,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1122,7 +1125,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1138,7 +1141,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1155,7 +1158,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1170,7 +1173,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         ninerr_set_err(NULL);
         free(res->client_token);
         free(res->access_token);
-        for(int i = 0; i < res->available_profiles_amount; i++)
+        for(unsigned int i = 0; i < res->available_profiles_amount; i++)
         {
             free(res->available_profiles[i].name);
         }
@@ -1180,7 +1183,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         return NULL;
     }
 
-    for(int i = 0; i < properties_json_size; i++)
+    for(size_t i = 0; i < properties_json_size; i++)
     {
         json_t *entry = json_array_get(properties_json, i);
         if(entry == NULL)
@@ -1188,7 +1191,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
             ninerr_set_err(NULL);
             free(res->client_token);
             free(res->access_token);
-            for(int i = 0; i < res->available_profiles_amount; i++)
+            for(unsigned int i = 0; i < res->available_profiles_amount; i++)
             {
                 free(res->available_profiles[i].name);
             }
@@ -1204,7 +1207,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
             ninerr_set_err(NULL);
             free(res->client_token);
             free(res->access_token);
-            for(int i = 0; i < res->available_profiles_amount; i++)
+            for(unsigned int i = 0; i < res->available_profiles_amount; i++)
             {
                 free(res->available_profiles[i].name);
             }
@@ -1221,7 +1224,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
                 ninerr_set_err(NULL);
                 free(res->client_token);
                 free(res->access_token);
-                for(int i = 0; i < res->available_profiles_amount; i++)
+                for(unsigned int i = 0; i < res->available_profiles_amount; i++)
                 {
                     free(res->available_profiles[i].name);
                 }
@@ -1240,7 +1243,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
             ninerr_set_err(NULL);
             free(res->client_token);
             free(res->access_token);
-            for(int i = 0; i < res->available_profiles_amount; i++)
+            for(unsigned int i = 0; i < res->available_profiles_amount; i++)
             {
                 free(res->available_profiles[i].name);
             }
@@ -1255,7 +1258,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
             ninerr_set_err(NULL);
             free(res->client_token);
             free(res->access_token);
-            for(int i = 0; i < res->available_profiles_amount; i++)
+            for(unsigned int i = 0; i < res->available_profiles_amount; i++)
             {
                 free(res->available_profiles[i].name);
             }
@@ -1277,7 +1280,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
                 ninerr_set_err(NULL);
                 free(res->client_token);
                 free(res->access_token);
-                for(int i = 0; i < res->available_profiles_amount; i++)
+                for(unsigned int i = 0; i < res->available_profiles_amount; i++)
                 {
                     free(res->available_profiles[i].name);
                 }
@@ -1300,7 +1303,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
                 ninerr_set_err(NULL);
                 free(res->client_token);
                 free(res->access_token);
-                for(int i = 0; i < res->available_profiles_amount; i++)
+                for(size_t i = 0; i < res->available_profiles_amount; i++)
                 {
                     free(res->available_profiles[i].name);
                 }
@@ -1322,7 +1325,9 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
 
 struct mapi_refresh_response *json_to_refresh_response(json_t *json)
 {
-
+    fprintf(stdout, "json_to_refresh_response is not implemented yet!");
+    abort();
+    return NULL;
 }
 
 static void mapi_err_authserver_err_free(struct ninerr *err)
@@ -1380,7 +1385,7 @@ static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_resp
 
     const char *value;
     const char *signature;
-    for(int i = 0; i < property_entries; i++)
+    for(size_t i = 0; i < property_entries; i++)
     {
         json_t *entry = json_array_get(properties_json, i);
         if(entry == NULL) { fprintf(stdout, "Aborting at %s:%i", __FILENAME__, __LINE__); abort(); } // Shouldn't happen.
@@ -1417,9 +1422,9 @@ static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_resp
     struct mapi_minecraft_has_joined_response *resp = malloc(sizeof(struct mapi_minecraft_has_joined_response) + value_len+1 + signature_len+1 + name_len+1);
     if(resp == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
 
-    char *value_buf = resp + sizeof(struct mapi_minecraft_has_joined_response);
-    char *signature_buf = value_buf + value_len;
-    char *name_buf = signature_buf + signature_len;
+    char *value_buf = (char *) resp + sizeof(struct mapi_minecraft_has_joined_response);
+    char *signature_buf = (char *) value_buf + value_len;
+    char *name_buf = (char *) signature_buf + signature_len;
 
     memcpy(value_buf, value, value_len + 1);
     memcpy(signature_buf, signature, signature_len + 1);

@@ -29,7 +29,7 @@
 #include <mcpr/mcpr.h>
 #include <mcpr/codec.h>
 #include <mcpr/packet.h>
-#include <mcpr/util.h>
+#include "util.h"
 
 #include <ninuuid/ninuuid.h>
 

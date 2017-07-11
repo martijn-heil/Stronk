@@ -45,7 +45,7 @@
 
 #include "world/world.h"
 #include "world/block.h"
-#include <util.h>
+#include "../util.h"
 
 int32_t entity_id_counter = INT32_MIN;
 pthread_mutex_t entity_id_counter_mutex;
@@ -184,7 +184,7 @@ static struct chunk *get_chunk(world *w, long x, long z)
     }
 }
 
-IGNORE("Wunused-parameter")
+IGNORE("-Wunused-parameter")
 static struct chunk *load_chunk(world *world, long x, long z)
 {
     // TODO later we need to read a chunk from disk, but for now we just use dummy chunks filled with stone up to a certain level.
@@ -303,7 +303,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk)
         }
     }
 
-    struct connection *conn = player_get_connection(p);
+    const struct connection *conn = player_get_connection(p);
     ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
     if(result < 0)
     {

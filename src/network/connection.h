@@ -25,7 +25,7 @@
 
 #include <mcpr/connection.h>
 
-#include <network/player.h>
+#include "player.h"
 
 
 struct connection

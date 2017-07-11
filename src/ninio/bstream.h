@@ -45,7 +45,7 @@ struct bstream
     Returns a bstream for the given file descriptor.
     All functionality will be available, none of the functions will be NULL.
 */
-bool bstream_from_fd(struct bstream *stream, int fd);
+struct bstream *bstream_from_fd(int fd);
 
 bool bstream_is_available(struct bstream *stream, size_t amount);
 ssize_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes);

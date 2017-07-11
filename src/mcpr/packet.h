@@ -33,6 +33,9 @@
 #include <nbt/nbt.h>
 
 #include "mcpr/mcpr.h"
+#include "warnings.h"
+
+IGNORE("-Wpedantic")
 
 enum mcpr_packet_type
 {
@@ -1198,7 +1201,7 @@ struct mcpr_entity_metadata_entry
                                 {
                                     union
                                     {
-                                        struct ageable
+                                        struct
                                         {
                                             union
                                             {
@@ -1326,7 +1329,7 @@ struct mcpr_entity_metadata_entry
                                                     enum mcpr_villager_profession profession;
                                                 };
                                             } villager;
-                                        };
+                                        } ageable;
 
                                         struct
                                         {
@@ -2613,7 +2616,7 @@ struct mcpr_packet
         } play;
     } data;
 };
-
+END_IGNORE()
 
 bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen);
 void mcpr_free_decoded_packet(struct mcpr_packet *pkt);

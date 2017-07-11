@@ -34,6 +34,8 @@
 
 // TODO: I seriously need to take a look at the portability of this damn thing,
 // it appears to be terrible, especially the sigaction stuff  - Nin
+#include <warnings.h>
+IGNORE("-Wpedantic")
 
 #include <unistd.h>
 #include <signal.h>
@@ -567,3 +569,5 @@ static void bsem_wait(bsem* bsem_p) {
 	bsem_p->v = 0;
 	pthread_mutex_unlock(&bsem_p->mutex);
 }
+
+END_IGNORE() // -Wpedantic

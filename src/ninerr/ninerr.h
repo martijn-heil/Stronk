@@ -34,12 +34,15 @@ struct ninerr_io
 
 struct ninerr_file_not_found
 {
-    struct ninerr_io_err *super;
+    struct ninerr_io *super;
 };
 
-struct ninerr_closed
+struct ninerr *ninerr_closed_new(char *message, bool free_message); // message can be NULL
+
+
+struct ninerr_wouldblock
 {
-    struct ninerr_io_err *super;
+    struct ninerr_io *super;
 };
 
 #endif

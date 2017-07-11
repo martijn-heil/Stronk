@@ -32,7 +32,9 @@
 #include <server.h>
 #include <world/world.h>
 #include <logging/logging.h>
-#include <util.h>
+#include "util.h"
+
+IGNORE("-Wunused-parameter")
 
 struct hp_result handle_pl_keep_alive(const struct mcpr_packet *pkt, struct connection *conn)
 {
@@ -52,7 +54,9 @@ struct hp_result handle_pl_plugin_message(const struct mcpr_packet *pkt, struct 
     {
         int32_t data_length = pkt->data.play.serverbound.plugin_message.data_length;
         if(data_length < 0) goto err;
-        if(data_length > SIZE_MAX) goto err;
+        IGNORE("-Wtype-limits")
+        if((uint32_t) data_length > SIZE_MAX) goto err;
+        END_IGNORE();
         void *data = pkt->data.play.serverbound.plugin_message.data;
 
         char *client_brand;
@@ -242,7 +246,6 @@ struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struc
     }
 }
 
-IGNORE("-Wunused-parameter")
 struct hp_result handle_pl_tab_complete(const struct mcpr_packet *pkt, struct connection *conn)
 {
     struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };

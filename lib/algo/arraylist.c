@@ -18,7 +18,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
  */
 
-// #include <stdlib.h>
+#include <stdlib.h> // Just to prevent the "ISO C forbids an empty translation unit [-Wpedantic]" warning, lol
 // #include <string.h>
 //
 // #include "arraylist.h"
@@ -252,7 +252,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 // 	list_data[list1_length] = pivot;
 //
 // 	/* Recursively sort the sublists. */
-// 
+//
 // 	arraylist_sort_internal(list_data, list1_length, compare_func);
 //
 // 	arraylist_sort_internal(&list_data[list1_length + 1], list2_length,

@@ -32,7 +32,7 @@
 typedef void mcpr_connection;
 
 // Calling any function on a closed connection is undefined behaviour.
-mcpr_connection *mcpr_connection_new(int sockfd);
+mcpr_connection *mcpr_connection_new(struct bstream *stream);
 void mcpr_connection_incref(mcpr_connection *conn);
 void mcpr_connection_decref(mcpr_connection *conn);
 bool mcpr_connection_update(mcpr_connection *conn);

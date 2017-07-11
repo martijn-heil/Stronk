@@ -41,7 +41,7 @@ struct fd_bstream
 
 static void bstream_fd_free(struct bstream *stream);
 
-static void attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size) {
+static bool attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size) {
     if(buf->size < size)
     {
         size_t remaining = size - buf->size;
@@ -53,9 +53,9 @@ static void attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size
             {
                 size_t possible = buf->max_size - buf->size;
                 ssize_t result = read(fd, buf->content + buf->size, possible);
-                if(result <= 0) return;
+                if(result < 0) { ninerr_set_err(ninerr_from_errno()); return false; }
                 buf->size += result;
-                return;
+                return true;
             }
 
             buf->content = tmp;
@@ -63,15 +63,17 @@ static void attempt_fill_up_buffer(struct ninio_buffer *buf, int fd, size_t size
         }
 
         ssize_t result = read(fd, buf->content + buf->size, remaining);
-        if(result <= 0) return;
+        if(result < 0) { ninerr_set_err(ninerr_from_errno()); return false; }
         buf->size += result;
+        return true;
     }
+    return true;
 }
 
 ssize_t bstream_fd_read_max(struct bstream *stream, void *out, size_t bytes)
 {
     struct fd_bstream *private = (struct fd_bstream *) stream->private;
-    attempt_fill_up_buffer(&(private->buf), private->fd, bytes);
+    if(!attempt_fill_up_buffer(&(private->buf), private->fd, bytes)) { return -1; }
 
     if(private->buf.size >= bytes)
     {
@@ -187,10 +189,13 @@ ssize_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes)
     return stream->read_max(stream, buf, maxbytes);
 }
 
-bool bstream_from_fd(struct bstream *stream, int fd)
+struct bstream *bstream_from_fd(int fd)
 {
+    struct bstream *stream = malloc(sizeof(struct bstream));
+    if(stream == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
+
     stream->private = malloc(sizeof(struct fd_bstream));
-    if(stream->private == NULL) { free(stream); return false; }
+    if(stream->private == NULL) { ninerr_set_err(ninerr_from_errno()); free(stream); return NULL; }
     struct fd_bstream *private = (struct fd_bstream *) stream->private;
     private->fd = fd;
     private->reference_count = 1;
@@ -207,15 +212,15 @@ bool bstream_from_fd(struct bstream *stream, int fd)
     stream->incref = bstream_fd_incref;
     stream->decref = bstream_fd_decref;
 
-    return true;
+    return stream;
 }
 
 void bstream_incref(struct bstream *stream)
 {
-    stream->incref(stream);
+    if(stream->incref != NULL) stream->incref(stream);
 }
 
 void bstream_decref(struct bstream *stream)
 {
-    stream->decref(stream);
+    if(stream->decref != NULL) stream->decref(stream);
 }

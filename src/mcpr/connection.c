@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <unistd.h>
@@ -78,10 +79,14 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
         struct mcpr_packet pkt;
         if(conn->state == MCPR_STATE_LOGIN) {
             pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
+            IGNORE("-Wdiscarded-qualifiers")
             pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+            END_IGNORE()
         } else if(conn->state == MCPR_STATE_PLAY) {
             pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
+            IGNORE("-Wdiscarded-qualifiers")
             pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+            END_IGNORE()
         }
 
         mcpr_connection_write_packet(conn, &pkt);
@@ -140,9 +145,7 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
 {
     struct conn *conn = (struct conn *) tmpconn;
 
-    bool again = false;
-    do
-    {
+    again:
         // Ensure the buffer is large enough.
         if(conn->receiving_buf.max_size < conn->receiving_buf.size + BLOCK_SIZE)
         {
@@ -152,15 +155,55 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
         }
 
         // Read a single block.
-        void *tmpbuf = malloc(BLOCK_SIZE);
-        if(tmpbuf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-        bool result = bstream_read(conn->io_stream, tmpbuf, BLOCK_SIZE);
-        if(!result) { free(tmpbuf); return false; }
 
-        ssize_t decrypt_result = mcpr_crypto_decrypt(conn->receiving_buf.content + conn->receiving_buf.size, tmpbuf, conn->ctx_decrypt, BLOCK_SIZE);
-        if(decrypt_result == -1) { free(tmpbuf); return false; }
-        conn->receiving_buf.size += decrypt_result;
-    } while(again);
+        if(conn->use_encryption)
+        {
+            void *tmpbuf = malloc(BLOCK_SIZE);
+            if(tmpbuf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+            bool result = bstream_read(conn->io_stream, tmpbuf, BLOCK_SIZE);
+            if(!result)
+            {
+                if(ninerr != NULL && strcmp(ninerr->type, "ninerr_wouldblock") == 0)
+                {
+                    return true;
+                }
+                else if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+                {
+                    free(tmpbuf);
+                    mcpr_connection_close(tmpconn, NULL);
+                    return false;
+                }
+            }
+
+            ssize_t decrypt_result = mcpr_crypto_decrypt(conn->receiving_buf.content + conn->receiving_buf.size, tmpbuf, conn->ctx_decrypt, BLOCK_SIZE);
+            if(decrypt_result == -1) { free(tmpbuf); return false; }
+            conn->receiving_buf.size += decrypt_result;
+            goto again;
+        }
+        else
+        {
+            ssize_t result = bstream_read_max(conn->io_stream, conn->receiving_buf.content, BLOCK_SIZE);
+            if(result < 0)
+            {
+                struct ninerr *err = ninerr;
+                printf("rikt\n");
+                if(ninerr != NULL && strcmp(ninerr->type, "ninerr_wouldblock") == 0)
+                {
+                    return true;
+                }
+                else if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+                {
+                    mcpr_connection_close(tmpconn, NULL);
+                    return false;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            conn->receiving_buf.size += result;
+            if(result > 0) goto again;
+        }
 
     return true;
 }
@@ -175,12 +218,13 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         int32_t pktlen;
         ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
         if(result == -1) return true;
-        if((conn->receiving_buf.size - 5) >= pktlen) {
+        if(pktlen < 0) { ninerr_set_err(ninerr_new("Received invalid packet length", false)); }
+        if((conn->receiving_buf.size - result) >= (uint32_t) pktlen) {
             struct mcpr_packet *pkt;
              if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content, conn->state, conn->receiving_buf.size)) return false;
             conn->packet_handler(pkt, conn);
             free(pkt);
-            memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + 5, conn->receiving_buf.size - pktlen - 5);
+            memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + result, conn->receiving_buf.size - pktlen - result);
         }
     }
 
