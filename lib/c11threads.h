@@ -1,29 +1,15 @@
 /*
 Author: John Tsiombikas <nuclear@member.fsf.org>
+
 I place this piece of code in the public domain. Feel free to use as you see
 fit.  I'd appreciate it if you keep my name at the top of the code somehwere,
 but whatever.
+
 Main project site: https://github.com/jtsiomb/c11threads
-
-^^^^ Awesome guy right there! :) -Nin
 */
-
-/* TODO: port to MacOSX: no timed mutexes under macosx...
- * TODO port timed mutexes to Cygwin and Mac OS X ^
- * just delete that bit if you don't care about timed mutexes
- */
 
 #ifndef C11THREADS_H_
 #define C11THREADS_H_
-
-#if defined(__STDC_NO_THREADS__) || __STDC_VERSION__ < 201112L || defined(FORCE_C11_THREAD_EMULATION)
-
-#ifdef _GNU_SOURCE // Undefine it first.. else we get an annoying redefinition warning on GCC.
-    #undef _GNU_SOURCE
-#endif
-#define _GNU_SOURCE // Required for PTHREAD_MUTEX_RECURSIVE on Ubuntu.
-
-
 
 #include <time.h>
 #include <errno.h>
@@ -32,6 +18,16 @@ Main project site: https://github.com/jtsiomb/c11threads
 #include <sys/time.h>
 
 #define ONCE_FLAG_INIT	PTHREAD_ONCE_INIT
+
+#ifdef __APPLE__
+/* Darwin doesn't implement timed mutexes currently */
+#define C11THREADS_NO_TIMED_MUTEX
+#endif
+
+#ifdef C11THREADS_NO_TIMED_MUTEX
+#define PTHREAD_MUTEX_TIMED_NP PTHREAD_MUTEX_NORMAL
+#define C11THREADS_TIMEDLOCK_POLL_INTERVAL 5000000	/* 5 ms */
+#endif
 
 /* types */
 typedef pthread_t thrd_t;
@@ -46,9 +42,7 @@ typedef void (*tss_dtor_t)(void*);
 enum {
 	mtx_plain		= 0,
 	mtx_recursive	= 1,
-
-    // TODO port timed mutexes to Cygwin and Mac OS X
-	//mtx_timed		= 2,
+	mtx_timed		= 2,
 };
 
 enum {
@@ -59,34 +53,16 @@ enum {
 	thrd_nomem
 };
 
-// http://stackoverflow.com/questions/18298280/how-to-declare-a-variable-as-thread-local-portably
-#ifndef thread_local
-# if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
-#  define thread_local _Thread_local
-# elif defined _WIN32 && ( \
-       defined _MSC_VER || \
-       defined __ICL || \
-       defined __DMC__ || \
-       defined __BORLANDC__ )
-#  define thread_local __declspec(thread)
-/* note that ICC (linux) and Clang are covered by __GNUC__ */
-# elif defined __GNUC__ || \
-       defined __SUNPRO_C || \
-       defined __xlC__
-#  define thread_local __thread
-# else
-#  error "Cannot define thread_local"
-# endif
-#endif
 
 /* ---- thread management ---- */
 
 static inline int thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
 {
-	/* XXX there's a third possible value returned according to the standard:
-	 * thrd_nomem. but it doesn't seem to correspond to any pthread_create errors.
-	 */
-	return pthread_create(thr, 0, (void*(*)(void*))func, arg) == 0 ? thrd_success : thrd_error;
+	int res = pthread_create(thr, 0, (void*(*)(void*))func, arg);
+	if(res == 0) {
+		return thrd_success;
+	}
+	return res == ENOMEM ? thrd_nomem : thrd_error;
 }
 
 static inline void thrd_exit(int res)
@@ -102,7 +78,7 @@ static inline int thrd_join(thrd_t thr, int *res)
 		return thrd_error;
 	}
 	if(res) {
-		*res = (int) retval;
+		*res = (long)retval;
 	}
 	return thrd_success;
 }
@@ -151,10 +127,9 @@ static inline int mtx_init(mtx_t *mtx, int type)
 
 	pthread_mutexattr_init(&attr);
 
-// TODO port timed mutexes to Cygwin and Mac OS X
-//	if(type & mtx_timed) {
-//		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_TIMED_NP);
-//	}
+	if(type & mtx_timed) {
+		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_TIMED_NP);
+	}
 	if(type & mtx_recursive) {
 		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	}
@@ -187,16 +162,34 @@ static inline int mtx_trylock(mtx_t *mtx)
 	return res == 0 ? thrd_success : thrd_error;
 }
 
-// TODO port timed mutexes to Cygwin and Mac OS X
-//static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
-//{
-//	int res;
-//
-//	if((res = pthread_mutex_timedlock(mtx, ts)) == ETIMEDOUT) {
-//		return thrd_timedout;
-//	}
-//	return res == 0 ? thrd_success : thrd_error;
-//}
+static inline int mtx_timedlock(mtx_t *mtx, const struct timespec *ts)
+{
+	int res;
+#ifdef C11THREADS_NO_TIMED_MUTEX
+	/* fake a timedlock by polling trylock in a loop and waiting for a bit */
+	struct timeval now;
+	struct timespec sleeptime;
+
+	sleeptime.tv_sec = 0;
+	sleeptime.tv_nsec = C11THREADS_TIMEDLOCK_POLL_INTERVAL;
+
+	while((res = pthread_mutex_trylock(mtx)) == EBUSY) {
+		gettimeofday(&now, NULL);
+
+		if(now.tv_sec > ts->tv_sec || (now.tv_sec == ts->tv_sec &&
+					(now.tv_usec * 1000) >= ts->tv_nsec)) {
+			return thrd_timedout;
+		}
+
+		nanosleep(&sleeptime, NULL);
+	}
+#else
+	if((res = pthread_mutex_timedlock(mtx, ts)) == ETIMEDOUT) {
+		return thrd_timedout;
+	}
+#endif
+	return res == 0 ? thrd_success : thrd_error;
+}
 
 static inline int mtx_unlock(mtx_t *mtx)
 {
@@ -269,7 +262,7 @@ static inline void call_once(once_flag *flag, void (*func)(void))
 	pthread_once(flag, func);
 }
 
-#if __STDC_VERSION__ < 201112L
+#if __STDC_VERSION__ < 201112L || defined(C11THREADS_NO_TIMED_MUTEX)
 /* TODO take base into account */
 static inline int timespec_get(struct timespec *ts, int base)
 {
@@ -282,9 +275,5 @@ static inline int timespec_get(struct timespec *ts, int base)
 	return base;
 }
 #endif	/* not C11 */
-
-#else // C11 threads are available.
-#include <threads.h>
-#endif //
 
 #endif	/* C11THREADS_H_ */
