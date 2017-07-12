@@ -504,5 +504,70 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
 
 enum mcpr_packet_type mcpr_get_packet_type(int8_t id, enum mcpr_state state)
 {
-    return MCPR_PKT_HS_SB_HANDSHAKE; // TODO implement
+    // only serverbound packets for now
+    switch(state)
+    {
+        case MCPR_STATE_HANDSHAKE: return 0x00;
+
+        case MCPR_STATE_LOGIN:
+        {
+            switch(id)
+            {
+                case 0x00: return MCPR_PKT_LG_SB_LOGIN_START;
+                case 0x01: return MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE;
+                default: abort();
+            }
+        }
+
+        case MCPR_STATE_STATUS:
+        {
+            switch(id)
+            {
+                case 0x00: return MCPR_PKT_ST_SB_REQUEST;
+                case 0x01: return MCPR_PKT_ST_SB_PING;
+                default: abort();
+            }
+        }
+
+        case MCPR_STATE_PLAY:
+        {
+            switch(id)
+            {
+                case 0x00: return MCPR_PKT_PL_SB_TELEPORT_CONFIRM;
+                case 0x01: return MCPR_PKT_PL_SB_PREPARE_CRAFTING_GRID;
+                case 0x02: return MCPR_PKT_PL_SB_TAB_COMPLETE;
+                case 0x03: return MCPR_PKT_PL_SB_CHAT_MESSAGE;
+                case 0x04: return MCPR_PKT_PL_SB_CLIENT_STATUS;
+                case 0x05: return MCPR_PKT_PL_SB_CLIENT_SETTINGS;
+                case 0x06: return MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;
+                case 0x07: return MCPR_PKT_PL_SB_ENCHANT_ITEM;
+                case 0x08: return MCPR_PKT_PL_SB_CLICK_WINDOW;
+                case 0x09: return MCPR_PKT_PL_SB_CLOSE_WINDOW;
+                case 0x0A: return MCPR_PKT_PL_SB_PLUGIN_MESSAGE;
+                case 0x0B: return MCPR_PKT_PL_SB_USE_ENTITY;
+                case 0x0C: return MCPR_PKT_PL_SB_KEEP_ALIVE;
+                case 0x0D: return MCPR_PKT_PL_SB_PLAYER;
+                case 0x0E: return MCPR_PKT_PL_SB_PLAYER_POSITION;
+                case 0x0F: return MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK;
+                case 0x10: return MCPR_PKT_PL_SB_PLAYER_LOOK;
+                case 0x11: return MCPR_PKT_PL_SB_VEHICLE_MOVE;
+                case 0x12: return MCPR_PKT_PL_SB_STEER_BOAT;
+                case 0x13: return MCPR_PKT_PL_SB_PLAYER_ABILITIES;
+                case 0x14: return MCPR_PKT_PL_SB_PLAYER_DIGGING;
+                case 0x15: return MCPR_PKT_PL_SB_ENTITY_ACTION;
+                case 0x16: return MCPR_PKT_PL_SB_STEER_VEHICLE;
+                case 0x17: return MCPR_PKT_PL_SB_CRAFTING_BOOK_DATA;
+                case 0x18: return MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS;
+                case 0x19: return MCPR_PKT_PL_SB_ADVANCEMENT_TAB;
+                case 0x1A: return MCPR_PKT_PL_SB_HELD_ITEM_CHANGE;
+                case 0x1B: return MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION;
+                case 0x1C: return MCPR_PKT_PL_SB_UPDATE_SIGN;
+                case 0x1D: return MCPR_PKT_PL_SB_ANIMATION;
+                case 0x1E: return MCPR_PKT_PL_SB_SPECTATE;
+                case 0x1F: return MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT;
+                case 0X20: return MCPR_PKT_PL_SB_USE_ITEM;
+                default: abort();
+            }
+        }
+    }
 }

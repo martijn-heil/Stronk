@@ -164,7 +164,13 @@ enum mcpr_packet_type
     MCPR_PKT_PL_SB_ANIMATION,
     MCPR_PKT_PL_SB_SPECTATE,
     MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT,
-    MCPR_PKT_PL_SB_USE_ITEM
+    MCPR_PKT_PL_SB_USE_ITEM,
+    MCPR_PKT_PL_SB_UNLOCK_RECIPES,
+    MCPR_PKT_PL_SB_ADVANCEMENT_PROGRESS,
+    MCPR_PKT_PL_SB_ADVANCEMENTS,
+    MCPR_PKT_PL_SB_PREPARE_CRAFTING_GRID,
+    MCPR_PKT_PL_SB_CRAFTING_BOOK_DATA,
+    MCPR_PKT_PL_SB_ADVANCEMENT_TAB,
 };
 enum mcpr_packet_type mcpr_get_packet_type(int8_t id, enum mcpr_state state);
 
@@ -205,6 +211,15 @@ enum mcpr_equipment_slot
     MCPR_EQUIP_MENT_SLOT_LEGS,
     MCPR_EQUIP_MENT_SLOT_FEET,
     MCPR_EQUIP_MENT_SLOT_OFFHAND,
+};
+
+enum mcpr_select_advancement_tab_id
+{
+    MCPR_SELECT_ADVANCEMENT_TAB_ID_STORY_ROOT,
+    MCPR_SELECT_ADVANCEMENT_TAB_ID_NETHER_ROOT,
+    MCPR_SELECT_ADVANCEMENT_TAB_ID_END_ROOT,
+    MCPR_SELECT_ADVANCEMENT_TAB_ID_ADVENTURE_ROOT,
+    MCPR_SELECT_ADVANCEMENT_TAB_ID_HUSBANDRY_ROOT,
 };
 
 enum mcpr_potion_effect
@@ -411,6 +426,7 @@ enum mcpr_entity_property
     MCPR_ENTITY_PROPERTY_GENERIC_MOVEMENT_SPEED,
     MCPR_ENTITY_PROPERTY_GENERIC_ATTACK_DAMAGE,
     MCPR_ENTITY_PROPERTY_GENERIC_ATTACK_SPEED,
+    MCPR_ENTITY_PROPERTY_GENERIC_FLYING_SPEED,
     MCPR_ENTITY_PROPERTY_HORSE_JUMP_SPEED,
     MCPR_ENTITY_PROPERTY_ZOMBIE_SPAWN_REINFORCEMENTS_CHANCE,
 };
@@ -970,6 +986,13 @@ enum mcpr_combat_event
     MCPR_COMBAT_EVENT_ENTER_COMBAT,
     MCPR_COMBAT_EVENT_END_COMBAT,
     MCPR_COMBAT_EVENT_ENTITY_DEAD
+};
+
+enum unlock_recipes_action
+{
+    MCPR_UNLOCK_RECIPES_ACTION_INIT,
+    MCPR_UNLOCK_RECIPES_ACTION_ADD,
+    MCPR_UNLOCK_RECIPES_ACTION_REMOVE,
 };
 
 struct mcpr_entity_metadata_entry
@@ -2612,6 +2635,35 @@ struct mcpr_packet
                     bool is_ambient;
                     bool show_particles;
                 } entity_effect;
+
+                struct
+                {
+                    enum unlock_recipes_action action;
+                    bool crafting_book_open;
+                    bool filtering_craftable;
+                    int32_t array_size_1;
+                    int32_t *recipe_ids;
+
+                    int32_t array_size_2; // optional, only present if action is UNLOCK_RECIPES_ACTION_INIT
+                    int32_t *recipe_ids_2; // optional, only present if action is UNLOCK_RECIPES_ACTION_INIT
+                } unlock_recipes;
+
+                struct
+                {
+                    bool has_id;
+                    enum mcpr_select_advancement_tab_id identifier; // optional, only if has_id is true
+                } select_advancement_tab;
+
+                // struct
+                // {
+                //     bool reset;
+                //     int32_t mapping_size;
+                //     struct mcpr_advancement_mapping *advancement_mapping;
+                //     int32_t list_size;
+                //     struct mcpr_identifier *identifiers;
+                //     int32_t progress_size;
+                //     struct mcpr_progress_mapping *progress_mapping;
+                // } advancements;
             } clientbound;
         } play;
     } data;

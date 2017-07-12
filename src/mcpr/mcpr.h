@@ -43,8 +43,8 @@
     MCPR = MineCraft PRotocol.
 */
 
-#define MCPR_PROTOCOL_VERSION 316
-#define MCPR_MINECRAFT_VERSION "1.11.2"
+#define MCPR_PROTOCOL_VERSION 335
+#define MCPR_MINECRAFT_VERSION "1.12"
 
 
 /**
