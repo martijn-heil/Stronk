@@ -141,6 +141,7 @@ void mcpr_connection_set_use_encryption(mcpr_connection *conn, bool value)
     ((struct conn *) conn)->use_encryption = value;
 }
 
+// TODO BLOCK_SIZE is apparentely only 1, horribly inefficient
 bool update_receiving_buffer(mcpr_connection *tmpconn)
 {
     struct conn *conn = (struct conn *) tmpconn;
@@ -182,7 +183,7 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
         }
         else
         {
-            ssize_t result = bstream_read_max(conn->io_stream, conn->receiving_buf.content, BLOCK_SIZE);
+            ssize_t result = bstream_read_max(conn->io_stream, conn->receiving_buf.content + conn->receiving_buf.size, BLOCK_SIZE);
             if(result < 0)
             {
                 if(ninerr != NULL && strcmp(ninerr->type, "ninerr_wouldblock") == 0)
@@ -216,7 +217,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         int32_t pktlen;
         ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
         if(result == -1) return true;
-        if(pktlen < 0) { ninerr_set_err(ninerr_new("Received invalid packet length", false)); }
+        if(pktlen <= 0) { ninerr_set_err(ninerr_new("Received invalid packet length", false)); return false; }
         if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
         {
             struct mcpr_packet *pkt;

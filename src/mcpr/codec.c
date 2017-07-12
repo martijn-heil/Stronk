@@ -292,7 +292,7 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     int32_t len;
     ssize_t bytes_read = mcpr_decode_varint(&len, in, maxlen);
     if(bytes_read < 0) { return -1; }
-    if(len < 0) { ninerr_set_err(NULL); return -1; }
+    if(len < 0) { ninerr_set_err(ninerr_new("Invalid string length in mcpr_decode_string().", false)); return -1; }
     if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
     *out = malloc(len + 1);
     if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }

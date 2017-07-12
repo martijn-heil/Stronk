@@ -42,7 +42,7 @@ zlog_category_t *_zc;
         memcpy(new_buf, buf, size);
         new_buf[size] = '\0';
 
-        nlog_info("%s", new_buf);
+        zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_INFO, "%s", new_buf);
         free(new_buf);
         return size;
     }
@@ -63,7 +63,7 @@ zlog_category_t *_zc;
             new_buf[size] = '\0';
         }
 
-        nlog_error("%s", new_buf);
+        zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_ERROR, "%s", new_buf);
         free(new_buf);
         return size;
     }

@@ -434,14 +434,8 @@ static void serve_client_batch(void *arg)
 
         if(!mcpr_connection_update(conn->conn))
         {
-            if(ninerr != NULL && ninerr->message != NULL)
-            {
-                nlog_error("Error whilst updating connection. (%s)", ninerr->message);
-            }
-            else
-            {
-                nlog_error("Error whilst updating connection.");
-            }
+            nlog_error("Error whilst updating connection.");
+            ninerr_print(ninerr);
 
             continue;
         }

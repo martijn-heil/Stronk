@@ -443,7 +443,7 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
     size_t len_left = maxlen;
     int32_t packet_id;
     ssize_t bytes_read_1 = mcpr_decode_varint(&packet_id, ptr, len_left);
-    if(bytes_read_1 < -1) return false;
+    if(bytes_read_1 < 0) return false;
     len_left -= bytes_read_1;
     ptr += bytes_read_1;
 
@@ -477,7 +477,7 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
             int32_t next_state;
             ssize_t bytes_read_5 = mcpr_decode_varint(&next_state, ptr, len_left);
             if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false;  }
-            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false; }
+            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(ninerr_new("Received invalid next state %i in handshake packet.", next_state)); return false; }
             pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
             return true;
         }

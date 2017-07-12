@@ -1,12 +1,15 @@
 #ifndef NINERR_H
 #define NINERR_H
 
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdbool.h>
 
 // TODO maybe line & file at which error occurred?
 struct ninerr
 {
     char *message; // may be NULL
+    char *stacktrace; // may be NULL.
     void *child; // may be NULL
     void *cause; // may be NULL
     const char *type; // may not be NULL.
@@ -19,8 +22,10 @@ void ninerr_cleanup_latest(void);
 bool ninerr_init(void);
 void ninerr_finish(void);
 struct ninerr *ninerr_from_errno(void); // may return NULL
-struct ninerr *ninerr_new(char *message, bool free_message);
+struct ninerr *ninerr_new(const char *fmt, ...);
 struct ninerr *ninerr_arithmetic_new(void);
+int ninerr_print(const struct ninerr *err);
+int ninerr_fprint(FILE *fp, const struct ninerr *err);
 
 
 
