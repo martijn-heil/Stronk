@@ -191,7 +191,6 @@ static void bstream_fd_decref(struct bstream *stream)
 static void bstream_fd_free(struct bstream *stream)
 {
     struct fd_bstream *private = (struct fd_bstream *) stream->private;
-    close(private->fd);
     free(stream->private);
     free(stream);
 }

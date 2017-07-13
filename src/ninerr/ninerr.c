@@ -72,7 +72,10 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
     if(fmt != NULL)
     {
         char tmpbuf;
-        int result = vsnprintf(&tmpbuf, 1, fmt, ap);
+        va_list ap2;
+        va_copy(ap2, ap);
+        int result = vsnprintf(&tmpbuf, 1, fmt, ap2);
+        va_end(ap2);
         if(result != -1) required_message_length = result; else fprintf(stderr, "Could not format message for new ninerr.");
     }
 
@@ -86,7 +89,10 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
     if(required_message_length > 0)
     {
         err->message = (char *) (err + sizeof(struct ninerr));
-        int result = vsprintf(err->message, fmt, ap);
+        va_list ap3;
+        va_copy(ap3, ap);
+        int result = vsprintf(err->message, fmt, ap3);
+        va_end(ap3);
         if(result == -1) err->message = NULL;
     }
     else

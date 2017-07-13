@@ -31,8 +31,11 @@
 
 struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connection *conn)
 {
+    nlog_debug("in handle_st_request");
+
     struct mcpr_packet response;
     response.id = MCPR_PKT_ST_CB_RESPONSE;
+    response.state = MCPR_STATE_STATUS;
     response.data.status.clientbound.response.version_name = MCPR_MINECRAFT_VERSION;
     response.data.status.clientbound.response.protocol_version = MCPR_PROTOCOL_VERSION;
     response.data.status.clientbound.response.max_players = net_get_max_players();
@@ -45,7 +48,7 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
     #ifdef __GNUC__
         #pragma GCC diagnostic pop
     #endif
-    response.data.status.clientbound.response.online_players = -1;
+    response.data.status.clientbound.response.online_players = 999;
     response.data.status.clientbound.response.player_sample = NULL;
     response.data.status.clientbound.response.favicon = NULL;
 
@@ -54,6 +57,7 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
     {
         if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
+            nlog_debug("Could not write packet to connection, it was closed.");
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_CLOSED;
             hp_result.disconnect_message = NULL;
@@ -62,14 +66,8 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
         }
         else
         {
-            if(ninerr != NULL && ninerr->message != NULL)
-            {
-                nlog_error("Could not write packet to connection (%s ?)", ninerr->message);
-            }
-            else
-            {
-                nlog_error("Could not write packet to connection.");
-            }
+            nlog_error("Could not write packet to connection.");
+            ninerr_print(ninerr);
 
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_ERR;
@@ -88,14 +86,17 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
 
 struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection *conn)
 {
+    nlog_debug("in handle_st_ping");
     struct mcpr_packet response;
     response.id = MCPR_PKT_ST_CB_PONG;
+    response.state = MCPR_STATE_STATUS;
     response.data.status.clientbound.pong.payload = pkt->data.status.serverbound.ping.payload;
 
     if(mcpr_connection_write_packet(conn->conn, &response) < 0)
     {
-        if(ninerr != NULL && ninerr->message != NULL)
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
+            nlog_debug("Could not write packet to connection, it was closed.");
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_CLOSED;
             hp_result.disconnect_message = NULL;
@@ -104,14 +105,8 @@ struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection
         }
         else
         {
-            if(ninerr != NULL && ninerr->message != NULL)
-            {
-                nlog_error("Could not write packet to connection (%s ?)", ninerr->message);
-            }
-            else
-            {
-                nlog_error("Could not write packet to connection.");
-            }
+            nlog_error("Could not write packet to connection.");
+            ninerr_print(ninerr);
 
             struct hp_result hp_result;
             hp_result.result = HP_RESULT_ERR;

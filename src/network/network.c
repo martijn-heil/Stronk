@@ -67,6 +67,7 @@ static int server_socket;
 static size_t client_count = 0;
 static pthread_mutex_t clients_delete_lock;
 static SListEntry *clients = NULL; // List of clients.
+static char *motd;
 
 
 static void accept_incoming_connections(void);
@@ -113,6 +114,15 @@ int net_init(void) {
         nlog_fatal("Could not initialize mutex.");
         return -1;
     }
+
+    motd = mcpr_as_chat("A bloody stronk server.");
+    if(motd == NULL)
+    {
+        nlog_fatal("Could not generate MOTD.");
+        ninerr_print(ninerr);
+        return -1;
+    }
+
     return 1;
 }
 
@@ -170,6 +180,8 @@ void connection_close(struct connection *conn, const char *disconnect_message)
 
 static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
 {
+    nlog_debug("Received a packet! at packet_handler");
+
     struct connection *conn2 = NULL;
     for(unsigned int i = 0; i < client_count; i++)
     {
@@ -354,6 +366,7 @@ static void accept_incoming_connections(void)
             continue;
         }
         client_count++;
+        nlog_info("Socket with fd %d connected.", newfd);
     }
 }
 
@@ -445,6 +458,11 @@ static void serve_client_batch(void *arg)
         {
             nlog_error("Error whilst updating connection.");
             ninerr_print(ninerr);
+            if(mcpr_connection_is_closed(conn->conn))
+            {
+                nlog_info("Client is closed, disconnecting.");
+                connection_close(conn, NULL);
+            }
 
             continue;
         }
@@ -481,5 +499,5 @@ unsigned int net_get_max_players(void)
 
 const char *net_get_motd(void)
 {
-    return "A bloody stronk server";
+    return motd;
 }

@@ -33,7 +33,133 @@
 
 #include <ninuuid/ninuuid.h>
 
+static char *server_list_response_to_json(const struct mcpr_packet *pkt)
+{
+    char *version_name = pkt->data.status.clientbound.response.version_name;
+    int protocol_version = pkt->data.status.clientbound.response.protocol_version;
+    unsigned int max_players = pkt->data.status.clientbound.response.max_players;
+    unsigned int online_players = pkt->data.status.clientbound.response.online_players;
+    char *description = pkt->data.status.clientbound.response.description;
+    char *favicon = pkt->data.status.clientbound.response.favicon;
+    size_t online_players_size = pkt->data.status.clientbound.response.online_players_size;
+    struct mcpr_player_sample *player_sample = pkt->data.status.clientbound.response.player_sample;
 
+
+    const char *main_fmt;
+    if(favicon != NULL && player_sample != NULL)
+    {
+        main_fmt = "{\"version\":{\"name\":\"%s\",\"protocol\":%i},\"players\":{\"max\":%i,\"online\":%i,\"sample\":%s},\"description\":%s,\"favicon\":\"%s\"}";
+    }
+    else if(favicon != NULL)
+    {
+        main_fmt = "{\"version\":{\"name\":\"%s\",\"protocol\":%i},\"players\":{\"max\":%i,\"online\":%i},\"description\":%s,\"favicon\":\"%s\"}";
+    }
+    else if(player_sample != NULL)
+    {
+        main_fmt = "{\"version\":{\"name\":\"%s\",\"protocol\":%i},\"players\":{\"max\":%i,\"online\":%i,\"sample\":%s},\"description\":%s}";
+    }
+    else
+    {
+        main_fmt = "{\"version\":{\"name\":\"%s\",\"protocol\":%i},\"players\":{\"max\":%i,\"online\":%i},\"description\":%s}";
+    }
+
+    if(player_sample != NULL)
+    {
+        size_t online_players_size = online_players_size;
+        const char *player_sample_fmt = "{\"name\":\"%s\",\"id\":\"%s\"}";
+
+        size_t buf_size = 256;
+        char *buf = malloc(buf_size);
+        if(buf == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
+        buf[0] = '[';
+        char *bufp = buf + 1;
+
+        char tmp_id[NINUUID_STRING_SIZE + 1];
+        for(size_t i = 0; i < online_players_size; i++)
+        {
+            const struct mcpr_player_sample sample = player_sample[i];
+            ninuuid_to_string(&(sample.uuid), tmp_id, LOWERCASE, false);
+            size_t remaining_size = buf_size - (bufp - buf);
+            if(buf_size < 19 + strlen(sample.player_name) + 3) // +3 for the potential comma, closing ] and nul byte, 19 comes from strlen(player_sample_fmt), minus the %s's
+            {
+                char *tmp = realloc(buf, buf_size + 256);
+                if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return NULL; }
+                bufp = tmp + (bufp - buf);
+                buf = tmp;
+            }
+
+            int result = sprintf(bufp, player_sample_fmt, sample.player_name, tmp_id);
+            if(result < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); free(buf); return NULL; }
+            bufp += result;
+            if(i != (online_players_size - 1)) { *bufp = ','; bufp++; } // only add the comma if this isn't the last entry.
+        }
+        *bufp = ']';
+        *(bufp + 1) = '\0';
+
+        if(favicon != NULL)
+        {
+            char tmpbuf;
+            int required_size = snprintf(&tmpbuf, 1, main_fmt, version_name, protocol_version, max_players, online_players, buf, description, favicon);
+            if(required_size < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); free(buf); return NULL; }
+
+            char *final_buf = malloc(required_size + 1);
+            if(final_buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return NULL; }
+
+            int final_result = sprintf(final_buf, main_fmt, version_name, protocol_version, max_players, online_players, buf, description, favicon);
+            if(final_result < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); free(buf); free(final_buf); return NULL; }
+
+            free(buf);
+            return final_buf;
+        }
+        else
+        {
+            char tmpbuf;
+            int required_size = snprintf(&tmpbuf, 1, main_fmt, version_name, protocol_version, max_players, online_players, buf, description);
+            if(required_size < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); free(buf); return NULL; }
+
+            char *final_buf = malloc(required_size + 1);
+            if(final_buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return NULL; }
+
+            int final_result = sprintf(final_buf, main_fmt, version_name, protocol_version, max_players, online_players, buf, description);
+            if(final_result < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); free(buf); free(final_buf); return NULL; }
+
+            free(buf);
+            return final_buf;
+        }
+
+    }
+    else
+    {
+        if(favicon != NULL)
+        {
+            char tmpbuf;
+            int required_size = snprintf(&tmpbuf, 1, main_fmt, version_name, protocol_version, max_players, online_players, description, favicon);
+            if(required_size < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); return NULL; }
+
+            char *final_buf = malloc(required_size + 1);
+            if(final_buf == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
+
+            int final_result = sprintf(final_buf, main_fmt, version_name, protocol_version, max_players, online_players, description, favicon);
+            if(final_result < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); return NULL; }
+
+            return final_buf;
+        }
+        else
+        {
+            char tmpbuf;
+            int required_size = snprintf(&tmpbuf, 1, main_fmt, version_name, protocol_version, max_players, online_players, description);
+            if(required_size < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); return NULL; }
+
+            char *final_buf = malloc(required_size + 1);
+            if(final_buf == NULL) { ninerr_set_err(ninerr_from_errno()); return NULL; }
+
+            int final_result = sprintf(final_buf, main_fmt, version_name, protocol_version, max_players, online_players, description);
+            if(final_result < 0) { ninerr_set_err(ninerr_new("sprintf failed.")); return NULL; }
+
+            return final_buf;
+        }
+    }
+}
 
 
 bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
@@ -75,6 +201,49 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     bufpointer += bytes_written_5;
 
                     *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
+            }
+        }
+
+        case MCPR_STATE_STATUS:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_ST_CB_PONG:
+                {
+                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_LONG_SIZE);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(*buf); return false; }
+                    void *bufpointer = *buf;
+
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, MCPR_PKT_ST_CB_PONG);
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_long(bufpointer, pkt->data.status.clientbound.pong.payload);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    return true;
+                }
+
+                case MCPR_PKT_ST_CB_RESPONSE:
+                {
+                    char *response = server_list_response_to_json(pkt);
+                    if(response == NULL) { return false; }
+                    size_t len = strlen(response);
+
+                    *buf = malloc(MCPR_VARINT_SIZE_MAX + len);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(*buf); return false; }
+                    void *bufpointer = *buf;
+
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, MCPR_PKT_ST_CB_RESPONSE);
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_varint(bufpointer, len);
+                    if(bytes_written_2 < 0) { free(*buf); free(response); return false; }
+                    bufpointer += bytes_written_2;
+                    memcpy(bufpointer, response, len);
+                    free(response);
                     return true;
                 }
             }
@@ -433,7 +602,16 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
     END_IGNORE()
 
     // Shouldn't be reached anyway
-    fprintf(stderr, "Aborting in mcpr/packet.c:%i", __LINE__);
+    const char *strstate = "null";
+    switch(pkt->state)
+    {
+        case MCPR_STATE_HANDSHAKE: strstate =   "handshake";    break;
+        case MCPR_STATE_LOGIN: strstate =       "login";        break;
+        case MCPR_STATE_STATUS: strstate =      "status";       break;
+        case MCPR_STATE_PLAY: strstate =        "play";         break;
+        default: fprintf(stderr, "Error! Could not even detect state of packet! (value: %i) at mcpr.c:%i\n", pkt->state, __LINE__); break;
+    }
+    fprintf(stderr, "Packet encoding for packet with id %i is not implemented yet! (state: %s)\n", pkt->id, strstate);
     exit(EXIT_FAILURE);
 }
 
@@ -450,7 +628,7 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
     *out = malloc(sizeof(struct mcpr_packet));
     if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
     struct mcpr_packet *pkt = *out;
-    if(!mcpr_get_packet_type(&(pkt->id), packet_id, state)) { ninerr_set_err(ninerr_new("Invalid packet id %u", packet_id)); return false; }
+    if(!mcpr_get_packet_type(&(pkt->id), packet_id, state)) { ninerr_set_err(ninerr_new("Invalid packet id %i", packet_id)); return false; }
 
     IGNORE("-Wswitch")
     switch(state)
@@ -494,6 +672,25 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
                 }
             }
         }
+
+        case MCPR_STATE_STATUS:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_ST_SB_PING:
+                {
+                    if(len_left < MCPR_LONG_SIZE) { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); return false; }
+                    ssize_t bytes_read_2 = mcpr_decode_long(&(pkt->data.status.serverbound.ping.payload), ptr);
+                    if(bytes_read_2 < 0) { free(pkt); return false; }
+                    return true;
+                }
+
+                case MCPR_PKT_ST_SB_REQUEST:
+                {
+                    return true;
+                }
+            }
+        }
     }
     END_IGNORE()
 
@@ -506,7 +703,7 @@ bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_stat
     // only serverbound packets for now
     switch(state)
     {
-        case MCPR_STATE_HANDSHAKE: return 0x00;
+        case MCPR_STATE_HANDSHAKE: *out = 0x00; return true;
 
         case MCPR_STATE_LOGIN:
         {

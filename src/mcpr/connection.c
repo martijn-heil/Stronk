@@ -108,9 +108,9 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream)
     conn->use_encryption = false;
     conn->reference_count = 1;
 
-    conn->receiving_buf.content = malloc(32 * BLOCK_SIZE);
+    conn->receiving_buf.content = malloc(256 * BLOCK_SIZE);
     if(conn->receiving_buf.content == NULL) { free(conn); ninerr_set_err(ninerr_from_errno()); return NULL; }
-    conn->receiving_buf.max_size = 32 * BLOCK_SIZE;
+    conn->receiving_buf.max_size = 256 * BLOCK_SIZE;
     conn->receiving_buf.size = 0;
     conn->packet_handler = NULL;
 
@@ -151,7 +151,7 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
         // Ensure the buffer is large enough.
         if(conn->receiving_buf.max_size < conn->receiving_buf.size + BLOCK_SIZE)
         {
-            void *tmp = realloc(conn->receiving_buf.content, conn->receiving_buf.size + BLOCK_SIZE * 256);
+            void *tmp = realloc(conn->receiving_buf.content, conn->receiving_buf.max_size + BLOCK_SIZE * 256);
             if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
             conn->receiving_buf.max_size += BLOCK_SIZE * 256;
             conn->receiving_buf.content = tmp;
@@ -219,7 +219,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
         {
             struct mcpr_packet *pkt;
-            if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result)) return false;
+            if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result)) { mcpr_connection_close(tmpconn, NULL); return false; }
             conn->packet_handler(pkt, conn);
             free(pkt);
             memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + result, conn->receiving_buf.size - pktlen - result);
@@ -318,5 +318,11 @@ void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression)
     struct conn *conn = (struct conn *) tmpconn;
     conn->use_compression = compression;
 }
+
+bool mcpr_connection_is_closed(mcpr_connection *conn)
+{
+    return ((struct conn *) conn)->is_closed;
+}
+
 
 #endif

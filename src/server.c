@@ -308,6 +308,7 @@ void server_start(void)
        {
            struct timespec diff;
            timespec_diff(&diff, &stop, &should_stop_at);
+           //nlog_debug("Sleeping for %lld.%.9ld", (long long) diff.tv_sec, diff.tv_nsec);
            if(nanosleep(&diff, NULL) == -1)
            {
                nlog_error("Sleeping in main game loop failed. (%s)", strerror(errno));

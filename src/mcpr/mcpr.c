@@ -33,10 +33,6 @@
 
 #include <sys/types.h>
 
-#ifdef MCPR_DO_LOGGING
-    #include "../stronk.h"
-#endif
-
 #include <zlib.h>
 
 #include <ninerr/ninerr.h>
@@ -96,8 +92,11 @@ char *mcpr_as_chat(const char *message_fmt, ...)
     va_start(args, message_fmt);
 
     char tmp;
-    int bytes_required = vsnprintf(&tmp, 1, message_fmt, args);
-    if(bytes_required < 0) { va_end(args); ninerr_set_err(ninerr_new("vsnprintf failed.", false)); return NULL; }
+    va_list args1;
+    va_copy(args1, args);
+    int bytes_required = vsnprintf(&tmp, 1, message_fmt, args1);
+    va_end(args1);
+    if(bytes_required < 0) { va_end(args); ninerr_set_err(ninerr_new("vsnprintf failed.")); return NULL; }
     bytes_required++; // For the NUL byte
 
     char *message;
@@ -113,14 +112,23 @@ char *mcpr_as_chat(const char *message_fmt, ...)
         if(message == NULL) { va_end(args); ninerr_set_err(ninerr_from_errno()); return NULL; }
         free_message = true;
     }
-    int message_length = vsprintf(message, message_fmt, args);
-    if(message_length < 0) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("vsprintf failed.", false)); }
+    message = malloc(bytes_required);
+    if(message == NULL) { va_end(args); ninerr_set_err(ninerr_from_errno()); return NULL; }
+    free_message = true;
+    va_list args2;
+    va_copy(args2, args);
+    int message_length = vsprintf(message, message_fmt, args2);
+    va_end(args2);
+    printf("message length: %d\n", message_length);
+    if(message_length < 0) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("vsprintf failed.")); return NULL; }
+    printf("Message: %s\n", message);
+    printf("Message fmt: %s\n", message_fmt);
 
     char *fmt = "{\"text\":\"%s\"}";
     char *buf = malloc(12 + message_length); // Important! Change 12 if you change the fmt above.
-    if(buf == NULL) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_from_errno()); }
+    if(buf == NULL) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_from_errno()); return NULL; }
     int result = sprintf(buf, fmt, message);
-    if(result < 0) { free(buf); if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("sprintf failed.", false)); }
+    if(result < 0) { free(buf); if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("sprintf failed.")); return NULL; }
 
     va_end(args);
     return buf;

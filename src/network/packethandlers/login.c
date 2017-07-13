@@ -433,6 +433,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet join_game_pkt;
         join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
+        join_game_pkt.state = MCPR_STATE_PLAY;
         join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
         join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
         join_game_pkt.data.play.clientbound.join_game.hardcore = false;
@@ -500,6 +501,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet spawn_position_pkt;
         spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
+        spawn_position_pkt.state = MCPR_STATE_PLAY;
         spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
 
         if(mcpr_connection_write_packet(conn->conn, &spawn_position_pkt) < 0)
@@ -524,6 +526,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet player_abilities_pkt;
         player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
+        player_abilities_pkt.state = MCPR_STATE_PLAY;
         player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
         player_abilities_pkt.data.play.clientbound.player_abilities.allow_flying = player->allow_flying;
         player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;

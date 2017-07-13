@@ -27,6 +27,6 @@ void net_tick(void);
 int net_init(void);
 void net_cleanup(void);
 unsigned int net_get_max_players(void);
-const char *net_get_motd(void);
+const char *net_get_motd(void); // returns chat JSON
 
 #endif

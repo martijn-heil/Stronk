@@ -172,7 +172,7 @@ enum mcpr_packet_type
     MCPR_PKT_PL_SB_CRAFTING_BOOK_DATA,
     MCPR_PKT_PL_SB_ADVANCEMENT_TAB,
 };
-enum mcpr_packet_type mcpr_get_packet_type(int8_t id, enum mcpr_state state);
+bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_state state);
 
 enum mcpr_painting
 {

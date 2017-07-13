@@ -36,6 +36,9 @@ struct ninuuid
     unsigned char bytes[16];
 };
 
+#define NINUUID_STRING_SIZE 36
+#define NINUUID_STRING_SIZE_COMPRESSED 32
+
 void ninuuid_load(struct ninuuid *out, const char *in);
 void ninuuid_unload(const struct ninuuid *in, char *out);
 bool ninuuid_generate(struct ninuuid *out, unsigned char version);

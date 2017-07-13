@@ -23,6 +23,7 @@
 #include <stdlib.h>
 
 #include "server.h"
+#include <mcpr/mcpr.h>
 
 
 /*
