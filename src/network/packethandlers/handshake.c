@@ -21,6 +21,7 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <inttypes.h>
@@ -32,7 +33,9 @@
 
 struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct connection *conn)\
 {
-    nlog_info("Received a handshake packet.");
+    nlog_info("Received a handshake packet. (protocol version: %i, server address: %s, server port: %i, next state: %s)",
+        pkt->data.handshake.serverbound.handshake.protocol_version, pkt->data.handshake.serverbound.handshake.server_address,
+        pkt->data.handshake.serverbound.handshake.server_port, (pkt->data.handshake.serverbound.handshake.next_state == MCPR_STATE_LOGIN) ? "login" : "status");
     int32_t protocol_version = pkt->data.handshake.serverbound.handshake.protocol_version;
     mcpr_connection_set_state(conn->conn, pkt->data.handshake.serverbound.handshake.next_state);
 

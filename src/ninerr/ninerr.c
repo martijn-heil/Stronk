@@ -73,7 +73,7 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
     {
         char tmpbuf;
         int result = vsnprintf(&tmpbuf, 1, fmt, ap);
-        if(result != -1) required_message_length = result;
+        if(result != -1) required_message_length = result; else fprintf(stderr, "Could not format message for new ninerr.");
     }
 
     size_t required_size = sizeof(struct ninerr);

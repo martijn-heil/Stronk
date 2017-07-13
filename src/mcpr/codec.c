@@ -292,12 +292,12 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
     int32_t len;
     ssize_t bytes_read = mcpr_decode_varint(&len, in, maxlen);
     if(bytes_read < 0) { return -1; }
-    if(len < 0) { ninerr_set_err(ninerr_new("Invalid string length in mcpr_decode_string().", false)); return -1; }
+    if(len < 0) { ninerr_set_err(ninerr_new("Invalid string length in mcpr_decode_string().")); return -1; }
     if(len > MCPR_STR_MAX || ((uint32_t) len) >= SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
     *out = malloc(len + 1);
     if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }
 
-    memcpy(*out, in, len);
+    memcpy(*out, in + bytes_read, len);
     (*out)[len] = '\0';
 
     size_t final_bytes_read;
@@ -329,12 +329,12 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
         i++;
         if (i > MCPR_VARINT_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
-            ninerr_set_err(ninerr_new("Varint size exceeded 5 bytes.", false));
+            ninerr_set_err(ninerr_new("Varint size exceeded 5 bytes."));
             return -1;
         }
-        else if (i >= max_len) // Max length exceeded whilst decoding VarInt
+        else if (i > max_len) // Max length exceeded whilst decoding VarInt
         {
-            ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varint.", false));
+            ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varint."));
             return -1;
         }
     } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
@@ -359,12 +359,12 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
         i++;
         if (i > MCPR_VARLONG_SIZE_MAX) // VarInt is longer than 10 bytes!
         {
-            ninerr_set_err(ninerr_new("Varlong size exceeded 10 bytes.", false));
+            ninerr_set_err(ninerr_new("Varlong size exceeded 10 bytes."));
             return -1;
         }
-        else if (i >= max_len) // Max length exceeded whilst decoding VarInt
+        else if (i > max_len) // Max length exceeded whilst decoding VarInt
         {
-            ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varlong.", false));
+            ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varlong."));
             return -1;
         }
     } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000

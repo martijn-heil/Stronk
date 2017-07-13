@@ -26,31 +26,61 @@
     Source: http://www.gnu.org/software/libc/manual/html_node/Standard-Streams.html
 */
 
-#if defined(__GNU_LIBRARY__) || defined(__GLIBC__)
+#if defined(__GNU_LIBRARY__) && 0 || defined(__GLIBC__) && 0
     #define STANDARD_STREAMS_ASSIGNABLE 1
 #else
     #define STANDARD_STREAMS_ASSIGNABLE 0
 #endif
 
+#if STANDARD_STREAMS_ASSIGNABLE && defined(HAVE_FOPENCOOKIE)
+    #define DO_REDIRECTION
+#endif
+
+#undef DO_REDIRECTION // temporary
+
 zlog_category_t *_zc;
 
-#if STANDARD_STREAMS_ASSIGNABLE && defined(HAVE_FOPENCOOKIE)
+#ifdef DO_REDIRECTION
     static ssize_t new_stdout_write(void *cookie, const char *buf, size_t size)
     {
-        char *new_buf = malloc(size + 1);
-        if(new_buf == NULL) return 0;
+        char *new_buf;
+        bool free_new_buf = false;
+        if(size <= 256)
+        {
+            char buf[size + 1];
+            new_buf = buf;
+        }
+        else
+        {
+            char *new_buf = malloc(size + 1);
+            if(new_buf == NULL) return 0;
+            free_new_buf = true;
+        }
+
         memcpy(new_buf, buf, size);
         new_buf[size] = '\0';
 
         zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_INFO, "%s", new_buf);
-        free(new_buf);
+        if(free_new_buf) free(new_buf);
         return size;
     }
 
     static ssize_t new_stderr_write(void *cookie, const char *buf, size_t size)
     {
-        char *new_buf = malloc(size + 1);
-        if(new_buf == NULL) return 0;
+        char *new_buf;
+        bool free_new_buf = false;
+        if(size <= 256)
+        {
+            char buf[size + 1];
+            new_buf = buf;
+        }
+        else
+        {
+            char *new_buf = malloc(size + 1);
+            if(new_buf == NULL) return 0;
+            free_new_buf = true;
+        }
+
         memcpy(new_buf, buf, size);
 
         // Remove newline at the end, if there is one.
@@ -64,7 +94,7 @@ zlog_category_t *_zc;
         }
 
         zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_ERROR, "%s", new_buf);
-        free(new_buf);
+        if(free_new_buf) free(new_buf);
         return size;
     }
 #endif
@@ -94,7 +124,7 @@ int logging_init(void)
         nlog_warn("Could not set application locale to make sure we use UTF-8.");
     }
 
-    #if STANDARD_STREAMS_ASSIGNABLE && defined(HAVE_FOPENCOOKIE)
+    #ifdef DO_REDIRECTION
         nlog_info("Redirecting stderr and stdout to log..");
 
         cookie_io_functions_t new_stdout_funcs;

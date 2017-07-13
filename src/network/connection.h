@@ -24,12 +24,15 @@
 #define STRONK_CONNECTION_H
 
 #include <mcpr/connection.h>
+#include <ninio/bstream.h>
 
 #include "player.h"
 
 
 struct connection
 {
+    int fd;
+    struct bstream *iostream;
     char *server_address_used; // Will only be initialized after having switched to a different state from HANDSHAKE
     mcpr_connection *conn;
     struct player *player; // may be NULL

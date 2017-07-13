@@ -161,6 +161,8 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     slist_remove_entry(&clients, (void *) conn);
     pthread_mutex_unlock(&clients_delete_lock);
     mcpr_connection_close(conn->conn, disconnect_message);
+    close(conn->fd);
+    bstream_decref(conn->iostream);
     mcpr_connection_decref(conn->conn);
     free(conn->server_address_used);
     free(conn);
@@ -171,7 +173,7 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     struct connection *conn2 = NULL;
     for(unsigned int i = 0; i < client_count; i++)
     {
-        struct connection *tmp = (struct connection *) slist_nth_entry(clients, i);
+        struct connection *tmp = (struct connection *) slist_nth_data(clients, i);
         if(tmp == NULL)
         {
             nlog_fatal("Fatal error, aborting..");
@@ -323,6 +325,7 @@ static void accept_incoming_connections(void)
         if(conn == NULL)
         {
             nlog_error("Could not create new connection object. (%s)", ninerr->message);
+            bstream_decref(stream);
             continue;
         }
         mcpr_connection_set_packet_handler(conn, packet_handler);
@@ -332,16 +335,22 @@ static void accept_incoming_connections(void)
         {
             nlog_error("Could not allocate memory for connection. (%s)", strerror(errno));
             if(close(newfd) == -1) nlog_error("Error closing socket after memory allocation failure. (%s)", strerror(errno));
+            mcpr_connection_decref(conn);
+            bstream_decref(stream);
             continue;
         }
         conn2->player = NULL;
         conn2->conn = conn;
+        conn2->fd = newfd;
+        conn2->iostream = stream;
 
         if(slist_append(&clients, conn2) == NULL)
         {
             nlog_error("Could not add incoming connection to connection storage.");
             if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", strerror(errno));
-            free(conn);
+            mcpr_connection_decref(conn);
+            bstream_decref(stream);
+            free(conn2);
             continue;
         }
         client_count++;
