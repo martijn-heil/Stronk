@@ -207,6 +207,10 @@ static struct chunk *load_chunk(world *world, long x, long z)
         }
     }
 
+    unsigned long long key = get_chunk_key(x, z);
+    int result = hash_table_insert(((struct world *) world)->chunks, &key, chunk);
+    if(result == 0){ nlog_error("Could not put new chunk in chunk map. (%s ?)", strerror(errno)); free(chunk); return NULL; }
+
     return chunk;
 }
 END_IGNORE()
