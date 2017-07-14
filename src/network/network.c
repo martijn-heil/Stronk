@@ -167,11 +167,16 @@ void connection_close(struct connection *conn, const char *disconnect_message)
 {
     // TODO should we free player here?
     nlog_info("Connection closed.");
+    bool found = false;
+    int i = 0;
+    for(; i < slist_length(clients); i++) if(slist_nth_data(clients, i) == conn) { found = true; break; }
+    if(!found) { nlog_fatal("Fatal error! Could not find client which needs to be closed in client list!"); exit(EXIT_FAILURE); }
+    SListEntry *entry = slist_nth_entry(clients, i);
     pthread_mutex_lock(&clients_delete_lock);
-    slist_remove_entry(&clients, (void *) conn);
+    slist_remove_entry(&clients, entry);
     pthread_mutex_unlock(&clients_delete_lock);
     mcpr_connection_close(conn->conn, disconnect_message);
-    close(conn->fd);
+    if(close(conn->fd) == -1) nlog_warn("Error whilst closing a socket: %s", strerror(errno));
     bstream_decref(conn->iostream);
     mcpr_connection_decref(conn->conn);
     free(conn->server_address_used);
@@ -355,6 +360,7 @@ static void accept_incoming_connections(void)
         conn2->conn = conn;
         conn2->fd = newfd;
         conn2->iostream = stream;
+        conn2->server_address_used = NULL;
 
         if(slist_append(&clients, conn2) == NULL)
         {
@@ -409,13 +415,12 @@ static void serve_client_batch(void *arg)
 
     for(unsigned int i = 0; i < amount; i++)
     {
-        SListEntry *current_entry = slist_nth_entry(first, i);
-        if(current_entry == NULL)
+        struct connection *conn = slist_nth_data(first, i);
+        if(conn == SLIST_NULL)
         {
             nlog_error("Bad slist index %i. (amount: %u)", i, amount);
             break;
         }
-        struct connection *conn = slist_data(current_entry);
 
         struct player *player = conn->player; // Will be NULL if there is no player associated with this connection.
         if(player != NULL)

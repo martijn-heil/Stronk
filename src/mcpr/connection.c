@@ -108,6 +108,9 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream)
     conn->use_encryption = false;
     conn->reference_count = 1;
 
+    conn->ctx_encrypt = NULL;
+    conn->ctx_decrypt = NULL;
+
     conn->receiving_buf.content = malloc(256 * BLOCK_SIZE);
     if(conn->receiving_buf.content == NULL) { free(conn); ninerr_set_err(ninerr_from_errno()); return NULL; }
     conn->receiving_buf.max_size = 256 * BLOCK_SIZE;

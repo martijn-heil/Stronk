@@ -33,7 +33,7 @@ struct connection
 {
     int fd;
     struct bstream *iostream;
-    char *server_address_used; // Will only be initialized after having switched to a different state from HANDSHAKE
+    char *server_address_used; // Will only be set after having switched to a different state from HANDSHAKE, else it will be NULL
     mcpr_connection *conn;
     struct player *player; // may be NULL
 };
