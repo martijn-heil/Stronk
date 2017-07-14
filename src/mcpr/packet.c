@@ -164,8 +164,6 @@ static char *server_list_response_to_json(const struct mcpr_packet *pkt)
 
 bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
 {
-    size_t data_size;
-
     IGNORE("-Wswitch")
 
     switch(pkt->state)
@@ -222,6 +220,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
                     ssize_t bytes_written_2 = mcpr_encode_long(bufpointer, pkt->data.status.clientbound.pong.payload);
                     if(bytes_written_2 < 0) { free(*buf); return false; }
+
+                    *out_bytes_written = bufpointer -*buf;
                     return true;
                 }
 
@@ -244,6 +244,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     bufpointer += bytes_written_2;
                     memcpy(bufpointer, response, len);
                     free(response);
+                    *out_bytes_written = bufpointer -*buf;
                     return true;
                 }
             }
@@ -334,8 +335,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     ssize_t bytes_written_1 = mcpr_encode_string(*buf ,pkt->data.login.serverbound.login_start.name);
                     if(bytes_written_1 < 0) { free(*buf); return false; }
 
-                    data_size = bytes_written_1;
-                    *out_bytes_written = data_size;
+                    *out_bytes_written = bytes_written_1;
                     return true;
                 }
 
@@ -362,8 +362,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.verify_token, verify_token_length);
                     bufpointer += verify_token_length;
 
-                    data_size = bufpointer - *buf;
-                    return data_size;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
                 }
             }
         }
@@ -379,8 +379,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 ssize_t bytes_written_1 = mcpr_encode_string(*buf, reason);
                 if(bytes_written_1 < 0) { free(*buf); return false; }
 
-                data_size = bytes_written_1;
-                return data_size;
+                *out_bytes_written = bytes_written_1;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_KEEP_ALIVE:
@@ -391,8 +391,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 ssize_t bytes_written_1 = mcpr_encode_varint(*buf, pkt->data.play.clientbound.keep_alive.keep_alive_id);
                 if(bytes_written_1 < 0) { free(*buf); return false; }
 
-                data_size = bytes_written_1;
-                return data_size;
+                *out_bytes_written = bytes_written_1;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_JOIN_GAME:
@@ -463,8 +463,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 if(bytes_written_7 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_7;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
@@ -480,8 +480,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 memcpy(bufpointer, pkt->data.play.clientbound.plugin_message.data, pkt->data.play.clientbound.plugin_message.data_length);
                 bufpointer += pkt->data.play.clientbound.plugin_message.data_length;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_SPAWN_POSITION:
@@ -494,8 +494,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 if(bytes_written_1 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_1;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
@@ -521,8 +521,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 if(bytes_written_3 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_3;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
 
             case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
@@ -565,8 +565,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 if(bytes_written_7 < 0) { free(*buf); return false; }
                 bufpointer += bytes_written_7;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
 
             case MCPR_PKT_PL_SB_KEEP_ALIVE:
@@ -577,8 +577,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 ssize_t bytes_written_1 = mcpr_encode_varint(*buf, pkt->data.play.serverbound.keep_alive.keep_alive_id);
                 if(bytes_written_1 < 0) { free(*buf); return false; }
 
-                data_size = bytes_written_1;
-                return data_size;
+                *out_bytes_written = bytes_written_1;
+                return true;
             }
 
             case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
@@ -594,8 +594,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 memcpy(bufpointer, pkt->data.play.serverbound.plugin_message.data, pkt->data.play.serverbound.plugin_message.data_length);
                 bufpointer += pkt->data.play.serverbound.plugin_message.data_length;
 
-                data_size = bufpointer - *buf;
-                return data_size;
+                *out_bytes_written = bufpointer - *buf;
+                return true;
             }
         }
     }
@@ -646,16 +646,16 @@ bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_stat
             len_left -= bytes_read_3;
             ptr += bytes_read_3;
 
-            if(len_left < MCPR_USHORT_SIZE) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return false; }
+            if(len_left < MCPR_USHORT_SIZE) { free(pkt->data.handshake.serverbound.handshake.server_address); free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return false; }
             ssize_t bytes_read_4 = mcpr_decode_ushort(&(pkt->data.handshake.serverbound.handshake.server_port), ptr);
-            if(bytes_read_4 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false; }
+            if(bytes_read_4 < 0) { free(pkt->data.handshake.serverbound.handshake.server_address); free(pkt); return false; }
             len_left -= bytes_read_4;
             ptr += bytes_read_4;
 
             int32_t next_state;
             ssize_t bytes_read_5 = mcpr_decode_varint(&next_state, ptr, len_left);
-            if(bytes_read_5 < 0) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); return false;  }
-            if(next_state != 1 && next_state != 2) { free(pkt); free(pkt->data.handshake.serverbound.handshake.server_address); ninerr_set_err(ninerr_new("Received invalid next state %i in handshake packet.", next_state)); return false; }
+            if(bytes_read_5 < 0) { free(pkt->data.handshake.serverbound.handshake.server_address); free(pkt); return false;  }
+            if(next_state != 1 && next_state != 2) { free(pkt->data.handshake.serverbound.handshake.server_address); free(pkt); ninerr_set_err(ninerr_new("Received invalid next state %i in handshake packet.", next_state)); return false; }
             pkt->data.handshake.serverbound.handshake.next_state = (next_state == 1) ? MCPR_STATE_STATUS : MCPR_STATE_LOGIN;
             return true;
         }

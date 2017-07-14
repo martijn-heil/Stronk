@@ -286,7 +286,8 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
     }
 }
 
-bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt) {
+bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt)
+{
     void *buf;
     size_t bytes_written;
     if(!mcpr_encode_packet(&buf, &bytes_written, pkt)) return false;
@@ -295,7 +296,8 @@ bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_pa
     return true;
 }
 
-void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn)) {
+void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn))
+{
     struct conn *conn = (struct conn *) tmpconn;
     conn->packet_handler = on_packet;
 }

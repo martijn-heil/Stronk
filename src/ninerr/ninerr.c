@@ -4,6 +4,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include <pthread.h>
 #include <features.h>
 
 #if defined(__GNU_LIBRARY__) || defined(__GLIBC__)
@@ -12,8 +13,7 @@
 
 #include <ninerr/ninerr.h>
 
-struct ninerr *ninerr;
-
+thread_local struct ninerr *ninerr;
 struct ninerr ninerr_out_of_memory_struct;
 
 
@@ -76,19 +76,20 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
         va_copy(ap2, ap);
         int result = vsnprintf(&tmpbuf, 1, fmt, ap2);
         va_end(ap2);
-        if(result != -1) required_message_length = result; else fprintf(stderr, "Could not format message for new ninerr.");
+        if(result >= 0) required_message_length = result; else fprintf(stderr, "Could not format message for new ninerr.");
     }
 
     size_t required_size = sizeof(struct ninerr);
-    if(required_message_length > 0) required_size += required_message_length + 1;
+    if(required_message_length > 0) required_size += (required_message_length + 1);
 
-    struct ninerr *err = malloc(required_size);
-    if(err == NULL) { return NULL; }
+    void *membuf = malloc(required_size);
+    if(membuf == NULL) { va_end(ap); return NULL; }
+    struct ninerr *err = membuf;
 
 
     if(required_message_length > 0)
     {
-        err->message = (char *) (err + sizeof(struct ninerr));
+        err->message = (char *) (membuf + sizeof(struct ninerr));
         va_list ap3;
         va_copy(ap3, ap);
         int result = vsprintf(err->message, fmt, ap3);
@@ -112,15 +113,15 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
 
         //backtrace_symbols_fd(buffer, levels, 2);
         char **symbols = backtrace_symbols(buffer, levels);
-        if(symbols == NULL) { err->stacktrace = NULL; return err; }
+        if(symbols == NULL) { err->stacktrace = NULL; va_end(ap); return err; }
         size_t total_size = 0;
         for(unsigned int i = 0; i < (unsigned int) levels; i++)
         {
             total_size += strlen(symbols[i]) + 4; // \n + a + t +' '
         }
 
-        err->stacktrace = malloc(total_size);
-        if(err->stacktrace == NULL) { free(symbols); return err; }
+        err->stacktrace = malloc(total_size + 1);
+        if(err->stacktrace == NULL) { free(symbols); va_end(ap); return err; }
 
         char *ptr = err->stacktrace;
         for(unsigned int i = 0; i < (unsigned int) levels; i++)
@@ -139,6 +140,7 @@ struct ninerr *ninerr_vnew(const char *fmt, va_list ap)
         err->stacktrace = NULL;
     #endif
 
+    va_end(ap);
     return err;
 }
 

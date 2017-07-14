@@ -119,10 +119,7 @@ char *mcpr_as_chat(const char *message_fmt, ...)
     va_copy(args2, args);
     int message_length = vsprintf(message, message_fmt, args2);
     va_end(args2);
-    printf("message length: %d\n", message_length);
     if(message_length < 0) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("vsprintf failed.")); return NULL; }
-    printf("Message: %s\n", message);
-    printf("Message fmt: %s\n", message_fmt);
 
     char *fmt = "{\"text\":\"%s\"}";
     char *buf = malloc(12 + message_length); // Important! Change 12 if you change the fmt above.
