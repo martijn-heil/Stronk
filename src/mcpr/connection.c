@@ -296,14 +296,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
 bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt)
 {
-    const char *state;
-    IGNORE("-Wswitch")
-    switch()
-    {
-
-    }
-    END_IGNORE();
-    printf("Writing packet (numerical ID: %#02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), tmpconn);
+    printf("Writing packet (numerical ID: 0x%02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state), tmpconn);
     void *buf;
     size_t bytes_written;
     if(!mcpr_encode_packet(&buf, &bytes_written, pkt)) return false;

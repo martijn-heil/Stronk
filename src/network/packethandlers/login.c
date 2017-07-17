@@ -225,12 +225,13 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             goto err;
         }
 
-        if(shared_secret_length >= RSA_size(conn->tmp.rsa) - 41)
+        nlog_debug("Attempting to decrypt shared secret of (encrypted) length %i", shared_secret_length);
+        nlog_debug("RSA_size(rsa) is %d", RSA_size(conn->tmp.rsa));
+        if(shared_secret_length >= RSA_size(conn->tmp.rsa) - 11)
         {
             nlog_error("Shared secret length is greater than RSA_size(rsa) - 11.");
             goto err;
         }
-        nlog_debug("Attempting to decrypt shared secret of (encrypted) length %i", shared_secret_length);
         int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_PKCS1_PADDING);
         if(size < 0)
         {
@@ -273,7 +274,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         if(encoded_public_key_len < 0)
         {
             // Error occured.
-            nlog_error("Ermg ze openssl errorz!!"); // TODO proper error handling.
+            nlog_error("Ermg ze openssl errorz!!");
+            ERR_print_errors_fp(stderr);
             goto err;
         }
 

@@ -882,8 +882,8 @@ uint8_t mcpr_packet_type_to_byte(enum mcpr_packet_type id)
     // only serverbound packets for now
     switch(id)
     {
-        case MCPR_PKT_ST_CB_PONG:                       return 0x00;
         case MCPR_PKT_ST_CB_RESPONSE:                   return 0x00;
+        case MCPR_PKT_ST_CB_PONG:                       return 0x01;
 
         case MCPR_PKT_LG_CB_DISCONNECT:                 return 0x00;
         case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:         return 0x01;

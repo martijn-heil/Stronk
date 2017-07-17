@@ -36,7 +36,7 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream);
 void mcpr_connection_incref(mcpr_connection *conn);
 void mcpr_connection_decref(mcpr_connection *conn);
 bool mcpr_connection_update(mcpr_connection *conn);
-void mcpr_connection_set_packet_handler(mcpr_connection *conn, void (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn));
+void mcpr_connection_set_packet_handler(mcpr_connection *conn, bool (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn));
 bool mcpr_connection_is_closed(mcpr_connection *conn);
 bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_packet *pkt);
 void mcpr_connection_set_crypto(mcpr_connection *conn, EVP_CIPHER_CTX *ctx_encrypt, EVP_CIPHER_CTX *ctx_decrypt);
