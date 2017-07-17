@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include <pthread.h>
 
@@ -30,6 +31,7 @@
 #include <openssl/x509.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/err.h>
 
 #include <algo/hash-table.h>
 #include <algo/hash-pointer.h>
@@ -49,56 +51,10 @@
 #include <world/entity.h>
 #include <util.h>
 
-static HashTable *tmp_username_states = NULL;
-static HashTable *tmp_encryption_states = NULL;
-bool tmp_encryption_states_init = false;
-bool tmp_username_states_init = false;
-struct tmp_encryption_state
-{
-    int32_t verify_token_length;
-    void *verify_token;
-    RSA *rsa;
-};
-
-static bool ensure_init(void)
-{
-    // Set up temporary state storage.
-    if(!tmp_encryption_states_init)
-    {
-        nlog_info("Initializing temporary encryption state storage.");
-        tmp_encryption_states = hash_table_new(pointer_hash, pointer_equal);
-        if(tmp_encryption_states == NULL)
-        {
-            nlog_error("Could not create hash table.");
-            return false;
-        }
-    }
-
-    if(!tmp_username_states_init)
-    {
-        tmp_username_states = hash_table_new(pointer_hash, pointer_equal);
-        if(tmp_username_states == NULL)
-        {
-            nlog_error("Could not create hash table.");
-            return false;
-        }
-    }
-
-    return true;
-}
 
 struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct connection *conn)
 {
-        if(!ensure_init())
-        {
-            nlog_error("Could not handle login start packet, initialization failed.");
-            char *reason = mcpr_as_chat("A fatal error occurred whilst logging in.");
-            struct hp_result result;
-            result.result = HP_RESULT_FATAL;
-            result.disconnect_message = reason;
-            result.free_disconnect_message = true;
-            return result;
-        }
+    nlog_debug("in handle_lg_login_start");
 
         RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
 
@@ -160,6 +116,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet response;
         response.id = MCPR_PKT_LG_CB_ENCRYPTION_REQUEST;
+        response.state = MCPR_STATE_LOGIN;
         response.data.login.clientbound.encryption_request.server_id = ""; // Yes, that's supposed to be an empty string.
         response.data.login.clientbound.encryption_request.public_key_length = (int32_t) buflen;
         response.data.login.clientbound.encryption_request.public_key = buf;
@@ -201,8 +158,9 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             }
         }
 
-        struct tmp_encryption_state *tmp_state = malloc(sizeof(struct tmp_encryption_state));
-        if(tmp_state == NULL)
+        size_t username_len = strlen(pkt->data.login.serverbound.login_start.name);
+        char *username = malloc(username_len + 1);
+        if(username == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
             RSA_free(rsa);
@@ -214,24 +172,13 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             result.free_disconnect_message = true;
             return result;
         }
+        memcpy(username, pkt->data.login.serverbound.login_start.name, username_len + 1);
 
-        tmp_state->rsa = rsa;
-        tmp_state->verify_token_length = verify_token_length;
-        tmp_state->verify_token = verify_token;
-
-
-        if(hash_table_insert(tmp_encryption_states, conn, tmp_state) == 0)
-        {
-            nlog_error("Could not insert entry into hash table. (%s ?)", strerror(errno));
-            RSA_free(rsa);
-
-            char *reason = mcpr_as_chat("A fatal error occurred whilst logging in.");
-            struct hp_result result;
-            result.result = HP_RESULT_FATAL;
-            result.disconnect_message = reason;
-            result.free_disconnect_message = true;
-            return result;
-        }
+        conn->tmp_present = true;
+        conn->tmp.rsa = rsa;
+        conn->tmp.verify_token_length = verify_token_length;
+        conn->tmp.verify_token = verify_token;
+        conn->tmp.username = username;
 
         struct hp_result result;
         result.result = HP_RESULT_OK;
@@ -242,9 +189,10 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
     struct hp_result handle_lg_encryption_response(const struct mcpr_packet *pkt, struct connection *conn)
     {
-        if(!ensure_init())
+        nlog_debug("in handle_lg_encryption_response");
+        if(!conn->tmp_present)
         {
-            nlog_error("Could not handle login start packet, initialization failed.");
+            nlog_error("Could not handle login start packet, tmp_present was false.");
             char *reason = mcpr_as_chat("A fatal error occurred whilst logging in.");
             struct hp_result result;
             result.result = HP_RESULT_FATAL;
@@ -253,50 +201,41 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             return result;
         }
 
-        struct tmp_encryption_state *tmp_state = NULL;
         void *decrypted_shared_secret = NULL;
         char *username = NULL;
         uint8_t server_id_hash[SHA_DIGEST_LENGTH];
         char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
         uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
-
-        username = hash_table_lookup(tmp_username_states, conn);
-        if(username == HASH_TABLE_NULL)
-        {
-            nlog_error("Could not find entry in hash table.");
-            goto err;
-        }
-
-        tmp_state = hash_table_lookup(tmp_encryption_states, conn);
-        if(tmp_state == HASH_TABLE_NULL) // Shouldn't happen.
-        {
-            nlog_error("Could not find entry in hash table.");
-            hash_table_remove(tmp_username_states, conn);
-            free(username);
-            goto err;
-        }
-        RSA *rsa = tmp_state->rsa;
+        struct player *player;
+        bool player_init = false;
 
         int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
         void *shared_secret = pkt->data.login.serverbound.encryption_response.shared_secret;
 
-        if(shared_secret_length > INT_MAX)
+        if(shared_secret_length > INT_MAX || shared_secret_length < INT_MIN)
         {
             nlog_error("Integer overflow.");
             goto err;
         }
 
-        decrypted_shared_secret = malloc(RSA_size(rsa));
+        decrypted_shared_secret = malloc(RSA_size(conn->tmp.rsa));
         if(decrypted_shared_secret == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
             goto err;
         }
 
-        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, rsa, RSA_PKCS1_PADDING);
+        if(shared_secret_length >= RSA_size(conn->tmp.rsa) - 41)
+        {
+            nlog_error("Shared secret length is greater than RSA_size(rsa) - 11.");
+            goto err;
+        }
+        nlog_debug("Attempting to decrypt shared secret of (encrypted) length %i", shared_secret_length);
+        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_PKCS1_PADDING);
         if(size < 0)
         {
-            nlog_error("Could not decrypt shared secret."); // TODO proper error handling.
+            nlog_error("Could not decrypt shared secret.");
+            ERR_print_errors_fp(stderr);
             goto err;
         }
 
@@ -309,7 +248,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         EVP_CIPHER_CTX_init(ctx_encrypt);
         if(EVP_EncryptInit_ex(ctx_encrypt, EVP_aes_128_cfb8(), NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
          {
-            nlog_error("Error upon EVP_EncryptInit_ex()."); // TODO proper error handling.
+            nlog_error("Error upon EVP_EncryptInit_ex().");
+            ERR_print_errors_fp(stderr);
             goto err;
         }
 
@@ -322,13 +262,14 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         EVP_CIPHER_CTX_init(ctx_decrypt);
         if(EVP_DecryptInit_ex(ctx_decrypt, EVP_aes_128_cfb8(), NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
          {
-            nlog_error("Error upon EVP_DecryptInit_ex()."); // TODO proper error handling.
+            nlog_error("Error upon EVP_DecryptInit_ex().");
+            ERR_print_errors_fp(stderr);
             goto err;
         }
         mcpr_connection_set_crypto(conn->conn, ctx_encrypt, ctx_decrypt);
 
         unsigned char *encoded_public_key = NULL; // TODO should this be freed afterwards?
-        int encoded_public_key_len = i2d_RSA_PUBKEY(rsa, &encoded_public_key);
+        int encoded_public_key_len = i2d_RSA_PUBKEY(conn->tmp.rsa, &encoded_public_key);
         if(encoded_public_key_len < 0)
         {
             // Error occured.
@@ -377,6 +318,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet response;
         response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
+        response.state = MCPR_STATE_LOGIN;
         response.data.login.clientbound.login_success.uuid = mapi_result->id;
         response.data.login.clientbound.login_success.username = username;
 
@@ -402,15 +344,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
 
-        hash_table_remove(tmp_encryption_states, conn);
-        hash_table_remove(tmp_username_states, conn);
-        RSA_free(rsa);
-        free(tmp_state->verify_token);
-        free(tmp_state);
-        free(decrypted_shared_secret);
-        free(username);
 
-        struct player *player = malloc(sizeof(struct player));
+        player = malloc(sizeof(struct player));
         if(player == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
@@ -430,6 +365,9 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         player->compass_target.z = 0;
 
         player->entity_id = generate_new_entity_id();
+        conn->player = player;
+
+        player_init = true;
 
         struct mcpr_packet join_game_pkt;
         join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
@@ -475,6 +413,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         struct mcpr_packet pm_brand;
         pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
+        pm_brand.state = MCPR_STATE_PLAY;
         pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
         pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
         pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
@@ -556,14 +495,12 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
     goto cleanup_only;
     err:
-        hash_table_remove(tmp_encryption_states, conn);
-        hash_table_remove(tmp_username_states, conn);
-        RSA_free(rsa);
-        free(tmp_state->verify_token);
-        free(tmp_state);
+        RSA_free(conn->tmp.rsa);
+        free(conn->tmp.verify_token);
+        free(conn->tmp.username);
+        conn->tmp_present = false;
         free(decrypted_shared_secret);
-        free(username);
-        free(player);
+        if(player_init) free(player);
         char *reason = mcpr_as_chat("A fatal error occurred whilst logging in.");
         struct hp_result result1;
         result1.result = HP_RESULT_FATAL;
@@ -572,14 +509,11 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         return result1;
 
     cleanup_only:
-        hash_table_remove(tmp_encryption_states, conn);
-        hash_table_remove(tmp_username_states, conn);
-        RSA_free(rsa);
-        free(tmp_state->verify_token);
-        free(tmp_state);
+        RSA_free(conn->tmp.rsa);
+        free(conn->tmp.verify_token);
+        free(conn->tmp.username);
+        conn->tmp_present = false;
         free(decrypted_shared_secret);
-        free(username);
-        free(player);
         struct hp_result result2;
         result2.result = HP_RESULT_OK;
         result2.disconnect_message = NULL;
@@ -587,14 +521,12 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         return result2;
 
     closed:
-        hash_table_remove(tmp_encryption_states, conn);
-        hash_table_remove(tmp_username_states, conn);
-        RSA_free(rsa);
-        free(tmp_state->verify_token);
-        free(tmp_state);
+        RSA_free(conn->tmp.rsa);
+        free(conn->tmp.verify_token);
+        free(conn->tmp.username);
+        conn->tmp_present = false;
         free(decrypted_shared_secret);
-        free(username);
-        free(player);
+        if(player_init) free(player);
         struct hp_result result3;
         result3.result = HP_RESULT_CLOSED;
         result3.disconnect_message = NULL;

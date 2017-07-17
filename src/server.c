@@ -110,6 +110,9 @@ static bool world_manager_init_done = false;
 static bool logging_init_done = false;
 static bool thread_pooling_init_done = false;
 static bool networking_init_done = false;
+
+static bool internal_clock_init_done = false;
+pthread_rwlock_t internal_clock_lock;
 static struct timespec internal_clock; // Every time the clock ticks 50ms is added
 
 unsigned int main_threadpool_threadcount;
@@ -198,7 +201,7 @@ static void secure_free(void *ptr)
     #pragma GCC diagnostic pop
 #endif
 
-void server_shutdown(void)
+void server_shutdown(int status)
 {
     nlog_info("Shutting down server..");
     cleanup();
@@ -208,7 +211,7 @@ void server_shutdown(void)
 void server_crash(void)
 {
     nlog_fatal("The server has crashed!");
-    server_shutdown();
+    server_shutdown(EXIT_FAILURE);
 }
 
 static void init_thread_pooling(void)
@@ -256,9 +259,18 @@ static void init(void)
 	SSL_load_error_strings();
 	SSL_library_init();
 
+    nlog_info("Initializing some synchronization locks..");
+    if(pthread_rwlock_init(&internal_clock_lock, NULL) != 0)
+    {
+        nlog_fatal("Could not initialize internal clock lock.");
+        cleanup();
+        exit(EXIT_FAILURE);
+    }
+    internal_clock_init_done = true;
+
     init_thread_pooling();
-    if(net_init() < 0) { cleanup(); exit(EXIT_FAILURE); }               networking_init_done = true;
-    if(world_manager_init() < 0) { cleanup(); exit(EXIT_FAILURE); }     world_manager_init_done = true;
+    if(net_init() < 0)              { cleanup(); exit(EXIT_FAILURE); } networking_init_done = true;
+    if(world_manager_init() < 0)    { cleanup(); exit(EXIT_FAILURE); } world_manager_init_done = true;
 
 
     nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
@@ -323,11 +335,14 @@ void cleanup(void)
     if(thread_pooling_init_done) cleanup_thread_pooling();
     if(world_manager_init_done) world_manager_cleanup();
 
+    if(internal_clock_init_done) pthread_rwlock_destroy(&internal_clock_lock);
+
     if(logging_init_done) logging_cleanup(); // Logging alwas as last.
 }
 
 static void server_tick(void)
 {
+    nlog_info("Current internal clock: %lu : %lu", internal_clock.tv_sec, internal_clock.tv_nsec);
     net_tick();
 
 
@@ -340,6 +355,13 @@ static void server_tick(void)
 
 void server_get_internal_clock_time(struct timespec *out)
 {
+    int result;
+    again:
+    result = pthread_rwlock_rdlock(&internal_clock_lock);
+    if(result != 0) { nlog_debug("Could not lock internal clock lock! Retrying.."); goto again; }
+
     out->tv_sec = internal_clock.tv_sec;
     out->tv_nsec = internal_clock.tv_nsec;
+
+    pthread_rwlock_unlock(&internal_clock_lock);
 }

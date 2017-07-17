@@ -80,6 +80,8 @@ enum mcpr_state {
     MCPR_STATE_LOGIN = 2,
     MCPR_STATE_PLAY = 3
 };
+const char *mcpr_state_to_string(enum mcpr_state state);
+
 
 enum mcpr_connection_type {
     MCPR_CONNECTION_TYPE_SERVERBOUND,

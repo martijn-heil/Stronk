@@ -65,7 +65,7 @@
 
 static int server_socket;
 static size_t client_count = 0;
-static pthread_mutex_t clients_delete_lock;
+static pthread_rwlock_t clients_lock;
 static SListEntry *clients = NULL; // List of clients.
 static char *motd;
 
@@ -109,9 +109,9 @@ int net_init(void) {
         return -1;
     }
 
-    if(pthread_mutex_init(&clients_delete_lock, NULL) != 0)
+    if(pthread_rwlock_init(&clients_lock, NULL) != 0)
     {
-        nlog_fatal("Could not initialize mutex.");
+        nlog_fatal("Could not initialize clients delete lock.");
         return -1;
     }
 
@@ -167,14 +167,20 @@ void connection_close(struct connection *conn, const char *disconnect_message)
 {
     // TODO should we free player here?
     nlog_info("Connection closed.");
+
+    again: if(pthread_rwlock_wrlock(&clients_lock) != 0) { nlog_debug("Could not lock internal clock lock! Retrying.."); goto again; }
+
     bool found = false;
     int i = 0;
     for(; i < slist_length(clients); i++) if(slist_nth_data(clients, i) == conn) { found = true; break; }
     if(!found) { nlog_fatal("Fatal error! Could not find client which needs to be closed in client list!"); exit(EXIT_FAILURE); }
     SListEntry *entry = slist_nth_entry(clients, i);
-    pthread_mutex_lock(&clients_delete_lock);
-    slist_remove_entry(&clients, entry);
-    pthread_mutex_unlock(&clients_delete_lock);
+    if(entry == SLIST_NULL) { nlog_error("Its null"); }
+
+
+    if(slist_remove_entry(&clients, entry) == 0) { nlog_error("Could not remove entry from clients"); }
+    client_count--;
+    pthread_rwlock_unlock(&clients_lock);
     mcpr_connection_close(conn->conn, disconnect_message);
     if(close(conn->fd) == -1) nlog_warn("Error whilst closing a socket: %s", strerror(errno));
     bstream_decref(conn->iostream);
@@ -183,18 +189,25 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     free(conn);
 }
 
-static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
+static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
 {
     nlog_debug("Received a packet! at packet_handler");
 
     struct connection *conn2 = NULL;
+
+    int lock_result;
+    do {
+        lock_result = pthread_rwlock_rdlock(&clients_lock);
+        if(lock_result != 0) { nlog_warn("Could not lock clients lock. Retrying.."); }
+    } while(lock_result != 0);
+
     for(unsigned int i = 0; i < client_count; i++)
     {
         struct connection *tmp = (struct connection *) slist_nth_data(clients, i);
         if(tmp == NULL)
         {
             nlog_fatal("Fatal error, aborting..");
-            abort();
+            server_crash();
         }
         if(tmp->conn == conn)
         {
@@ -202,10 +215,11 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
             break;
         }
     }
+    pthread_rwlock_unlock(&clients_lock);
     if(conn2 == NULL)
     {
         nlog_error("Could not find connection struct for given mcpr_connection.");
-        return;
+        return true;
     }
 
     struct hp_result result;
@@ -286,15 +300,26 @@ static void packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
         {
             nlog_error("Fatal error, closing connection");
             connection_close(conn2, result.disconnect_message);
+            IGNORE("-Wdiscarded-qualifiers")
+            if(result.free_disconnect_message) free(result.disconnect_message);
+            END_IGNORE()
+            return false;
         }
         else if(result.result == HP_RESULT_CLOSED)
         {
             connection_close(conn2, result.disconnect_message);
+            IGNORE("-Wdiscarded-qualifiers")
+            if(result.free_disconnect_message) free(result.disconnect_message);
+            END_IGNORE()
+            return false;
         }
-        IGNORE("-Wdiscarded-qualifiers")
-        if(result.free_disconnect_message) free(result.disconnect_message);
-        END_IGNORE()
-        return;
+        else
+        {
+            IGNORE("-Wdiscarded-qualifiers")
+            if(result.free_disconnect_message) free(result.disconnect_message);
+            END_IGNORE()
+            return true;
+        }
 }
 
 static void accept_incoming_connections(void)
@@ -361,6 +386,7 @@ static void accept_incoming_connections(void)
         conn2->fd = newfd;
         conn2->iostream = stream;
         conn2->server_address_used = NULL;
+        conn2->tmp_present = false;
 
         if(slist_append(&clients, conn2) == NULL)
         {
@@ -376,8 +402,104 @@ static void accept_incoming_connections(void)
     }
 }
 
+static void update_client(struct connection *conn)
+{
+    struct player *player = conn->player; // Will be NULL if there is no player associated with this connection.
+    if(player != NULL)
+    {
+        struct timespec now;
+        server_get_internal_clock_time(&now);
+
+        struct timespec diff;
+        timespec_diff(&diff, &(player->last_keepalive_sent), &now);
+
+        if(diff.tv_sec >= 10)
+        {
+            struct mcpr_packet keep_alive;
+
+            keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
+            keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
+
+
+            if(mcpr_connection_write_packet(conn->conn, &keep_alive) < 0)
+            {
+                if(strcmp(ninerr->type, "ninerr_closed") == 0)
+                {
+                    connection_close(conn, NULL);
+                    return;
+                }
+                else
+                {
+                    nlog_error("Could not send keep alive packet. (%s)", ninerr->message);
+                }
+            }
+            else
+            {
+                server_get_internal_clock_time(&(player->last_keepalive_sent));
+            }
+        }
+    }
+
+    if(!mcpr_connection_update(conn->conn))
+    {
+        nlog_error("Error whilst updating connection.");
+        ninerr_print(ninerr);
+        if(mcpr_connection_is_closed(conn->conn))
+        {
+            nlog_info("Client is closed, disconnecting.");
+            connection_close(conn, NULL);
+        }
+
+        return;
+    }
+
+    if(player != NULL)
+    {
+        struct timespec now;
+        server_get_internal_clock_time(&now);
+
+        struct timespec diff;
+        timespec_diff(&diff, &(player->last_keepalive_received), &now);
+
+        if(diff.tv_sec >= 30)
+        {
+            char uuid[37];
+            ninuuid_to_string(&(player->uuid), uuid, LOWERCASE, false);
+            nlog_error("Player with UUID %s timed out. (server-side)", uuid);
+
+            char *reason = mcpr_as_chat("Timed out. (server-side)");
+            connection_close(conn, reason);
+            free(reason);
+        }
+    }
+}
+
+static void serve_client_batch(void *arg)
+{
+    again: if(pthread_rwlock_rdlock(&clients_lock) != 0) { nlog_warn("Could not lock clients lock. Retrying.."); goto again; }
+
+    SListEntry *first = *(SListEntry **) arg;
+    unsigned int amount = *((unsigned int *) (arg + sizeof(SListEntry *)));
+
+    struct connection *clients[amount];
+    for(unsigned int i = 0; i < amount; i++)
+    {
+        clients[i] = slist_nth_data(first, i);
+        if(clients[i] == SLIST_NULL) // Shouldn't happen
+        {
+            nlog_error("Bad slist index %i. (amount: %u)", i, amount);
+            break;
+        }
+    }
+    pthread_rwlock_unlock(&clients_lock);
+    free(arg);
+
+    for(unsigned int i = 0; i < amount; i++) update_client(clients[i]);
+}
+
 static void serve_clients(void)
 {
+    again: if(pthread_rwlock_rdlock(&clients_lock) != 0) { nlog_warn("Could not lock clients lock. Retrying.."); goto again; }
     unsigned int conns_per_thread = client_count / main_threadpool_threadcount;
     unsigned int rest = client_count % main_threadpool_threadcount;
 
@@ -403,103 +525,14 @@ static void serve_clients(void)
         thpool_add_work(main_threadpool, serve_client_batch, args);
         index += amount;
     }
+    pthread_rwlock_unlock(&clients_lock);
 
     thpool_wait(main_threadpool);
 }
 
-static void serve_client_batch(void *arg)
-{
-    SListEntry *first = *(SListEntry **) arg;
-    unsigned int amount = *((unsigned int *) (arg + sizeof(SListEntry *)));
-
-
-    for(unsigned int i = 0; i < amount; i++)
-    {
-        struct connection *conn = slist_nth_data(first, i);
-        if(conn == SLIST_NULL)
-        {
-            nlog_error("Bad slist index %i. (amount: %u)", i, amount);
-            break;
-        }
-
-        struct player *player = conn->player; // Will be NULL if there is no player associated with this connection.
-        if(player != NULL)
-        {
-            struct timespec now;
-            server_get_internal_clock_time(&now);
-
-            struct timespec diff;
-            timespec_diff(&diff, &(player->last_keepalive_sent), &now);
-
-            if(diff.tv_sec >= 10)
-            {
-                struct mcpr_packet keep_alive;
-
-                keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
-                keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
-
-
-
-                if(mcpr_connection_write_packet(conn->conn, &keep_alive) < 0)
-                {
-                    if(strcmp(ninerr->type, "ninerr_closed") == 0)
-                    {
-                        connection_close(conn, NULL);
-                        continue;
-                    }
-                    else
-                    {
-                        nlog_error("Could not send keep alive packet. (%s)", ninerr->message);
-                    }
-                }
-                else
-                {
-                    server_get_internal_clock_time(&(player->last_keepalive_sent));
-                }
-            }
-        }
-
-        if(!mcpr_connection_update(conn->conn))
-        {
-            nlog_error("Error whilst updating connection.");
-            ninerr_print(ninerr);
-            if(mcpr_connection_is_closed(conn->conn))
-            {
-                nlog_info("Client is closed, disconnecting.");
-                connection_close(conn, NULL);
-            }
-
-            continue;
-        }
-
-        if(player != NULL)
-        {
-            struct timespec now;
-            server_get_internal_clock_time(&now);
-
-            struct timespec diff;
-            timespec_diff(&diff, &(player->last_keepalive_received), &now);
-
-            if(diff.tv_sec >= 30)
-            {
-                char uuid[37];
-                ninuuid_to_string(&(player->uuid), uuid, LOWERCASE, false);
-                nlog_error("Player with UUID %s timed out. (server-side)", uuid);
-
-                char *reason = mcpr_as_chat("Timed out. (server-side)");
-                connection_close(conn, reason);
-                free(reason);
-            }
-        }
-    }
-
-
-    free(arg);
-}
-
 unsigned int net_get_max_players(void)
 {
-    return 99; // TODO
+    return 999; // TODO
 }
 
 const char *net_get_motd(void)

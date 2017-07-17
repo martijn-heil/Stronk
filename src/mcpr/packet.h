@@ -173,6 +173,7 @@ enum mcpr_packet_type
     MCPR_PKT_PL_SB_ADVANCEMENT_TAB,
 };
 bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_state state);
+uint8_t mcpr_packet_type_to_byte(enum mcpr_packet_type id);
 
 enum mcpr_painting
 {
@@ -2670,7 +2671,7 @@ struct mcpr_packet
 };
 END_IGNORE()
 
-bool mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen);
+ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen);
 void mcpr_free_decoded_packet(struct mcpr_packet *pkt);
 bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt);
 

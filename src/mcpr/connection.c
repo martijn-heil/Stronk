@@ -57,7 +57,7 @@ struct conn
     EVP_CIPHER_CTX *ctx_decrypt;
     unsigned int reference_count;
     struct ninio_buffer receiving_buf;
-    void (*packet_handler)(const struct mcpr_packet *pkt, mcpr_connection *conn);
+    bool (*packet_handler)(const struct mcpr_packet *pkt, mcpr_connection *conn);
 
     bool tmp_encryption_state_available;
     RSA *rsa;
@@ -79,11 +79,13 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
         struct mcpr_packet pkt;
         if(conn->state == MCPR_STATE_LOGIN) {
             pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
+            pkt.state = MCPR_STATE_LOGIN;
             IGNORE("-Wdiscarded-qualifiers")
             pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
             END_IGNORE()
         } else if(conn->state == MCPR_STATE_PLAY) {
             pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
+            pkt.state = MCPR_STATE_PLAY;
             IGNORE("-Wdiscarded-qualifiers")
             pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
             END_IGNORE()
@@ -221,12 +223,15 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         if(pktlen <= 0) { ninerr_set_err(ninerr_new("Received invalid packet length")); return false; }
         if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
         {
+            printf("Received packet in mcpr_connection_update\n");
             struct mcpr_packet *pkt;
-            if(!mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result)) { mcpr_connection_close(tmpconn, NULL); return false; }
-            conn->packet_handler(pkt, conn);
+            ssize_t bytes_read = mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result);
+            if(bytes_read == -1) { mcpr_connection_close(tmpconn, NULL); return false; }
+            memmove(conn->receiving_buf.content, conn->receiving_buf.content + bytes_read + result, conn->receiving_buf.size - bytes_read - result);
+            conn->receiving_buf.size -= bytes_read + result;
+            bool conn_still_valid = conn->packet_handler(pkt, conn);
             free(pkt);
-            memmove(conn->receiving_buf.content, conn->receiving_buf.content + pktlen + result, conn->receiving_buf.size - pktlen - result);
-            conn->receiving_buf.size -= pktlen + result;
+            if(!conn_still_valid) return true;
         }
         else
         {
@@ -291,15 +296,30 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
 bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt)
 {
+    const char *state;
+    IGNORE("-Wswitch")
+    switch()
+    {
+
+    }
+    END_IGNORE();
+    printf("Writing packet (numerical ID: %#02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), tmpconn);
     void *buf;
     size_t bytes_written;
     if(!mcpr_encode_packet(&buf, &bytes_written, pkt)) return false;
-    if(!mcpr_connection_write(tmpconn, buf, bytes_written)) { free(buf); return false; }
+    void *buf2 = malloc(bytes_written + MCPR_VARINT_SIZE_MAX);
+    if(buf2 == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return false; }
+    ssize_t bytes_written_2 = mcpr_encode_varint(buf2, (int32_t) bytes_written);
+    if(bytes_written_2 < 0) { free(buf); free(buf2); return false; }
+    memcpy(buf2 + bytes_written_2, buf, bytes_written);
+    printf("Writing packet, total size: %i, initial size: %i\n", bytes_written + bytes_written_2, bytes_written);
+    if(!mcpr_connection_write(tmpconn, buf2, bytes_written + bytes_written_2)) { free(buf); free(buf2); return false; }
     free(buf);
+    free(buf2);
     return true;
 }
 
-void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, void (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn))
+void mcpr_connection_set_packet_handler(mcpr_connection *tmpconn, bool (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn))
 {
     struct conn *conn = (struct conn *) tmpconn;
     conn->packet_handler = on_packet;

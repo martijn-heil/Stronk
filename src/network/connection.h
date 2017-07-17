@@ -36,6 +36,14 @@ struct connection
     char *server_address_used; // Will only be set after having switched to a different state from HANDSHAKE, else it will be NULL
     mcpr_connection *conn;
     struct player *player; // may be NULL
+
+    bool tmp_present;
+    struct {
+        int32_t verify_token_length;
+        void *verify_token;
+        RSA *rsa;
+        char *username;
+    } tmp;
 };
 void connection_close(struct connection *conn, const char *disconnect_message);
 

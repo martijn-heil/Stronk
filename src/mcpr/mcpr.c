@@ -130,3 +130,15 @@ char *mcpr_as_chat(const char *message_fmt, ...)
     va_end(args);
     return buf;
 }
+
+const char *mcpr_state_to_string(enum mcpr_state state)
+{
+    switch(state)
+    {
+        case MCPR_STATE_HANDSHAKE:  return "handshake";
+        case MCPR_STATE_LOGIN:      return"login";
+        case MCPR_STATE_STATUS:     return "status";
+        case MCPR_STATE_PLAY:       return "play";
+        default: abort(); return NULL;
+    }
+}

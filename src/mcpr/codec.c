@@ -327,12 +327,12 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
         result |= (value << (7 * i));
 
         i++;
-        if (i >= MCPR_VARINT_SIZE_MAX) // VarInt is longer than 5 bytes!
+        if (i > MCPR_VARINT_SIZE_MAX) // VarInt is longer than 5 bytes!
         {
             ninerr_set_err(ninerr_new("Varint size exceeded 5 bytes."));
             return -1;
         }
-        else if (i >= max_len) // Max length exceeded whilst decoding VarInt
+        else if (i > max_len) // Max length exceeded whilst decoding VarInt
         {
             ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varint."));
             return -1;
@@ -357,12 +357,12 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
         result |= (value << (7 * i));
 
         i++;
-        if (i >= MCPR_VARLONG_SIZE_MAX) // VarInt is longer than 10 bytes!
+        if (i > MCPR_VARLONG_SIZE_MAX) // VarInt is longer than 10 bytes!
         {
             ninerr_set_err(ninerr_new("Varlong size exceeded 10 bytes."));
             return -1;
         }
-        else if (i >= max_len) // Max length exceeded whilst decoding VarInt
+        else if (i > max_len) // Max length exceeded whilst decoding VarInt
         {
             ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varlong."));
             return -1;

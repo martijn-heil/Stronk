@@ -26,6 +26,10 @@
 #include <time.h>
 
 void server_start(void);
+void server_crash(void);
+void server_shutdown(int status);
+
+
 void server_get_internal_clock_time(struct timespec *out);
 
 #endif
