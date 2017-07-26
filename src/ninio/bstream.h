@@ -53,6 +53,8 @@ bool bstream_read(struct bstream *stream, void *buf, size_t bytes);
 bool bstream_write(struct bstream *stream, const void *buf, size_t bytes);
 void bstream_peek(struct bstream *stream, void *out, size_t bytes);
 ssize_t bstream_peek_max(struct bstream *stream, void *out, size_t maxbytes);
+
+// If the following two functions are called on a bstream where incref/decref is NULL, no operation will be performed.
 void bstream_incref(struct bstream *stream);
 void bstream_decref(struct bstream *stream);
 

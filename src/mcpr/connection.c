@@ -75,26 +75,29 @@ enum mcpr_state mcpr_connection_get_state(mcpr_connection *conn)
 void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
 {
     struct conn *conn = (struct conn *) tmpconn;
-    if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) {
-        struct mcpr_packet pkt;
-        if(conn->state == MCPR_STATE_LOGIN) {
-            pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
-            pkt.state = MCPR_STATE_LOGIN;
-            IGNORE("-Wdiscarded-qualifiers")
-            pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
-            END_IGNORE()
-        } else if(conn->state == MCPR_STATE_PLAY) {
-            pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
-            pkt.state = MCPR_STATE_PLAY;
-            IGNORE("-Wdiscarded-qualifiers")
-            pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
-            END_IGNORE()
+    if(!conn->is_closed)
+    {
+        if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) {
+            struct mcpr_packet pkt;
+            if(conn->state == MCPR_STATE_LOGIN) {
+                pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
+                pkt.state = MCPR_STATE_LOGIN;
+                IGNORE("-Wdiscarded-qualifiers")
+                pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+                END_IGNORE()
+            } else if(conn->state == MCPR_STATE_PLAY) {
+                pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
+                pkt.state = MCPR_STATE_PLAY;
+                IGNORE("-Wdiscarded-qualifiers")
+                pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
+                END_IGNORE()
+            }
+
+            mcpr_connection_write_packet(conn, &pkt);
         }
 
-        mcpr_connection_write_packet(conn, &pkt);
+        conn->is_closed = true;
     }
-
-    conn->is_closed = true;
 }
 
 
@@ -118,6 +121,8 @@ mcpr_connection *mcpr_connection_new(struct bstream *stream)
     conn->receiving_buf.max_size = 256 * BLOCK_SIZE;
     conn->receiving_buf.size = 0;
     conn->packet_handler = NULL;
+
+    conn->is_closed = false;
 
     return conn;
 }

@@ -42,7 +42,7 @@ struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct conne
     if(protocol_version != MCPR_PROTOCOL_VERSION && mcpr_connection_get_state(conn->conn) == MCPR_STATE_LOGIN)
     {
         nlog_info("Client has unsupported protocol version. (%lld)", (long long) protocol_version);
-        char *reason = mcpr_as_chat("Protocol version " PRId32 " is not supported! I'm on protocol version %i (MC %s)", protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
+        char *reason = mcpr_as_chat("Protocol version %lld is not supported! I'm on protocol version %d (MC %s)", (long long) protocol_version, MCPR_PROTOCOL_VERSION, MCPR_MINECRAFT_VERSION);
         struct hp_result hp_result;
         hp_result.result = HP_RESULT_FATAL;
         hp_result.disconnect_message = reason;
@@ -69,6 +69,7 @@ struct hp_result handle_hs_handshake(const struct mcpr_packet *pkt, struct conne
         return hp_result;
     }
     memcpy(conn->server_address_used, pkt->data.handshake.serverbound.handshake.server_address, server_address_len + 1);
+    conn->port_used = pkt->data.handshake.serverbound.handshake.server_port;
 
     struct hp_result hp_result;
     hp_result.result = HP_RESULT_OK;

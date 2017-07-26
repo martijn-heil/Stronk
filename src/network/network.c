@@ -166,8 +166,6 @@ static int make_server_socket (uint16_t port)
 void connection_close(struct connection *conn, const char *disconnect_message)
 {
     // TODO should we free player here?
-    nlog_info("Connection closed.");
-
     again: if(pthread_rwlock_wrlock(&clients_lock) != 0) { nlog_debug("Could not lock internal clock lock! Retrying.."); goto again; }
 
     bool found = false;
@@ -175,7 +173,7 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     for(; i < slist_length(clients); i++) if(slist_nth_data(clients, i) == conn) { found = true; break; }
     if(!found) { nlog_fatal("Fatal error! Could not find client which needs to be closed in client list!"); exit(EXIT_FAILURE); }
     SListEntry *entry = slist_nth_entry(clients, i);
-    if(entry == SLIST_NULL) { nlog_error("Its null"); }
+    if(entry == SLIST_NULL) { nlog_error("Fatal error! Could not find client which needs to be closed in client list!"); exit(EXIT_FAILURE); }
 
 
     if(slist_remove_entry(&clients, entry) == 0) { nlog_error("Could not remove entry from clients"); }
@@ -187,6 +185,8 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     mcpr_connection_decref(conn->conn);
     free(conn->server_address_used);
     free(conn);
+
+    nlog_info("Connection at address %p closed.", conn);
 }
 
 static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)

@@ -55,6 +55,7 @@
 struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct connection *conn)
 {
     nlog_debug("in handle_lg_login_start");
+    conn->tmp.username = pkt->data.login.serverbound.login_start.name;
 
         RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
 
@@ -202,7 +203,6 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         }
 
         void *decrypted_shared_secret = NULL;
-        char *username = NULL;
         uint8_t server_id_hash[SHA_DIGEST_LENGTH];
         char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
         uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
@@ -225,14 +225,14 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             goto err;
         }
 
-        nlog_debug("Attempting to decrypt shared secret of (encrypted) length %i", shared_secret_length);
+        nlog_debug("Attempting to decrypt shared secret of (encrypted) length %lld", (long long) shared_secret_length);
         nlog_debug("RSA_size(rsa) is %d", RSA_size(conn->tmp.rsa));
-        if(shared_secret_length >= RSA_size(conn->tmp.rsa) - 11)
+        if(shared_secret_length > RSA_size(conn->tmp.rsa))
         {
-            nlog_error("Shared secret length is greater than RSA_size(rsa) - 11.");
+            nlog_error("Shared secret length is greater than RSA_size(rsa)");
             goto err;
         }
-        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_PKCS1_PADDING);
+        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_NO_PADDING);
         if(size < 0)
         {
             nlog_error("Could not decrypt shared secret.");
@@ -310,7 +310,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
 
-        struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(username, stringified_server_id_hash, conn->server_address_used);
+        struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(conn->tmp.username, stringified_server_id_hash, conn->server_address_used);
         if(mapi_result == NULL)
         {
             // TODO handle legit non error case where a failure happened.
@@ -322,7 +322,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
         response.state = MCPR_STATE_LOGIN;
         response.data.login.clientbound.login_success.uuid = mapi_result->id;
-        response.data.login.clientbound.login_success.username = username;
+        response.data.login.clientbound.login_success.username = conn->tmp.username; // eh i think we should get the username from another source?
 
         if(mcpr_connection_write_packet(conn->conn, &response) < 0)
         {
@@ -354,6 +354,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             goto err;
         }
         player->uuid = mapi_result->id;
+        player->username = conn->tmp.username;
         player->conn = conn->conn;
         player->client_brand = NULL;
         player->invulnerable = false;
@@ -513,7 +514,6 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
     cleanup_only:
         RSA_free(conn->tmp.rsa);
         free(conn->tmp.verify_token);
-        free(conn->tmp.username);
         conn->tmp_present = false;
         free(decrypted_shared_secret);
         struct hp_result result2;

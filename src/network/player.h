@@ -38,6 +38,7 @@
 
 struct player {
     int32_t entity_id;
+    char *username;
     struct ninuuid uuid;
     char *client_brand; // or NULL if unknown. Might be set to a non-NULL value when a MC|BRAND plugin message is received.
     struct entitypos pos;

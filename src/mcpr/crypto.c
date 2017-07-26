@@ -34,7 +34,7 @@ ssize_t mcpr_crypto_decrypt(void *out, const void *data, EVP_CIPHER_CTX *ctx_dec
     return writtenlen;
 }
 
-ssize_t mcpr_crypto_stringify_sha1(char *out, const void *hash2)
+void mcpr_crypto_stringify_sha1(char *out, const void *hash2)
 {
     const unsigned char *hash1 = (const unsigned char *) hash2;
 
@@ -88,7 +88,4 @@ ssize_t mcpr_crypto_stringify_sha1(char *out, const void *hash2)
         if(*stringified_hashp != '0') { break; }
         stringified_hashp++;
     }
-
-
-    return 0;
 }

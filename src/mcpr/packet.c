@@ -270,8 +270,9 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
-                    ssize_t bytes_written_2 = mcpr_encode_chat(buf, pkt->data.login.clientbound.disconnect.reason);
+                    ssize_t bytes_written_2 = mcpr_encode_chat(bufpointer, pkt->data.login.clientbound.disconnect.reason);
                     if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
 
                     *out_bytes_written = bufpointer - *buf;
                     return true;
