@@ -25,6 +25,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdarg.h>
 #include <sys/types.h>
 
 
@@ -36,14 +37,20 @@ struct bstream
     bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
     ssize_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
     bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
-    void (*incref)(struct bstream *stream); // may be NULL
-    void (*decref)(struct bstream *stream); // may be NULL
+    void (*incref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
+    void (*decref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
     bool (*is_available)(struct bstream *stream, size_t amount); // may be NULL
 };
 
 /*
     Returns a bstream for the given file descriptor.
-    All functionality will be available, none of the functions will be NULL.
+    Provided functionality:
+    read
+    read_max
+    write
+    incref
+    decref
+    is_available? TODO
 */
 struct bstream *bstream_from_fd(int fd);
 
@@ -57,5 +64,14 @@ ssize_t bstream_peek_max(struct bstream *stream, void *out, size_t maxbytes);
 // If the following two functions are called on a bstream where incref/decref is NULL, no operation will be performed.
 void bstream_incref(struct bstream *stream);
 void bstream_decref(struct bstream *stream);
+
+
+int bstream_vprintf(struct bstream *stream, const char *fmt, va_list ap);
+int bstream_printf(struct bstream *stream, const char *fmt, ...);
+
+#ifdef HAVE_FOPENCOOKIE
+    #define HAVE_FP_FROM_BSTREAM
+    FILE *fp_from_bstream(struct bstream *stream);
+#endif
 
 #endif

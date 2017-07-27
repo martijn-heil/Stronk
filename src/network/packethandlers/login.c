@@ -236,7 +236,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         if(size < 0)
         {
             nlog_error("Could not decrypt shared secret.");
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(fp_error);
             goto err;
         }
 
@@ -250,7 +250,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         if(EVP_EncryptInit_ex(ctx_encrypt, EVP_aes_128_cfb8(), NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
          {
             nlog_error("Error upon EVP_EncryptInit_ex().");
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(fp_error);
             goto err;
         }
 
@@ -264,7 +264,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         if(EVP_DecryptInit_ex(ctx_decrypt, EVP_aes_128_cfb8(), NULL, (unsigned char *) decrypted_shared_secret, (unsigned char *) decrypted_shared_secret) == 0) // TODO Should those 2 pointers be seperate buffers of shared secret?
          {
             nlog_error("Error upon EVP_DecryptInit_ex().");
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(fp_error);
             goto err;
         }
         mcpr_connection_set_crypto(conn->conn, ctx_encrypt, ctx_decrypt);
@@ -275,7 +275,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         {
             // Error occured.
             nlog_error("Ermg ze openssl errorz!!");
-            ERR_print_errors_fp(stderr);
+            ERR_print_errors_fp(fp_error);
             goto err;
         }
 
@@ -314,6 +314,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         if(mapi_result == NULL)
         {
             // TODO handle legit non error case where a failure happened.
+            ninerr_print(ninerr);
             goto err;
         }
 

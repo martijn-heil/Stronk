@@ -186,7 +186,7 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     free(conn->server_address_used);
     free(conn);
 
-    nlog_info("Connection at address %p closed.", conn);
+    nlog_info("Connection at address %p closed.", (void *) conn);
 }
 
 static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)

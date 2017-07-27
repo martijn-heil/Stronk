@@ -104,8 +104,6 @@ static void init(void);
 
 
 static const long tick_duration_ns = 50000000; // Delay in nanoseconds, equivalent to 50 milliseconds
-//static char *motd = "A bloody stronk server.";
-static HashTable *players = NULL; // hash table indexed by strings of compressed UUIDs
 static bool world_manager_init_done = false;
 static bool logging_init_done = false;
 static bool thread_pooling_init_done = false;
@@ -275,14 +273,6 @@ static void init(void)
 
     nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
     json_set_alloc_funcs(secure_malloc, secure_free);
-
-    players = hash_table_new(string_hash, string_equal);
-    if(players == NULL)
-    {
-        nlog_fatal("Could not create hash table for player storage.");
-        cleanup();
-        exit(EXIT_FAILURE);
-    }
 }
 
 void server_start(void)
@@ -342,7 +332,7 @@ void cleanup(void)
 
 static void server_tick(void)
 {
-    nlog_info("Current internal clock: %lu : %lu", internal_clock.tv_sec, internal_clock.tv_nsec);
+    nlog_debug("Current internal clock: %lu : %lu", internal_clock.tv_sec, internal_clock.tv_nsec);
     net_tick();
 
 

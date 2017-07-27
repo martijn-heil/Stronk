@@ -43,7 +43,7 @@
 #include "util.h"
 
 #ifndef __FILENAME__
-    #ifdef defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
+    #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
         #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
     #else
         #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
@@ -66,6 +66,25 @@
     #ifndef unlikely
         #define unlikely(x) (x)
     #endif
+#endif
+
+#ifdef DEBUG
+    #include <stdarg.h>
+
+    static void debug_print(const char *fmt, ...)
+    {
+        va_list ap;
+        va_start(ap, fmt);
+        char final_fmt[strlen(fmt) + strlen("\n") + 1];
+        if(sprintf(final_fmt, "%s\n", fmt) < 0) { va_end(ap); return; }
+        vfprintf(stdout, final_fmt, ap);
+        fflush(stdout);
+        va_end(ap);
+    }
+
+    #define DEBUG_PRINT(x, ...) debug_print(x, __VA_ARGS__);
+#else
+    #define DEBUG_PRINT(x, ...)
 #endif
 
 #ifndef HAVE_SECURE_RANDOM
@@ -196,6 +215,19 @@ enum mapi_http_method {
     MAPI_HTTP_PUT,
     MAPI_HTTP_DELETE,
 };
+IGNORE("-Wreturn-type")
+const char *mapi_http_method_to_string(enum mapi_http_method method)
+{
+    switch(method)
+    {
+        case MAPI_HTTP_GET: return "GET";
+        case MAPI_HTTP_HEAD: return "HEAD";
+        case MAPI_HTTP_POST: return "POST";
+        case MAPI_HTTP_PUT: return "PUT";
+        case MAPI_HTTP_DELETE: return "DELETE";
+    }
+}
+END_IGNORE()
 
 static size_t mapi_curl_write_callback(void *contents, size_t size, size_t nmemb, void *arg);
 
@@ -495,6 +527,8 @@ struct mapi_err_authserver_err *mapi_err_authserver_err_new(const char *error, c
 
 struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char *username, const char *server_id_hash, const char *ip)
 {
+    DEBUG_PRINT("in mapi_minecraft_has_joined(username = %s, server_id_hash = %s, ip = %s)", username, server_id_hash, ip);
+
     const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
     char url[strlen(fmt) + strlen(username) + strlen(ip) + 1];
     sprintf(url, fmt, username, server_id_hash, ip);
@@ -533,7 +567,6 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
 
 /**
  * mapi_errno error codes: (outdated, kept here for documentation purposes for a little bit )
- * TODO switch to ninerr
  *
  * 0: Unknown error occurred, this could be anything, including but not limited to the errors listed below.
  * 1: Remote host could not be resolved.
@@ -559,6 +592,7 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
         ninerr_set_err(ninerr_from_errno());
         return -1;
     }
+    curl_buf.size = 0;
 
 
     curl_global_init(CURL_GLOBAL_ALL);
@@ -608,7 +642,7 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
     if (http_code != 200 && http_code != 204) // Authentication server returned an error.
     {
         json_error_t json_error;
-        json_t *error_response = json_loads(curl_buf.content, 0, &json_error);
+        json_t *error_response = json_loadb(curl_buf.content, curl_buf.size, 0, &json_error);
         if(error_response == NULL)
         {
             free(curl_buf.content);
@@ -628,7 +662,7 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
     }
 
     json_error_t json_error;
-    *response = json_loads(curl_buf.content, 0, &json_error);
+    *response = json_loadb(curl_buf.content, curl_buf.size, 0, &json_error);
     if(response == NULL)
     {
         free(curl_buf.content);
@@ -645,9 +679,11 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
 }
 
 static int mapi_make_api_request(json_t **output, const char *url, enum mapi_http_method http_method, char **headers, size_t header_count, const char *payload) {
+    DEBUG_PRINT("in mapi_make_api_request(), arguments: url: %s, http_method: %s, header_count: %zu, payload: %s", url, mapi_http_method_to_string(http_method), header_count, payload);
+
     curl_global_init(CURL_GLOBAL_ALL);
     CURL *curl = curl_easy_init();
-    if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL.", false)); return -1; }
+    if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL.")); return -1; }
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "MAPI/1.0");
@@ -674,6 +710,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
         ninerr_set_err(ninerr_from_errno());
         return -1;
     }
+    curl_buf.size = 0;
     if(http_method != MAPI_HTTP_HEAD) {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, mapi_curl_write_callback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &curl_buf);
@@ -698,21 +735,29 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
     CURLcode res = curl_easy_perform(curl);
     if(res != CURLE_OK)
     {
-        ninerr_set_err(ninerr_new("Could not curl_easy_perform", false));
+        ninerr_set_err(ninerr_new("Could not curl_easy_perform (%s)", curl_easy_strerror(res)));
         free(curl_buf.content);
         return -1;
     }
 
     long http_code = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+    DEBUG_PRINT("Returned HTTP code is %ld", http_code);
 
 
     json_error_t json_error;
-    *output = json_loads(curl_buf.content, 0, &json_error);
+
+    #if DEBUG
+        char tmp[curl_buf.size + 1];
+        memcpy(tmp, curl_buf.content, curl_buf.size);
+        tmp[curl_buf.size] = '\0';
+        DEBUG_PRINT("Content of curl buf: %s\n", tmp);
+    #endif
+    *output = json_loadb(curl_buf.content, curl_buf.size, 0, &json_error);
     if(*output == NULL)
     {
         free(curl_buf.content);
-        ninerr_set_err(ninerr_new("Error loading JSON.", false));
+        ninerr_set_err(ninerr_new("Error loading JSON. (text: %s, source: %s, line: %d, column: %d, position: %d)", json_error.text, json_error.source, json_error.line, json_error.column, json_error.position));
         return -1;
     }
 
@@ -727,15 +772,11 @@ static size_t mapi_curl_write_callback(void *contents, size_t size, size_t nmemb
 {
     struct mapi_curl_buffer *buf = arg;
     size_t real_size = size * nmemb;
-    buf->content = realloc(buf->content, buf->size + real_size + 1);
-    if(buf->content == NULL)
-    {
-        return 0;
-    }
+    buf->content = realloc(buf->content, buf->size + real_size);
+    if(buf->content == NULL) return 0;
 
     memcpy(&(buf->content[buf->size]), contents, real_size);
     buf->size += real_size;
-    buf->content[buf->size] = '\0';
 
     return real_size;
 }
@@ -874,7 +915,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
 
     for(unsigned int i = 0; i < res->available_profiles_amount; i++)
     {
-        json_t *available_profile_json = json_array_get(available_profile_json, i);
+        json_t *available_profile_json = json_array_get(available_profiles_json, i);
         if(available_profile_json == NULL)
         {
             ninerr_set_err(ninerr_from_errno());

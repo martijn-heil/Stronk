@@ -27,6 +27,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include <ninio/bstream.h>
+
 #include <zlog.h>
 
 int logging_init(void);
@@ -43,7 +45,11 @@ extern zlog_category_t *_zc; // don't access this..
 #undef zlog_debug
 
 #ifndef __FILENAME__
-    #define __FILENAME__ __FILE__
+    #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
+        #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+    #else
+        #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+    #endif
 #endif
 
 #define zlog_fatal(cat, ...) \
@@ -73,5 +79,20 @@ extern zlog_category_t *_zc; // don't access this..
 #define nlog_notice(...)   zlog_notice(_zc, __VA_ARGS__)
 #define nlog_info(...)     zlog_info(_zc, __VA_ARGS__)
 #define nlog_debug(...)    zlog_debug(_zc, __VA_ARGS__)
+
+extern struct bstream *bstream_fatal;
+extern struct bstream *bstream_error;
+extern struct bstream *bstream_warn;
+extern struct bstream *bstream_notice;
+extern struct bstream *bstream_info;
+extern struct bstream *bstream_debug;
+
+// these function pointer variants are sub-optimal, only use them if you really have no other choice.
+extern FILE *fp_fatal;
+extern FILE *fp_error;
+extern FILE *fp_warn;
+extern FILE *fp_notice;
+extern FILE *fp_info;
+extern FILE *fp_debug;
 
 #endif

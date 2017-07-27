@@ -21,7 +21,12 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdarg.h>
+#include <stddef.h>
 #include <string.h>
+#include <limits.h>
 #include <errno.h>
 
 #include <unistd.h>
@@ -245,3 +250,87 @@ void bstream_decref(struct bstream *stream)
 {
     if(stream->decref != NULL) stream->decref(stream);
 }
+
+
+int bstream_vprintf(struct bstream *stream, const char *fmt, va_list ap)
+{
+    char *buf;
+    va_list ap2;
+    va_copy(ap2, ap);
+    int result = vasprintf(&buf, fmt, ap2);
+    va_end(ap2);
+    if(result < 0) return -1;
+    if((unsigned int) result > SIZE_MAX) { free(buf); return -1; }
+    if(!bstream_write(stream, buf, result)) { free(buf); return -1; }
+    free(buf);
+    return result;
+}
+
+int bstream_printf(struct bstream *stream, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    int result = bstream_vprintf(stream, fmt, ap);
+    va_end(ap);
+    return result;
+}
+
+#ifdef HAVE_FOPENCOOKIE
+    static ssize_t fp_from_bstream_write(void *cookie, const char *buf, size_t size)
+    {
+        struct bstream *stream = (struct bstream *) cookie;
+        if(!bstream_write(stream, buf, size)) return -1;
+        return size;
+    }
+
+    static ssize_t fp_from_bstream_read(void *cookie, char *buf, size_t size)
+    {
+        struct bstream *stream = (struct bstream *) cookie;
+        if(!bstream_read(stream, buf, size)) return -1;
+        return size;
+    }
+
+    static ssize_t fp_from_bstream_read_max(void *cookie, char *buf, size_t size)
+    {
+        struct bstream *stream = (struct bstream *) cookie;
+        return bstream_read_max(stream, buf, size);
+    }
+
+    static int fp_from_bstream_close(void *cookie)
+    {
+        bstream_decref((struct bstream *) cookie);
+        return 0;
+    }
+
+    FILE *fp_from_bstream(struct bstream *stream)
+    {
+        const char *mode;
+        if(stream->write != NULL && (stream->read != NULL || stream->read_max != NULL))
+        {
+            mode = "r+";
+        }
+        else if(stream->write != NULL)
+        {
+            mode = "w";
+        }
+        else if(stream->read != NULL || stream->read_max != NULL)
+        {
+            mode = "r";
+        }
+
+        cookie_io_functions_t funcs;
+        funcs.seek = NULL;
+        if(stream->write != NULL) funcs.write = fp_from_bstream_write; else funcs.write = NULL;
+        if(stream->read != NULL) funcs.read = fp_from_bstream_read; else if(stream->read_max != NULL) funcs.read = fp_from_bstream_read_max; else funcs.read = NULL;
+        funcs.close = fp_from_bstream_close;
+        FILE *new_fp = fopencookie(stream, mode, funcs);
+        if(new_fp == NULL) return NULL;
+        if(setvbuf(new_fp, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
+        {
+            fclose(new_fp);
+            return NULL;
+        }
+        bstream_incref(stream);
+        return new_fp;
+    }
+#endif

@@ -32,7 +32,10 @@
 
 #include <zlog.h>
 
+#include <ninio/bstream.h>
+
 #include "logging/logging.h"
+#include "../warnings.h"
 
 
 /*
@@ -62,64 +65,79 @@
 
 zlog_category_t *_zc;
 
-#ifdef DO_REDIRECTION
-    static ssize_t new_stdout_write(void *cookie, const char *buf, size_t size)
+enum log_level
+{
+    LOG_LEVEL_DEBUG,
+    LOG_LEVEL_NOTICE,
+    LOG_LEVEL_INFO,
+    LOG_LEVEL_WARN,
+    LOG_LEVEL_ERROR,
+    LOG_LEVEL_FATAL
+};
+IGNORE("-Wreturn-type")
+zlog_level log_level_to_zlog(enum log_level level)
+{
+    switch(level)
     {
-        char *new_buf;
-        bool free_new_buf = false;
-        if(size <= 256)
-        {
-            char buf[size + 1];
-            new_buf = buf;
-        }
-        else
-        {
-            char *new_buf = malloc(size + 1);
-            if(new_buf == NULL) return 0;
-            free_new_buf = true;
-        }
+        case LOG_LEVEL_DEBUG: return ZLOG_LEVEL_DEBUG;
+        case LOG_LEVEL_NOTICE: return ZLOG_LEVEL_NOTICE;
+        case LOG_LEVEL_INFO: return ZLOG_LEVEL_INFO;
+        case LOG_LEVEL_WARN: return ZLOG_LEVEL_WARN;
+        case LOG_LEVEL_ERROR: return ZLOG_LEVEL_ERROR;
+        case LOG_LEVEL_FATAL: return ZLOG_LEVEL_FATAL;
+    }
+}
+END_IGNORE()
 
-        memcpy(new_buf, buf, size);
+FILE *fp_fatal;
+FILE *fp_error;
+FILE *fp_warn;
+FILE *fp_notice;
+FILE *fp_info;
+FILE *fp_debug;
+
+struct bstream *bstream_fatal;
+struct bstream *bstream_error;
+struct bstream *bstream_warn;
+struct bstream *bstream_notice;
+struct bstream *bstream_info;
+struct bstream *bstream_debug;
+
+bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)
+{
+    enum log_level level = *((enum log_level *) stream->private);
+
+    char *new_buf;
+    bool free_new_buf = false;
+    if(size <= 256)
+    {
+        char buf[size + 1];
+        new_buf = buf;
+    }
+    else
+    {
+        char *new_buf = malloc(size + 1);
+        if(new_buf == NULL) return false;
+        free_new_buf = true;
+    }
+
+    memcpy(new_buf, buf, size);
+
+    // Remove newline at the end, if there is one.
+    if(new_buf[size - 1] == '\n')
+    {
+        new_buf[size - 1] = '\0';
+    }
+    else
+    {
         new_buf[size] = '\0';
-
-        zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_INFO, "%s", new_buf);
-        if(free_new_buf) free(new_buf);
-        return size;
     }
 
-    static ssize_t new_stderr_write(void *cookie, const char *buf, size_t size)
-    {
-        char *new_buf;
-        bool free_new_buf = false;
-        if(size <= 256)
-        {
-            char buf[size + 1];
-            new_buf = buf;
-        }
-        else
-        {
-            char *new_buf = malloc(size + 1);
-            if(new_buf == NULL) return 0;
-            free_new_buf = true;
-        }
+    zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, log_level_to_zlog(level), "%s", new_buf);
+    if(free_new_buf) free(new_buf);
+    return true;
+}
 
-        memcpy(new_buf, buf, size);
-
-        // Remove newline at the end, if there is one.
-        if(new_buf[size - 1] == '\n')
-        {
-            new_buf[size - 1] = '\0';
-        }
-        else
-        {
-            new_buf[size] = '\0';
-        }
-
-        zlog(_zc, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, ZLOG_LEVEL_ERROR, "%s", new_buf);
-        if(free_new_buf) free(new_buf);
-        return size;
-    }
-#endif
 
 int logging_init(void)
 {
@@ -138,61 +156,150 @@ int logging_init(void)
         return -1;
     }
 
-    nlog_info("Logging system was successfully initialized.");
-
     nlog_info("Setting application locale to make sure we use UTF-8..");
     if(setlocale(LC_ALL, "") == NULL) // important, make sure we can use UTF-8.
     {
         nlog_warn("Could not set application locale to make sure we use UTF-8.");
     }
 
-    #ifdef DO_REDIRECTION
-        nlog_info("Redirecting stderr and stdout to log..");
+    bstream_fatal = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_fatal == NULL) { zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_fatal_level = (enum log_level *) (((void *) bstream_fatal) + sizeof(struct bstream));
+    *bstream_fatal_level = LOG_LEVEL_FATAL;
+    bstream_fatal->private = bstream_fatal_level;
+    bstream_fatal->write = bstreamlog_write;
+    bstream_fatal->read = NULL;
+    bstream_fatal->read_max = NULL;
+    bstream_fatal->peek = NULL;
+    bstream_fatal->peek_max = NULL;
+    bstream_fatal->incref = NULL;
+    bstream_fatal->decref = NULL;
+    bstream_fatal->is_available = NULL;
 
-        cookie_io_functions_t new_stdout_funcs;
-        new_stdout_funcs.write = new_stdout_write;
-        new_stdout_funcs.read = NULL;
-        new_stdout_funcs.seek = NULL;
-        new_stdout_funcs.close = NULL;
-        FILE *new_stdout = fopencookie(NULL, "a", new_stdout_funcs);
-        if(new_stdout == NULL)
-        {
-            nlog_error("Could not redirect stdout to log.");
-            return 0;
-        }
-        if(setvbuf(new_stdout, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
-        {
-            nlog_error("Could not redirect stdout to log.");
-            fclose(new_stdout);
-            return 0;
-        }
-        stdout = new_stdout;
+    bstream_error = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_error == NULL) { free(bstream_fatal); zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_error_level = (enum log_level *) (((void *) bstream_error) + sizeof(struct bstream));
+    *bstream_error_level = LOG_LEVEL_ERROR;
+    bstream_error->private = bstream_error_level;
+    bstream_error->write = bstreamlog_write;
+    bstream_error->read = NULL;
+    bstream_error->read_max = NULL;
+    bstream_error->peek = NULL;
+    bstream_error->peek_max = NULL;
+    bstream_error->incref = NULL;
+    bstream_error->decref = NULL;
+    bstream_error->is_available = NULL;
 
+    bstream_warn = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_warn == NULL) { free(bstream_warn); zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_warn_level = (enum log_level *) (((void *) bstream_warn) + sizeof(struct bstream));
+    *bstream_error_level = LOG_LEVEL_WARN;
+    bstream_warn->private = bstream_warn_level;
+    bstream_warn->write = bstreamlog_write;
+    bstream_warn->read = NULL;
+    bstream_warn->read_max = NULL;
+    bstream_warn->peek = NULL;
+    bstream_warn->peek_max = NULL;
+    bstream_warn->incref = NULL;
+    bstream_warn->decref = NULL;
+    bstream_warn->is_available = NULL;
 
-        cookie_io_functions_t new_stderr_funcs;
-        new_stderr_funcs.write = new_stderr_write;
-        new_stderr_funcs.read = NULL;
-        new_stderr_funcs.seek = NULL;
-        new_stderr_funcs.close = NULL;
-        FILE *new_stderr = fopencookie(NULL, "a", new_stderr_funcs);
-        if(new_stderr == NULL)
-        {
-            nlog_error("Could not redirect stderr to log.");
-            return 0;
-        }
-        if(setvbuf(new_stderr, NULL, _IOLBF, 0) != 0) // Ensure line buffering.
-        {
-            nlog_error("Could not redirect stderr to log.");
-            fclose(new_stderr);
-            return 0;
-        }
-        stderr = new_stderr;
+    bstream_notice = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_notice == NULL) { free(bstream_fatal); free(bstream_error); zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_notice_level = (enum log_level *) (((void *) bstream_notice) + sizeof(struct bstream));
+    *bstream_notice_level = LOG_LEVEL_NOTICE;
+    bstream_notice->private = bstream_notice_level;
+    bstream_notice->write = bstreamlog_write;
+    bstream_notice->read = NULL;
+    bstream_notice->read_max = NULL;
+    bstream_notice->peek = NULL;
+    bstream_notice->peek_max = NULL;
+    bstream_notice->incref = NULL;
+    bstream_notice->decref = NULL;
+    bstream_notice->is_available = NULL;
+
+    bstream_info = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_info == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_info_level = (enum log_level *) (((void *) bstream_info) + sizeof(struct bstream));
+    *bstream_info_level = LOG_LEVEL_INFO;
+    bstream_info->private = bstream_info_level;
+    bstream_info->write = bstreamlog_write;
+    bstream_info->read = NULL;
+    bstream_info->read_max = NULL;
+    bstream_info->peek = NULL;
+    bstream_info->peek_max = NULL;
+    bstream_info->incref = NULL;
+    bstream_info->decref = NULL;
+    bstream_info->is_available = NULL;
+
+    bstream_debug = malloc(sizeof(struct bstream) + sizeof(enum log_level));
+    if(bstream_debug == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
+    enum log_level *bstream_debug_level = (enum log_level *) (((void *) bstream_debug) + sizeof(struct bstream));
+    *bstream_debug_level = LOG_LEVEL_DEBUG;
+    bstream_debug->private = bstream_debug_level;
+    bstream_debug->write = bstreamlog_write;
+    bstream_debug->read = NULL;
+    bstream_debug->read_max = NULL;
+    bstream_debug->peek = NULL;
+    bstream_debug->peek_max = NULL;
+    bstream_debug->incref = NULL;
+    bstream_debug->decref = NULL;
+    bstream_debug->is_available = NULL;
+
+    #ifdef HAVE_FP_FROM_BSTREAM
+        fp_fatal = fp_from_bstream(bstream_fatal);
+        if(fp_fatal == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+
+        fp_error = fp_from_bstream(bstream_error);
+        if(fp_error == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+
+        fp_warn = fp_from_bstream(bstream_warn);
+        if(fp_warn == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+
+        fp_notice = fp_from_bstream(bstream_notice);
+        if(fp_notice == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+
+        fp_info = fp_from_bstream(bstream_info);
+        if(fp_info == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+
+        fp_debug = fp_from_bstream(bstream_debug);
+        if(fp_debug == NULL) { free(bstream_fatal); free(bstream_error); free(bstream_notice); free(bstream_info); zlog_fini(); nlog_fatal("Could not create file pointer from bstream."); return -1; }
+    #else
+        fp_fatal    = stderr;
+        fp_error    = stderr;
+        fp_warn     = stderr;
+        fp_notice   = stdout;
+        fp_info     = stdout;
+        fp_debug    = stdout;
     #endif
 
+
+    #ifdef DO_REDIRECTION
+        stderr = fp_error;
+        stdout = fp_info;
+    #endif
+
+    nlog_info("Logging system was successfully initialized.");
     return 0;
 }
 
 void logging_cleanup(void) {
+    nlog_debug("In logging_cleanup()");
+    nlog_info("Cleaning up logging system..");
+    fclose(fp_fatal);
+    fclose(fp_error);
+    fclose(fp_warn);
+    fclose(fp_notice);
+    fclose(fp_info);
+    fclose(fp_debug);
+
+    free(bstream_fatal);
+    free(bstream_error);
+    free(bstream_warn);
+    free(bstream_notice);
+    free(bstream_info);
+    free(bstream_debug);
+
     nlog_info("Closing log..");
     zlog_fini();
 }

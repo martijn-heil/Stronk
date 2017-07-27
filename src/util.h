@@ -23,7 +23,11 @@
 #ifndef STRONK_UTIL_H
 #define STRONK_UTIL_H
 
+#include <stdlib.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <limits.h>
 #include <time.h>
 
 #include <arpa/inet.h>
@@ -140,6 +144,44 @@ void timeval_to_timespec(struct timespec *ts, const struct timeval *tv);
  * More than zero if t1 is found to be greater than t2.
  */
 int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
+
+#ifndef HAVE_ASPRINTF
+    static int asprintf(char **strp, const char *fmt, ...)
+    {
+        va_list ap;
+        va_start(ap, fmt);
+        int result = vasprintf(strp, fmt, ap);
+        va_end(ap);
+        return result;
+    }
+
+    IGNORE("-Wtype-limits")
+    static int vasprintf(char **strp, const char *fmt, va_list ap)
+    {
+        char tmp;
+        va_list ap2;
+        va_copy(ap2, ap);
+        int bytes_required = vsnprintf(&tmp, 1, fmt, ap2);
+        va_end(ap2);
+        if(bytes_required < 0) return -1;
+        if((unsigned int) bytes_required > SIZE_MAX) return -1;
+        bytes_required++; // For the NUL byte
+
+        char *buf = malloc(bytes_required);
+        if(buf == NULL) return -1;
+
+        va_list ap3;
+        va_copy(ap3, ap);
+        int result2 = vsprintf(buf, fmt, ap3);
+        va_end(ap3);
+        if(result2 < 0) { free(buf); return -1; }
+        *strp = buf;
+        return result2;
+    }
+    END_IGNORE()
+
+    #define HAVE_ASPRINTF
+#endif
 
 // Returns <0 upon error.
 #ifndef HAVE_SECURE_RANDOM

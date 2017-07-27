@@ -184,7 +184,7 @@ void ninerr_finish(void)
 void ninerr_set_err(struct ninerr *err)
 {
     ninerr_cleanup_latest();
-    if(err == NULL) // temporary hack, not sure if ninerr_set_err(NULL should be allowed)
+    if(err == NULL)
     {
         ninerr = ninerr_new(NULL);
     }
