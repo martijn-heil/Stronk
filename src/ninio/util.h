@@ -20,8 +20,8 @@
     SOFTWARE.
 */
 
-#ifndef MCPR_UTIL_H
-#define MCPR_UTIL_H
+#ifndef NINIO_UTIL_H
+#define NINIO_UTIL_H
 
 #ifndef DO_PRAGMA
     #ifdef __GNUC__
@@ -75,5 +75,21 @@
 
 #define END_IGNORE() \
     DO_GCC_PRAGMA(GCC diagnostic pop)
+
+#ifndef __FILENAME__
+    #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
+        #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+    #else
+        #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+    #endif
+#endif
+
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
+# if defined __GNUC__ && __GNUC__ >= 2
+#  define __func__ __FUNCTION__
+# else
+#  define __func__ "<unknown>"
+# endif
+#endif
 
 #endif

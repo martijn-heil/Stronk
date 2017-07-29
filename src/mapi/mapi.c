@@ -530,6 +530,11 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
     DEBUG_PRINT("in mapi_minecraft_has_joined(username = %s, server_id_hash = %s, ip = %s)", username, server_id_hash, ip);
 
     const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
+    CURL *curl = curl_easy_init();
+    if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
+
+    //char *escaped_username = curl_easy_escape(username, );
+
     char url[strlen(fmt) + strlen(username) + strlen(ip) + 1];
     sprintf(url, fmt, username, server_id_hash, ip);
     json_t *response;
@@ -595,7 +600,6 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
     curl_buf.size = 0;
 
 
-    curl_global_init(CURL_GLOBAL_ALL);
     CURL *curl = curl_easy_init();
     CURLcode res;
     if(curl == NULL)
@@ -633,7 +637,6 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
         }
 
         curl_easy_cleanup(curl);
-        curl_global_cleanup();
         return -1;
     }
 
@@ -648,7 +651,6 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
             free(curl_buf.content);
             ninerr_set_err(NULL);
             curl_easy_cleanup(curl);
-            curl_global_cleanup();
             return -1;
         }
 
@@ -657,7 +659,6 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
         json_decref(error_response);
         free(curl_buf.content);
         curl_easy_cleanup(curl);
-        curl_global_cleanup();
         return -1;
     }
 
@@ -668,12 +669,10 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
         free(curl_buf.content);
         ninerr_set_err(NULL);
         curl_easy_cleanup(curl);
-        curl_global_cleanup();
         return -1;
     }
 
     curl_easy_cleanup(curl);
-    curl_global_cleanup();
     free(curl_buf.content);
     return 0;
 }
@@ -681,7 +680,6 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
 static int mapi_make_api_request(json_t **output, const char *url, enum mapi_http_method http_method, char **headers, size_t header_count, const char *payload) {
     DEBUG_PRINT("in mapi_make_api_request(), arguments: url: %s, http_method: %s, header_count: %zu, payload: %s", url, mapi_http_method_to_string(http_method), header_count, payload);
 
-    curl_global_init(CURL_GLOBAL_ALL);
     CURL *curl = curl_easy_init();
     if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL.")); return -1; }
 
@@ -762,7 +760,6 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
     }
 
     curl_easy_cleanup(curl);
-    curl_global_cleanup();
     free(curl_buf.content);
     if(http_code > INT_MAX) { ninerr_set_err(ninerr_arithmetic_new()); return -1; }
     return (int) http_code;

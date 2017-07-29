@@ -74,4 +74,6 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...);
     FILE *fp_from_bstream(struct bstream *stream);
 #endif
 
+void bstream_init_black_hole(struct bstream *stream);
+
 #endif

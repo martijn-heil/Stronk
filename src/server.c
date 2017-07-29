@@ -54,6 +54,8 @@
 #include <algo/hash-string.h>
 #include <algo/compare-string.h>
 
+#include <curl/curl.h>
+
 #include <logging/logging.h>
 #include <network/network.h>
 #include <world/world.h>
@@ -108,6 +110,7 @@ static bool world_manager_init_done = false;
 static bool logging_init_done = false;
 static bool thread_pooling_init_done = false;
 static bool networking_init_done = false;
+static bool curl_init_done = false;
 
 static bool internal_clock_init_done = false;
 pthread_rwlock_t internal_clock_lock;
@@ -202,8 +205,7 @@ static void secure_free(void *ptr)
 void server_shutdown(int status)
 {
     nlog_info("Shutting down server..");
-    cleanup();
-    exit(EXIT_SUCCESS);
+    exit(status);
 }
 
 void server_crash(void)
@@ -249,13 +251,26 @@ void cleanup_thread_pooling(void)
 
 static void init(void)
 {
-    ninerr_init();
-    if(logging_init() < 0) { cleanup(); exit(EXIT_FAILURE); }
+    if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr."); exit(EXIT_FAILURE); }
+    if(logging_init() < 0) { cleanup(); ninerr_finish(); fprintf(stderr, "Could not initialize logging module."); exit(EXIT_FAILURE); }
+
+    if(!atexit(cleanup)) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");
+
     nlog_info("Intializing OpenSSL..");\
     // TODO
     OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
 	SSL_library_init();
+
+    // Important we initialize CURL before we start more threads!
+    nlog_info("Initializing CURL..");
+    if(!curl_global_init(CURL_GLOBAL_ALL))
+    {
+        nlog_fatal("Could not initialize CURL!");
+        cleanup();
+        exit(EXIT_FAILURE);
+    }
+    curl_init_done = true;
 
     nlog_info("Initializing some synchronization locks..");
     if(pthread_rwlock_init(&internal_clock_lock, NULL) != 0)
@@ -326,6 +341,7 @@ void cleanup(void)
     if(world_manager_init_done) world_manager_cleanup();
 
     if(internal_clock_init_done) pthread_rwlock_destroy(&internal_clock_lock);
+    if(curl_init_done) { nlog_info("Cleaning up CURL.."); curl_global_cleanup(); }
 
     if(logging_init_done) logging_cleanup(); // Logging alwas as last.
 }

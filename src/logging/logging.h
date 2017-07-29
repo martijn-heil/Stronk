@@ -28,57 +28,25 @@
 #include <stdio.h>
 
 #include <ninio/bstream.h>
+#include <ninio/logging.h>
 
 #include <zlog.h>
 
 int logging_init(void);
 void logging_cleanup(void);
 
+extern struct logger *nlogger;
 
-extern zlog_category_t *_zc; // don't access this..
-
-#undef zlog_fatal
-#undef zlog_error
-#undef zlog_warn
-#undef zlog_notice
-#undef zlog_info
-#undef zlog_debug
-
-#ifndef __FILENAME__
-    #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) && !defined(__CYGWIN__)
-        #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
-    #else
-        #define __FILENAME__ (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
-    #endif
-#endif
-
-#define zlog_fatal(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_FATAL, __VA_ARGS__)
-#define zlog_error(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_ERROR, __VA_ARGS__)
-#define zlog_warn(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_WARN, __VA_ARGS__)
-#define zlog_notice(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_NOTICE, __VA_ARGS__)
-#define zlog_info(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_INFO, __VA_ARGS__)
-#define zlog_debug(cat, ...) \
-	zlog(cat, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, \
-	ZLOG_LEVEL_DEBUG, __VA_ARGS__)
 
 // nlog for ninlog ofcourse :P
 // on a serious note, this is used to make migrating to other logging systems easier.
-#define nlog_fatal(...)    zlog_fatal(_zc, __VA_ARGS__)
-#define nlog_error(...)    zlog_error(_zc, __VA_ARGS__)
-#define nlog_warn(...)     zlog_warn(_zc, __VA_ARGS__)
-#define nlog_notice(...)   zlog_notice(_zc, __VA_ARGS__)
-#define nlog_info(...)     zlog_info(_zc, __VA_ARGS__)
-#define nlog_debug(...)    zlog_debug(_zc, __VA_ARGS__)
+
+#define nlog_fatal(...)    log_fatal(nlogger, __VA_ARGS__)
+#define nlog_error(...)    log_error(nlogger, __VA_ARGS__)
+#define nlog_warn(...)     log_warn(nlogger, __VA_ARGS__)
+#define nlog_notice(...)   log_notice(nlogger, __VA_ARGS__)
+#define nlog_info(...)     log_info(nlogger, __VA_ARGS__)
+#define nlog_debug(...)    log_debug(nlogger, __VA_ARGS__)
 
 extern struct bstream *bstream_fatal;
 extern struct bstream *bstream_error;

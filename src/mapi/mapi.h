@@ -33,6 +33,8 @@
 
 #include <ninuuid/ninuuid.h>
 #include <ninerr/ninerr.h>
+#include <ninio/bstream.h>
+
 
 
 struct mapi_profile

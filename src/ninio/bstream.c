@@ -334,3 +334,21 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...)
         return new_fp;
     }
 #endif
+
+
+static ssize_t bstream_black_hole_write(void *cookie, const char *buf, size_t size)
+{
+    return size;
+}
+
+void bstream_init_black_hole(struct bstream *stream)
+{
+    stream->is_available = NULL;
+    stream->peek_max = NULL;
+    stream->peek = NULL;
+    stream->read_max = NULL;
+    stream->read = NULL;
+    stream->write = bstream_black_hole_write;
+    stream->incref = NULL;
+    stream->decref = NULL;
+}

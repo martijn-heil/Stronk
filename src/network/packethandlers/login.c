@@ -190,7 +190,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
     struct hp_result handle_lg_encryption_response(const struct mcpr_packet *pkt, struct connection *conn)
     {
-        nlog_debug("in handle_lg_encryption_response");
+        nlog_debug("in handle_lg_encryption_response(pkt = %p, conn = %p)", (void *) pkt, (void *) conn);
         if(!conn->tmp_present)
         {
             nlog_error("Could not handle login start packet, tmp_present was false.");
@@ -356,7 +356,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         }
         player->uuid = mapi_result->id;
         player->username = conn->tmp.username;
-        player->conn = conn->conn;
+        player->conn = conn;
         player->client_brand = NULL;
         player->invulnerable = false;
         player->is_flying = false;
