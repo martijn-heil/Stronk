@@ -59,10 +59,10 @@ static inline void logger_write(const struct logger *logger, const char *filenam
 }
 
 #define log_fatal(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
-#define log_error(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
-#define log_warn(logger, ...)   logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
-#define log_notice(logger, ...) logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
-#define log_info(logger, ...)   logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
-#define log_debug(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, __VA_ARGS__)
+#define log_error(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_ERROR, __VA_ARGS__)
+#define log_warn(logger, ...)   logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_WARN, __VA_ARGS__)
+#define log_notice(logger, ...) logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_NOTICE, __VA_ARGS__)
+#define log_info(logger, ...)   logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_INFO, __VA_ARGS__)
+#define log_debug(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_DEBUG, __VA_ARGS__)
 
 #endif

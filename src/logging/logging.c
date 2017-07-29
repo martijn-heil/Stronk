@@ -101,7 +101,7 @@ static struct logger nlogger_raw;
 
 static void vnlog(const char *filename, size_t filename_len, const char *func, size_t func_len, int line, enum log_level level, const char *fmt, va_list ap)
 {
-    vzlog(_zc, filename, filename_len, __func__, func_len, line, log_level_to_zlog(level), fmt, ap);
+    vzlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), fmt, ap);
 }
 
 bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)

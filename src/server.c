@@ -254,7 +254,7 @@ static void init(void)
     if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr."); exit(EXIT_FAILURE); }
     if(logging_init() < 0) { cleanup(); ninerr_finish(); fprintf(stderr, "Could not initialize logging module."); exit(EXIT_FAILURE); }
 
-    if(!atexit(cleanup)) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");
+    if(atexit(cleanup) != 0) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");
 
     nlog_info("Intializing OpenSSL..");\
     // TODO
@@ -264,7 +264,7 @@ static void init(void)
 
     // Important we initialize CURL before we start more threads!
     nlog_info("Initializing CURL..");
-    if(!curl_global_init(CURL_GLOBAL_ALL))
+    if(curl_global_init(CURL_GLOBAL_ALL) != 0)
     {
         nlog_fatal("Could not initialize CURL!");
         cleanup();
