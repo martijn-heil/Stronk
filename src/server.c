@@ -56,10 +56,14 @@
 
 #include <curl/curl.h>
 
+#include <ninerr/ninerr.h>
+#include <ninio/logging.h>
+#include <mapi/mapi.h>
+#include <mcpr/mcpr.h>
+
 #include <logging/logging.h>
 #include <network/network.h>
 #include <world/world.h>
-#include <ninerr/ninerr.h>
 
 #include "server.h"
 #include "stronk.h"
@@ -253,6 +257,8 @@ static void init(void)
 {
     if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr."); exit(EXIT_FAILURE); }
     if(logging_init() < 0) { cleanup(); ninerr_finish(); fprintf(stderr, "Could not initialize logging module."); exit(EXIT_FAILURE); }
+    mapi_logger = nlogger;
+    mcpr_logger = nlogger;
 
     if(atexit(cleanup) != 0) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");
 

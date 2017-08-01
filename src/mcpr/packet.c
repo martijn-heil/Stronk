@@ -35,6 +35,8 @@
 
 #include <ninuuid/ninuuid.h>
 
+#include "internal.h"
+
 static char *server_list_response_to_json(const struct mcpr_packet *pkt)
 {
     char *version_name = pkt->data.status.clientbound.response.version_name;
@@ -166,7 +168,7 @@ static char *server_list_response_to_json(const struct mcpr_packet *pkt)
 
 bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
 {
-    printf("In mcpr_encode_packet\n");
+    DEBUG_PRINT("In mcpr_encode_packet\n");
     IGNORE("-Wswitch")
 
     switch(pkt->state)
@@ -233,7 +235,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 {
                     char *response = server_list_response_to_json(pkt);
                     if(response == NULL) { return false; }
-                    printf("Response: %s\n", response);
+                    DEBUG_PRINT("Response: %s\n", response);
                     size_t len = strlen(response);
 
                     *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_VARINT_SIZE_MAX + len);

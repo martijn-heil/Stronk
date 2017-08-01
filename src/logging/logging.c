@@ -34,6 +34,7 @@
 #include <zlog.h>
 
 #include <ninio/bstream.h>
+#include <ninio/ninio.h>
 
 #include "logging/logging.h"
 #include "../warnings.h"
@@ -101,7 +102,14 @@ static struct logger nlogger_raw;
 
 static void vnlog(const char *filename, size_t filename_len, const char *func, size_t func_len, int line, enum log_level level, const char *fmt, va_list ap)
 {
-    vzlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), fmt, ap);
+    char *msg;
+    int len = vasprintf(&msg, fmt, ap);
+    if(len == -1) return;
+    if(msg[len-1] == '\n')
+    {
+        msg[len-1] = '\0';
+    }
+    zlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), "%s", msg);
 }
 
 bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)

@@ -65,4 +65,11 @@ static inline void logger_write(const struct logger *logger, const char *filenam
 #define log_info(logger, ...)   logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_INFO, __VA_ARGS__)
 #define log_debug(logger, ...)  logger_write(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_DEBUG, __VA_ARGS__)
 
+#define vlog_fatal(logger, fmt, ap)  logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_FATAL, fmt, ap)
+#define vlog_error(logger, fmt, ap)  logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_ERROR, fmt, ap)
+#define vlog_warn(logger, fmt, ap)   logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_WARN, fmt, ap)
+#define vlog_notice(logger, fmt, ap) logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_NOTICE, fmt, ap)
+#define vlog_info(logger, fmt, ap)   logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_INFO, fmt, ap)
+#define vlog_debug(logger, fmt, ap)  logger_vwrite(logger, __FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, LOG_LEVEL_DEBUG, fmt, ap)
+
 #endif

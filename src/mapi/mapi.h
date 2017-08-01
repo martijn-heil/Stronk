@@ -34,8 +34,9 @@
 #include <ninuuid/ninuuid.h>
 #include <ninerr/ninerr.h>
 #include <ninio/bstream.h>
+#include <ninio/logging.h>
 
-
+extern struct logger *mapi_logger; // set to non null value to enable logging, set to null value to disable logging.
 
 struct mapi_profile
 {

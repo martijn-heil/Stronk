@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -9,6 +10,8 @@
 
 #include "mcpr/crypto.h"
 #include "mcpr/mcpr.h"
+
+#include "internal.h"
 
 
 
@@ -34,58 +37,54 @@ ssize_t mcpr_crypto_decrypt(void *out, const void *data, EVP_CIPHER_CTX *ctx_dec
     return writtenlen;
 }
 
-void mcpr_crypto_stringify_sha1(char *out, const void *hash2)
+void mcpr_crypto_stringify_sha1(char *out, const void *hash)
 {
-    const unsigned char *hash1 = (const unsigned char *) hash2;
+    DEBUG_PRINT("in mcpr_crypto_stringify_sha1(out = %p, hash = %p)", (void *) out, (void *) hash);
+    const unsigned char *bytes = (const unsigned char *) hash;
+    bool is_negative = bytes[19] & 0x80;
+    if(is_negative) *out = '-';
 
-    unsigned char uhash[SHA_DIGEST_LENGTH];
-    for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
-        uhash[i] = hash1[i];
-    }
+    char *outp = (is_negative) ? out + 1 : out;
 
-    char *hash = (char *) uhash;
-
-    bool is_negative = *hash < 0;
-    if(is_negative) {
+    const unsigned char *final_bytes;
+    if(is_negative)
+    {
+        unsigned char tmp[20];
         bool carry = true;
-        int i;
         unsigned char new_byte;
         unsigned char value;
-
-        for(i = SHA_DIGEST_LENGTH - 1; i >= 0; --i) {
-            value = uhash[i];
-            new_byte = ~value & 0xFF;
-            if(carry) {
+        for(int_fast8_t i = 19; i >= 0; i--)
+        {
+            new_byte = ~(bytes[i]) & 0xFF;
+            if(carry)
+            {
                 carry = new_byte == 0xFF;
-                uhash[i] = new_byte + 1;
-            } else {
-                uhash[i] = new_byte;
+                tmp[i] = new_byte + 1;
+            }
+            else
+            {
+                tmp[i] = new_byte;
             }
         }
-    }
-
-    char *stringified_hashp;
-    if(is_negative) // Hash is negative.
-    {
-        *out = '-';
-        stringified_hashp = out + 1;
+        final_bytes = tmp;
     }
     else
     {
-        stringified_hashp = out;
+        final_bytes = bytes;
     }
 
     // Write it as a hex string.
-    for(int i = 0; i < SHA_DIGEST_LENGTH; i++) {
-        sprintf(stringified_hashp, "%02x", uhash[i]);
-        stringified_hashp += 2;
+    for(uint_fast8_t i = 0; i < 20; i++)
+    {
+        sprintf(outp, "%02x", final_bytes[i]);
+        outp += 2;
     }
-    *stringified_hashp = '\0';
-
+    *outp = '\0';
     // Trim leading zeros
-    stringified_hashp = out + 1;
-    for(int i = 0; i < SHA_DIGEST_LENGTH * 2; i++) {
-        if(*stringified_hashp != '0') { break; }
-        stringified_hashp++;
+    outp = (is_negative) ? out + 1 : out;
+    for(uint_fast8_t i = 0; i < 40; i++)
+    {
+        if(*outp != '0') break;
+        outp++;
     }
 }

@@ -47,6 +47,8 @@
 #define MCPR_MINECRAFT_VERSION "1.12"
 
 
+extern struct logger *mcpr_logger; // set to non null value to enable logging, set to null value to disable logging.
+
 /**
  * Compress data for use in the Minecraft protocol.
  *

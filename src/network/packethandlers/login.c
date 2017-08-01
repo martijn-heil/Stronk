@@ -306,11 +306,11 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             nlog_error("Could not finalize SHA-1 hash.");
             goto err;
         }
-
-
+        nlog_debug("Value before mcpr_crypto_stringify_sha1: %p", (void *) conn);
         mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
-
+        nlog_debug("Value after mcpr_crypto_stringify_sha1: %p", (void *) conn);
         struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(conn->tmp.username, stringified_server_id_hash, conn->server_address_used);
+        nlog_debug("Value after mapi_minecraft_has_joined: %p", (void *) conn);
         if(mapi_result == NULL)
         {
             // TODO handle legit non error case where a failure happened.
@@ -499,6 +499,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
     goto cleanup_only;
     err:
+        nlog_debug("Last address of conn: %p", (void *) conn);
         RSA_free(conn->tmp.rsa);
         free(conn->tmp.verify_token);
         free(conn->tmp.username);

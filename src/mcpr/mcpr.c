@@ -40,6 +40,7 @@
 #include "mcpr.h"
 #include "../util.h"
 
+struct logger *mcpr_logger = NULL; // set to non null value to enable logging, set to null value to disable logging.
 
 IGNORE("-Wtype-limits")
 size_t mcpr_compress_bounds(size_t len) {

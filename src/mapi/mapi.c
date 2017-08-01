@@ -68,24 +68,22 @@
     #endif
 #endif
 
-#ifdef DEBUG
-    #include <stdarg.h>
+struct logger *mapi_logger = NULL;
 
-    static void debug_print(const char *fmt, ...)
-    {
-        va_list ap;
-        va_start(ap, fmt);
-        char final_fmt[strlen(fmt) + strlen("\n") + 1];
-        if(sprintf(final_fmt, "%s\n", fmt) < 0) { va_end(ap); return; }
-        vfprintf(stdout, final_fmt, ap);
-        fflush(stdout);
-        va_end(ap);
-    }
+#include <stdarg.h>
+static void debug_print(const char *filename, size_t filename_len, const char *func, size_t func_len, int line, ...)
+{
+    if(mapi_logger == NULL) return;
+    va_list ap;
+    va_start(ap, line);
+    const char *fmt = va_arg(ap, const char *);
+    char final_fmt[strlen(fmt) + strlen("\n") + 1];
+    if(sprintf(final_fmt, "%s\n", fmt) < 0) { va_end(ap); return; }
+    logger_vwrite(mapi_logger, filename, filename_len, func, func_len, line, LOG_LEVEL_DEBUG, final_fmt, ap);
+    va_end(ap);
+}
 
-    #define DEBUG_PRINT(x, ...) debug_print(x, __VA_ARGS__);
-#else
-    #define DEBUG_PRINT(x, ...)
-#endif
+#define DEBUG_PRINT(...) debug_print(__FILENAME__, sizeof(__FILENAME__)-1, __func__, sizeof(__func__)-1, __LINE__, __VA_ARGS__);
 
 #ifndef HAVE_SECURE_RANDOM
 #define HAVE_SECURE_RANDOM
