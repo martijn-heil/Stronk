@@ -51,12 +51,192 @@
 #include <world/entity.h>
 #include <util.h>
 
+static bool is_auth_required(const char *username)
+{
+    return false;
+}
+
+
+static struct hp_result send_post_login_sequence(struct connection *conn)
+{
+    struct player *player = conn->player;
+
+    struct mcpr_packet join_game_pkt;
+    join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
+    join_game_pkt.state = MCPR_STATE_PLAY;
+    join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
+    join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
+    join_game_pkt.data.play.clientbound.join_game.hardcore = false;
+    join_game_pkt.data.play.clientbound.join_game.dimension = MCPR_DIMENSION_OVERWORLD;
+    join_game_pkt.data.play.clientbound.join_game.difficulty = MCPR_DIFFICULTY_PEACEFUL;
+    join_game_pkt.data.play.clientbound.join_game.max_players = 255;
+    join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
+    join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
+
+    if(mcpr_connection_write_packet(conn->conn, &join_game_pkt) < 0)
+    {
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+        {
+            struct hp_result result;
+            result.result = HP_RESULT_CLOSED;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+        else
+        {
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not send join game packet. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not send join game packet.");
+            }
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+    }
+
+
+    uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
+    ssize_t encode_str_result = mcpr_encode_string(server_brand_buf, "Stronk");
+    if(encode_str_result < 0)
+    {
+        nlog_error("Could not encode brand string.");
+        struct hp_result result;
+        result.result = HP_RESULT_FATAL;
+        result.disconnect_message = NULL;
+        result.free_disconnect_message = true;
+        return result;
+    }
+
+
+    struct mcpr_packet pm_brand;
+    pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
+    pm_brand.state = MCPR_STATE_PLAY;
+    pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
+    pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
+    pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
+
+    if(mcpr_connection_write_packet(conn->conn, &pm_brand) < 0)
+    {
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+        {
+            struct hp_result result;
+            result.result = HP_RESULT_CLOSED;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+        else
+        {
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not write MC|BRAND plugin message. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not write MC|BRAND plugin message.");
+            }
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+    }
+
+    struct mcpr_packet spawn_position_pkt;
+    spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
+    spawn_position_pkt.state = MCPR_STATE_PLAY;
+    spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
+
+    if(mcpr_connection_write_packet(conn->conn, &spawn_position_pkt) < 0)
+    {
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+        {
+            struct hp_result result;
+            result.result = HP_RESULT_CLOSED;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+        else
+        {
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not write spawn position packet. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not write spawn position packet.");
+            }
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+    }
+
+    struct mcpr_packet player_abilities_pkt;
+    player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
+    player_abilities_pkt.state = MCPR_STATE_PLAY;
+    player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
+    player_abilities_pkt.data.play.clientbound.player_abilities.allow_flying = player->allow_flying;
+    player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
+    player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
+    player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
+
+    if(mcpr_connection_write_packet(conn->conn, &player_abilities_pkt) < 0)
+    {
+        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+        {
+            struct hp_result result;
+            result.result = HP_RESULT_CLOSED;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+        else
+        {
+            if(ninerr != NULL && ninerr->message != NULL)
+            {
+                nlog_error("Could not write player abilities packet. (%s)", ninerr->message);
+            }
+            else
+            {
+                nlog_error("Could not write player abilities packet.");
+            }
+
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = true;
+            return result;
+        }
+    }
+
+    struct hp_result result;
+    result.result = HP_RESULT_OK;
+    result.disconnect_message = NULL;
+    result.free_disconnect_message = true;
+    return result;
+}
+
 
 struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct connection *conn)
 {
     nlog_debug("in handle_lg_login_start");
     conn->tmp.username = pkt->data.login.serverbound.login_start.name;
 
+    if(is_auth_required(pkt->data.login.serverbound.login_start.name))
+    {
+        nlog_info("Connection at %p is required to do authentication.", (void *) conn);
         RSA *rsa = RSA_generate_key(1024, 3, 0, 0); // TODO this is deprecated in OpenSSL 1.0.2? But the alternative is not there in 1.0.1
 
         unsigned char *buf = NULL; // TODO should this be freed afterwards?
@@ -187,6 +367,99 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         result.free_disconnect_message = false;
         return result;
     }
+    else
+    {
+        nlog_info("Connection at %p is not required to do authentication.", (void *) conn);
+        struct ninuuid uuid;
+        if(!ninuuid_generate(&uuid, 4)) // TODO should not actually be version 4
+        {
+            nlog_error("Could not generate new UUID for player.");
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = false;
+            return result;
+        }
+
+        struct mcpr_packet response;
+        response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
+        response.state = MCPR_STATE_LOGIN;
+        response.data.login.clientbound.login_success.uuid = uuid;
+        response.data.login.clientbound.login_success.username = conn->tmp.username; // eh i think we should get the username from another source?
+
+        if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+        {
+            if(strcmp(ninerr->type, "ninerr_closed") == 0)
+            {
+                struct hp_result result;
+                result.result = HP_RESULT_CLOSED;
+                result.disconnect_message = NULL;
+                result.free_disconnect_message = false;
+                return result;
+            }
+            else
+            {
+                if(ninerr != NULL && ninerr->message != NULL)
+                {
+                    nlog_error("Could not send login success packet to connection. (%s ?)", ninerr->message);
+                }
+                else
+                {
+                    nlog_error("Could not send login success packet to connection.");
+                }
+                struct hp_result result;
+                result.result = HP_RESULT_FATAL;
+                result.disconnect_message = NULL;
+                result.free_disconnect_message = false;
+                return result;
+            }
+        }
+
+        mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
+
+
+        struct player *player = malloc(sizeof(struct player));
+        if(player == NULL)
+        {
+            nlog_error("Could not allocate memory. (%s)", strerror(errno));
+            struct hp_result result;
+            result.result = HP_RESULT_FATAL;
+            result.disconnect_message = NULL;
+            result.free_disconnect_message = false;
+            return result;
+        }
+        player->uuid = uuid;
+        player->username = conn->tmp.username;
+        player->conn = conn;
+        player->client_brand = NULL;
+        player->invulnerable = false;
+        player->is_flying = false;
+        player->allow_flying = false;
+        player->gamemode = MCPR_GAMEMODE_SURVIVAL;
+        player->client_settings_known = false;
+
+        player->compass_target.x = 0;
+        player->compass_target.y = 0;
+        player->compass_target.z = 0;
+
+        player->entity_id = generate_new_entity_id();
+        conn->player = player;
+
+        struct hp_result result = send_post_login_sequence(conn);
+        if(result.result != HP_RESULT_OK) free(player);
+        return result;
+    }
+}
+
+
+
+
+
+
+
+
+
+
 
     struct hp_result handle_lg_encryption_response(const struct mcpr_packet *pkt, struct connection *conn)
     {
@@ -205,7 +478,6 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         void *decrypted_shared_secret = NULL;
         uint8_t server_id_hash[SHA_DIGEST_LENGTH];
         char stringified_server_id_hash[SHA_DIGEST_LENGTH * 2 + 2];
-        uint8_t server_brand_buf[MCPR_VARINT_SIZE_MAX + 6];
         struct player *player;
         bool player_init = false;
 
@@ -373,131 +645,11 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         player_init = true;
 
-        struct mcpr_packet join_game_pkt;
-        join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
-        join_game_pkt.state = MCPR_STATE_PLAY;
-        join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
-        join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
-        join_game_pkt.data.play.clientbound.join_game.hardcore = false;
-        join_game_pkt.data.play.clientbound.join_game.dimension = MCPR_DIMENSION_OVERWORLD;
-        join_game_pkt.data.play.clientbound.join_game.difficulty = MCPR_DIFFICULTY_PEACEFUL;
-        join_game_pkt.data.play.clientbound.join_game.max_players = 255;
-        join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
-        join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
+        struct hp_result send_post_login_sequence_result = send_post_login_sequence(conn);
+        if(send_post_login_sequence_result.result == HP_RESULT_FATAL) goto err;
+        else if(send_post_login_sequence_result.result == HP_RESULT_CLOSED) goto closed;
+        else goto cleanup_only;
 
-        if(mcpr_connection_write_packet(conn->conn, &join_game_pkt) < 0)
-        {
-            if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
-            {
-                goto closed;
-            }
-            else
-            {
-                if(ninerr != NULL && ninerr->message != NULL)
-                {
-                    nlog_error("Could not send join game packet. (%s)", ninerr->message);
-                }
-                else
-                {
-                    nlog_error("Could not send join game packet.");
-                }
-                goto err;
-            }
-        }
-
-
-
-        ssize_t encode_str_result = mcpr_encode_string(server_brand_buf, "Stronk");
-        if(encode_str_result < 0)
-        {
-            nlog_error("Could not encode brand string.");
-            goto err;
-        }
-
-
-        struct mcpr_packet pm_brand;
-        pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
-        pm_brand.state = MCPR_STATE_PLAY;
-        pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
-        pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
-        pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
-
-        if(mcpr_connection_write_packet(conn->conn, &pm_brand) < 0)
-        {
-            if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
-            {
-                goto closed;
-            }
-            else
-            {
-                if(ninerr != NULL && ninerr->message != NULL)
-                {
-                    nlog_error("Could not write MC|BRAND plugin message. (%s)", ninerr->message);
-                }
-                else
-                {
-                    nlog_error("Could not write MC|BRAND plugin message.");
-                }
-                goto err;
-            }
-        }
-
-        struct mcpr_packet spawn_position_pkt;
-        spawn_position_pkt.id = MCPR_PKT_PL_CB_SPAWN_POSITION;
-        spawn_position_pkt.state = MCPR_STATE_PLAY;
-        spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
-
-        if(mcpr_connection_write_packet(conn->conn, &spawn_position_pkt) < 0)
-        {
-            if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
-            {
-                goto closed;
-            }
-            else
-            {
-                if(ninerr != NULL && ninerr->message != NULL)
-                {
-                    nlog_error("Could not write spawn position packet. (%s)", ninerr->message);
-                }
-                else
-                {
-                    nlog_error("Could not write spawn position packet.");
-                }
-                goto err;
-            }
-        }
-
-        struct mcpr_packet player_abilities_pkt;
-        player_abilities_pkt.id = MCPR_PKT_PL_CB_PLAYER_ABILITIES;
-        player_abilities_pkt.state = MCPR_STATE_PLAY;
-        player_abilities_pkt.data.play.clientbound.player_abilities.invulnerable = player->invulnerable;
-        player_abilities_pkt.data.play.clientbound.player_abilities.allow_flying = player->allow_flying;
-        player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
-        player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
-        player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
-
-        if(mcpr_connection_write_packet(conn->conn, &player_abilities_pkt) < 0)
-        {
-            if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
-            {
-                goto closed;
-            }
-            else
-            {
-                if(ninerr != NULL && ninerr->message != NULL)
-                {
-                    nlog_error("Could not write player abilities packet. (%s)", ninerr->message);
-                }
-                else
-                {
-                    nlog_error("Could not write player abilities packet.");
-                }
-
-                goto err;
-            }
-        }
-
-    goto cleanup_only;
     err:
         nlog_debug("Last address of conn: %p", (void *) conn);
         RSA_free(conn->tmp.rsa);

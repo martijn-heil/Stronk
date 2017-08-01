@@ -528,12 +528,14 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
     DEBUG_PRINT("in mapi_minecraft_has_joined(username = %s, server_id_hash = %s, ip = %s)", username, server_id_hash, ip);
 
     const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
-    CURL *curl = curl_easy_init();
-    if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
+    // CURL *curl = curl_easy_init();
+    // if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
+
 
     //char *escaped_username = curl_easy_escape(username, );
+    // curl_easy_cleanup(curl);
 
-    char url[strlen(fmt) + strlen(username) + strlen(ip) + 1];
+    char url[strlen(server_id_hash) + strlen(fmt) + strlen(username) + strlen(ip) + 1];
     sprintf(url, fmt, username, server_id_hash, ip);
     json_t *response;
     int status = mapi_make_api_request(&response, url, MAPI_HTTP_GET, NULL, 0, NULL);

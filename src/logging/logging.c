@@ -110,6 +110,7 @@ static void vnlog(const char *filename, size_t filename_len, const char *func, s
         msg[len-1] = '\0';
     }
     zlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), "%s", msg);
+    free(msg);
 }
 
 bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)

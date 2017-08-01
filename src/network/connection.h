@@ -39,6 +39,7 @@ struct connection
     char *server_address_used; // Will only be set after having switched to a different state from HANDSHAKE, else it will be NULL
     mcpr_connection *conn;
     struct player *player; // may be NULL
+    bool auth_required;
 
     bool tmp_present;
     struct {
