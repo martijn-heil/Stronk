@@ -36,6 +36,8 @@
 #include <ninio/bstream.h>
 #include <ninio/ninio.h>
 
+#include <mcpr/mcpr.h>
+
 #include "logging/logging.h"
 #include "../warnings.h"
 
@@ -300,8 +302,8 @@ int logging_init(void)
     #endif
 
     #ifdef DEBUG
-        nlog_info("Debug mode detected, enabling MAPI debug.");
-        // TODO
+        nlog_info("Debug mode detected, enabling MAPI debug and MCPR debug.");
+        mcpr_logger = nlogger;
     #endif
 
     nlog_info("Logging system was successfully initialized.");

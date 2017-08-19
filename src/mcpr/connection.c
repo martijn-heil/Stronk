@@ -41,6 +41,8 @@
 #include <mcpr/codec.h>
 #include <util.h>
 
+#include "internal.h"
+
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cfb8())
 
 // TODO COMPRESSION!!!
@@ -228,7 +230,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         if(pktlen <= 0) { ninerr_set_err(ninerr_new("Received invalid packet length")); return false; }
         if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
         {
-            printf("Received packet in mcpr_connection_update\n");
+            DEBUG_PRINT("Received packet in mcpr_connection_update\n");
             struct mcpr_packet *pkt;
             ssize_t bytes_read = mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result);
             if(bytes_read == -1) { mcpr_connection_close(tmpconn, NULL); return false; }
@@ -247,12 +249,14 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
     return true;
 }
 
-static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t bytes)
+bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t bytes)
 {
+    DEBUG_PRINT("Writing %zu bytes to mcpr_connection at address %p", bytes, (void *) tmpconn)
     struct conn *conn = (struct conn *) tmpconn;
 
     if(conn->use_encryption)
     {
+        DEBUG_PRINT("Writing those bytes encrypted.");
         void *encrypted_data = malloc(bytes + BLOCK_SIZE - 1);
         if(encrypted_data == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
@@ -261,6 +265,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
         if(conn->use_compression) // TODO compression treshold
         {
+            DEBUG_PRINT("Writing those bytes compressed.");
             void *compressed_data = malloc(mcpr_compress_bounds(encrypted_data_length));
             if(compressed_data == NULL) { free(encrypted_data); ninerr_set_err(ninerr_from_errno()); return false; }
             ssize_t compression_result = mcpr_compress(compressed_data, encrypted_data, encrypted_data_length);
@@ -273,6 +278,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         }
         else
         {
+            DEBUG_PRINT("Writing those bytes uncompressed.");
             bool write_result = bstream_write(conn->io_stream, encrypted_data, encrypted_data_length);
             free(encrypted_data);
             return write_result;
@@ -280,8 +286,10 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
     }
     else
     {
+        DEBUG_PRINT("Writing those bytes unencrypted.");
         if(conn->use_compression)
         {
+            DEBUG_PRINT("Writing those bytes compressed.");
             void *compressed_data = malloc(mcpr_compress_bounds(bytes));
             if(compressed_data == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
 
@@ -293,6 +301,7 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
         }
         else
         {
+            DEBUG_PRINT("Writing those bytes uncompressed.");
             bool result = bstream_write(conn->io_stream, in, bytes);
             return result;
         }
@@ -301,19 +310,20 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
 bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt)
 {
-    printf("Writing packet (numerical ID: 0x%02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state), tmpconn);
+    DEBUG_PRINT("Writing packet (numerical ID: 0x%02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state), tmpconn);
     void *buf;
-    size_t bytes_written;
-    if(!mcpr_encode_packet(&buf, &bytes_written, pkt)) return false;
-    void *buf2 = malloc(bytes_written + MCPR_VARINT_SIZE_MAX);
-    if(buf2 == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return false; }
-    ssize_t bytes_written_2 = mcpr_encode_varint(buf2, (int32_t) bytes_written);
-    if(bytes_written_2 < 0) { free(buf); free(buf2); return false; }
-    memcpy(buf2 + bytes_written_2, buf, bytes_written);
-    printf("Writing packet, total size: %i, initial size: %i\n", bytes_written + bytes_written_2, bytes_written);
-    if(!mcpr_connection_write(tmpconn, buf2, bytes_written + bytes_written_2)) { free(buf); free(buf2); return false; }
+    size_t pktlen;
+    if(!mcpr_encode_packet(&buf, &pktlen, pkt)) return false;
+    if(pktlen > INT32_MAX) { free(buf); ninerr_set_err(ninerr_arithmetic_new()); return false; }
+    void *tmp = realloc(buf, pktlen + MCPR_VARINT_SIZE_MAX);
+    if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return false; }
+    buf = tmp;
+    memmove(buf + mcpr_varint_bounds((int32_t) pktlen), buf, pktlen);
+    ssize_t bytes_written_1 = mcpr_encode_varint(buf, (int32_t) pktlen);
+    if(bytes_written_1 < 0) { free(buf); return false; }
+    DEBUG_PRINT("Writing packet, total size: %zu, initial size: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
+    if(!mcpr_connection_write(tmpconn, buf, pktlen + bytes_written_1)) { free(buf); return false; }
     free(buf);
-    free(buf2);
     return true;
 }
 

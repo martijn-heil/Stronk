@@ -43,8 +43,8 @@
     MCPR = MineCraft PRotocol.
 */
 
-#define MCPR_PROTOCOL_VERSION 335
-#define MCPR_MINECRAFT_VERSION "1.12"
+#define MCPR_PROTOCOL_VERSION 338
+#define MCPR_MINECRAFT_VERSION "1.12.1"
 
 
 extern struct logger *mcpr_logger; // set to non null value to enable logging, set to null value to disable logging.

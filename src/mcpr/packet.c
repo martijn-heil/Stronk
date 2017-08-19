@@ -168,7 +168,7 @@ static char *server_list_response_to_json(const struct mcpr_packet *pkt)
 
 bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
 {
-    DEBUG_PRINT("In mcpr_encode_packet\n");
+    DEBUG_PRINT("In mcpr_encode_packet, numerical packet ID: 0x%02x, state: %s\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state));
     IGNORE("-Wswitch")
 
     switch(pkt->state)
@@ -318,7 +318,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
                     void *bufpointer = *buf;
 
-                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_ENCRYPTION_REQUEST));
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_LOGIN_SUCCESS));
                     if(bytes_written_1 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_1;
 
@@ -404,276 +404,282 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
         case MCPR_STATE_PLAY:
         {
-            case MCPR_PKT_PL_CB_DISCONNECT:
+            switch(pkt->id)
             {
-                const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
-                *buf = malloc(10 + strlen(reason));
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
-
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_DISCONNECT));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
-
-                ssize_t bytes_written_2 = mcpr_encode_string(*buf, reason);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
-
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
-
-            case MCPR_PKT_PL_CB_KEEP_ALIVE:
-            {
-                *buf = malloc(10);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
-
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_KEEP_ALIVE));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
-
-                ssize_t bytes_written_2 = mcpr_encode_varint(*buf, pkt->data.play.clientbound.keep_alive.keep_alive_id);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
-
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
-
-            case MCPR_PKT_PL_CB_JOIN_GAME:
-            {
-                *buf = malloc(33);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
-
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_JOIN_GAME));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
-
-                ssize_t bytes_written_2 = mcpr_encode_int(bufpointer, pkt->data.play.clientbound.join_game.entity_id);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
-
-                uint8_t gamemode;
-                switch(pkt->data.play.clientbound.join_game.gamemode)
+                case MCPR_PKT_PL_CB_DISCONNECT:
                 {
-                    case MCPR_GAMEMODE_SURVIVAL:    gamemode = 0x00; break;
-                    case MCPR_GAMEMODE_CREATIVE:    gamemode = 0x01; break;
-                    case MCPR_GAMEMODE_ADVENTURE:   gamemode = 0x02; break;
-                    case MCPR_GAMEMODE_SPECTATOR:   gamemode = 0x03; break;
-                    default: abort(); return false; // Won't be reached, but else the compiler will complain.
-                }
-                if(pkt->data.play.clientbound.join_game.hardcore) gamemode = gamemode | 0x08;
-                ssize_t bytes_written_3 = mcpr_encode_ubyte(bufpointer, gamemode);
-                if(bytes_written_3 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_3;
+                    const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
+                    *buf = malloc(10 + strlen(reason));
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                int32_t dimension;
-                switch(pkt->data.play.clientbound.join_game.dimension)
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_DISCONNECT));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_string(*buf, reason);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
+
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
+
+                case MCPR_PKT_PL_CB_KEEP_ALIVE:
                 {
-                    case MCPR_DIMENSION_NETHER:     dimension = -1; break;
-                    case MCPR_DIMENSION_OVERWORLD:  dimension = 0;  break;
-                    case MCPR_DIMENSION_END:        dimension = 1;  break;
-                    default: abort(); return false; // Won't be reached, but else the compiler will complain.
-                }
-                ssize_t bytes_written_4 = mcpr_encode_int(bufpointer, dimension);
-                if(bytes_written_4 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_4;
+                    *buf = malloc(10);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                uint8_t difficulty;
-                switch(pkt->data.play.clientbound.join_game.difficulty)
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_KEEP_ALIVE));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_varint(*buf, pkt->data.play.clientbound.keep_alive.keep_alive_id);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
+
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
+
+                case MCPR_PKT_PL_CB_JOIN_GAME:
                 {
-                    case MCPR_DIFFICULTY_PEACEFUL:  difficulty = 0; break;
-                    case MCPR_DIFFICULTY_EASY:      difficulty = 1; break;
-                    case MCPR_DIFFICULTY_NORMAL:    difficulty = 2; break;
-                    case MCPR_DIFFICULTY_HARD:      difficulty = 3; break;
-                    default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    *buf = malloc(33);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
+
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_JOIN_GAME));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_int(bufpointer, pkt->data.play.clientbound.join_game.entity_id);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
+
+                    uint8_t gamemode;
+                    switch(pkt->data.play.clientbound.join_game.gamemode)
+                    {
+                        case MCPR_GAMEMODE_SURVIVAL:    gamemode = 0x00; break;
+                        case MCPR_GAMEMODE_CREATIVE:    gamemode = 0x01; break;
+                        case MCPR_GAMEMODE_ADVENTURE:   gamemode = 0x02; break;
+                        case MCPR_GAMEMODE_SPECTATOR:   gamemode = 0x03; break;
+                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    }
+                    if(pkt->data.play.clientbound.join_game.hardcore) gamemode = gamemode | 0x08;
+                    ssize_t bytes_written_3 = mcpr_encode_ubyte(bufpointer, gamemode);
+                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_3;
+
+                    int32_t dimension;
+                    switch(pkt->data.play.clientbound.join_game.dimension)
+                    {
+                        case MCPR_DIMENSION_NETHER:     dimension = -1; break;
+                        case MCPR_DIMENSION_OVERWORLD:  dimension = 0;  break;
+                        case MCPR_DIMENSION_END:        dimension = 1;  break;
+                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    }
+                    ssize_t bytes_written_4 = mcpr_encode_int(bufpointer, dimension);
+                    if(bytes_written_4 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_4;
+
+                    uint8_t difficulty;
+                    switch(pkt->data.play.clientbound.join_game.difficulty)
+                    {
+                        case MCPR_DIFFICULTY_PEACEFUL:  difficulty = 0; break;
+                        case MCPR_DIFFICULTY_EASY:      difficulty = 1; break;
+                        case MCPR_DIFFICULTY_NORMAL:    difficulty = 2; break;
+                        case MCPR_DIFFICULTY_HARD:      difficulty = 3; break;
+                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    }
+                    ssize_t bytes_written_5 = mcpr_encode_ubyte(bufpointer, difficulty);
+                    if(bytes_written_5 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_5;
+
+                    ssize_t bytes_written_6 = mcpr_encode_ubyte(bufpointer, pkt->data.play.clientbound.join_game.max_players);
+                    if(bytes_written_6 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_6;
+
+                    char *level_type;
+                    switch(pkt->data.play.clientbound.join_game.level_type)
+                    {
+                        case MCPR_LEVEL_DEFAULT:        level_type = "default";     break;
+                        case MCPR_LEVEL_FLAT:           level_type = "flat";        break;
+                        case MCPR_LEVEL_LARGE_BIOMES:   level_type = "largeBiomes"; break;
+                        case MCPR_LEVEL_AMPLIFIED:      level_type = "amplified";   break;
+                        case MCPR_LEVEL_DEFAULT_1_1:    level_type = "default_1_1"; break;
+                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    }
+                    ssize_t bytes_written_7 = mcpr_encode_string(bufpointer, level_type);
+                    if(bytes_written_7 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_7;
+
+                    ssize_t bytes_written_8 = mcpr_encode_bool(bufpointer, pkt->data.play.clientbound.join_game.reduced_debug_info);
+                    if(bytes_written_8 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_8;
+
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
                 }
-                ssize_t bytes_written_5 = mcpr_encode_ubyte(bufpointer, difficulty);
-                if(bytes_written_5 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_5;
 
-                ssize_t bytes_written_6 = mcpr_encode_ubyte(bufpointer, pkt->data.play.clientbound.join_game.max_players);
-                if(bytes_written_6 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_6;
-
-                char *level_type;
-                switch(pkt->data.play.clientbound.join_game.level_type)
+                case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
                 {
-                    case MCPR_LEVEL_DEFAULT:        level_type = "default";     break;
-                    case MCPR_LEVEL_FLAT:           level_type = "flat";        break;
-                    case MCPR_LEVEL_LARGE_BIOMES:   level_type = "largeBiomes"; break;
-                    case MCPR_LEVEL_AMPLIFIED:      level_type = "amplified";   break;
-                    case MCPR_LEVEL_DEFAULT_1_1:    level_type = "default_1_1"; break;
-                    default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                    size_t channel_len = strlen(pkt->data.play.clientbound.plugin_message.channel);
+                    if(channel_len > 20) { DEBUG_PRINT("Error for clientbound plugin message packet! Channel string length is greather than 20."); exit(EXIT_FAILURE); }
+
+                    *buf = malloc(10 + channel_len + pkt->data.play.clientbound.plugin_message.data_length);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
+
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLUGIN_MESSAGE));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
+
+                    ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.clientbound.plugin_message.channel);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
+
+                    memcpy(bufpointer, pkt->data.play.clientbound.plugin_message.data, pkt->data.play.clientbound.plugin_message.data_length);
+                    bufpointer += pkt->data.play.clientbound.plugin_message.data_length;
+
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
                 }
-                ssize_t bytes_written_7 = mcpr_encode_string(bufpointer, level_type);
-                if(bytes_written_7 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_7;
 
-                ssize_t bytes_written_8 = mcpr_encode_bool(bufpointer, pkt->data.play.clientbound.join_game.reduced_debug_info);
-                if(bytes_written_8 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_8;
+                case MCPR_PKT_PL_CB_SPAWN_POSITION:
+                {
+                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_POSITION_SIZE);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_SPAWN_POSITION));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
 
-            case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
-            {
-                *buf = malloc(10 + strlen(pkt->data.play.clientbound.plugin_message.channel) + pkt->data.play.clientbound.plugin_message.data_length);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
+                    ssize_t bytes_written_2 = mcpr_encode_position(bufpointer, &(pkt->data.play.clientbound.spawn_position.location));
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
 
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLUGIN_MESSAGE));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
 
-                ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.clientbound.plugin_message.channel);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
+                case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
+                {
+                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_BYTE_SIZE + MCPR_FLOAT_SIZE + MCPR_FLOAT_SIZE);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                memcpy(bufpointer, pkt->data.play.clientbound.plugin_message.data, pkt->data.play.clientbound.plugin_message.data_length);
-                bufpointer += pkt->data.play.clientbound.plugin_message.data_length;
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_ABILITIES));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
 
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
+                    uint8_t flags = 0;
+                    if(pkt->data.play.clientbound.player_abilities.invulnerable)    flags |= 0x01;
+                    if(pkt->data.play.clientbound.player_abilities.is_flying)       flags |= 0x02;
+                    if(pkt->data.play.clientbound.player_abilities.allow_flying)    flags |= 0x04;
+                    if(pkt->data.play.clientbound.player_abilities.creative_mode)   flags |= 0x08;
+                    ssize_t bytes_written_2 = mcpr_encode_byte(bufpointer, flags);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
 
-            case MCPR_PKT_PL_CB_SPAWN_POSITION:
-            {
-                *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_POSITION_SIZE);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
+                    ssize_t bytes_written_3 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.flying_speed);
+                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_3;
 
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_SPAWN_POSITION));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
+                    ssize_t bytes_written_4 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.field_of_view_modifier);
+                    if(bytes_written_4 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_4;
 
-                ssize_t bytes_written_2 = mcpr_encode_position(bufpointer, &(pkt->data.play.clientbound.spawn_position.location));
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
 
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
+                case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
+                {
+                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_DOUBLE_SIZE * 3 + MCPR_FLOAT_SIZE * 2 + MCPR_BYTE_SIZE + MCPR_VARINT_SIZE_MAX);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-            case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
-            {
-                *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_BYTE_SIZE + MCPR_FLOAT_SIZE + MCPR_FLOAT_SIZE);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
 
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_ABILITIES));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
+                    ssize_t bytes_written_2 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.x);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
 
-                int8_t flags = 0;
-                if(pkt->data.play.clientbound.player_abilities.invulnerable)    flags = flags | 0x01;
-                if(pkt->data.play.clientbound.player_abilities.is_flying)       flags = flags | 0x02;
-                if(pkt->data.play.clientbound.player_abilities.allow_flying)    flags = flags | 0x04;
-                if(pkt->data.play.clientbound.player_abilities.creative_mode)   flags = flags | 0x08;
-                ssize_t bytes_written_2 = mcpr_encode_byte(bufpointer, flags);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
+                    ssize_t bytes_written_3 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.y);
+                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_3;
 
-                ssize_t bytes_written_3 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.flying_speed);
-                if(bytes_written_3 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_3;
+                    ssize_t bytes_written_4 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.z);
+                    if(bytes_written_4 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_4;
 
-                ssize_t bytes_written_4 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.field_of_view_modifier);
-                if(bytes_written_4 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_4;
+                    ssize_t bytes_written_5 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.yaw);
+                    if(bytes_written_5 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_5;
 
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
+                    ssize_t bytes_written_6 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.pitch);
+                    if(bytes_written_6 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_6;
 
-            case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
-            {
-                *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_DOUBLE_SIZE * 3 + MCPR_FLOAT_SIZE * 2 + MCPR_BYTE_SIZE + MCPR_VARINT_SIZE_MAX);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
+                    int8_t flags = 0;
+                    if(pkt->data.play.clientbound.player_position_and_look.x_is_relative)       flags = flags | 0x01;
+                    if(pkt->data.play.clientbound.player_position_and_look.y_is_relative)       flags = flags | 0x02;
+                    if(pkt->data.play.clientbound.player_position_and_look.z_is_relative)       flags = flags | 0x04;
+                    if(pkt->data.play.clientbound.player_position_and_look.pitch_is_relative)   flags = flags | 0x08;
+                    if(pkt->data.play.clientbound.player_position_and_look.yaw_is_relative)     flags = flags | 0x10;
+                    ssize_t bytes_written_7 = mcpr_encode_byte(bufpointer, flags);
+                    if(bytes_written_7 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_7;
 
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
+                    ssize_t bytes_written_8 = mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.player_position_and_look.teleport_id);
+                    if(bytes_written_8 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_8;
 
-                ssize_t bytes_written_2 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.x);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
 
-                ssize_t bytes_written_3 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.y);
-                if(bytes_written_3 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_3;
+                case MCPR_PKT_PL_SB_KEEP_ALIVE:
+                {
+                    *buf = malloc(10);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                ssize_t bytes_written_4 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.z);
-                if(bytes_written_4 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_4;
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_KEEP_ALIVE));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
 
-                ssize_t bytes_written_5 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.yaw);
-                if(bytes_written_5 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_5;
+                    ssize_t bytes_written_2 = mcpr_encode_varint(*buf, pkt->data.play.serverbound.keep_alive.keep_alive_id);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
 
-                ssize_t bytes_written_6 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.pitch);
-                if(bytes_written_6 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_6;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
 
-                int8_t flags = 0;
-                if(pkt->data.play.clientbound.player_position_and_look.x_is_relative)       flags = flags | 0x01;
-                if(pkt->data.play.clientbound.player_position_and_look.y_is_relative)       flags = flags | 0x02;
-                if(pkt->data.play.clientbound.player_position_and_look.z_is_relative)       flags = flags | 0x04;
-                if(pkt->data.play.clientbound.player_position_and_look.pitch_is_relative)   flags = flags | 0x08;
-                if(pkt->data.play.clientbound.player_position_and_look.yaw_is_relative)     flags = flags | 0x10;
-                ssize_t bytes_written_7 = mcpr_encode_byte(bufpointer, flags);
-                if(bytes_written_7 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_7;
+                case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
+                {
+                    *buf = malloc(10+ strlen(pkt->data.play.serverbound.plugin_message.channel) + pkt->data.play.serverbound.plugin_message.data_length);
+                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+                    void *bufpointer = *buf;
 
-                ssize_t bytes_written_8 = mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.player_position_and_look.teleport_id);
-                if(bytes_written_8 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_8;
+                    ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_PLUGIN_MESSAGE));
+                    if(bytes_written_1 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_1;
 
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
+                    ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.serverbound.plugin_message.channel);
+                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    bufpointer += bytes_written_2;
 
-            case MCPR_PKT_PL_SB_KEEP_ALIVE:
-            {
-                *buf = malloc(10);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
+                    memcpy(bufpointer, pkt->data.play.serverbound.plugin_message.data, pkt->data.play.serverbound.plugin_message.data_length);
+                    bufpointer += pkt->data.play.serverbound.plugin_message.data_length;
 
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_KEEP_ALIVE));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
-
-                ssize_t bytes_written_2 = mcpr_encode_varint(*buf, pkt->data.play.serverbound.keep_alive.keep_alive_id);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-
-                *out_bytes_written = bufpointer - *buf;
-                return true;
-            }
-
-            case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
-            {
-                *buf = malloc(10+ strlen(pkt->data.play.serverbound.plugin_message.channel) + pkt->data.play.serverbound.plugin_message.data_length);
-                if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                void *bufpointer = *buf;
-
-                ssize_t bytes_written_1 = mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_PLUGIN_MESSAGE));
-                if(bytes_written_1 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_1;
-
-                ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.serverbound.plugin_message.channel);
-                if(bytes_written_2 < 0) { free(*buf); return false; }
-                bufpointer += bytes_written_2;
-
-                memcpy(bufpointer, pkt->data.play.serverbound.plugin_message.data, pkt->data.play.serverbound.plugin_message.data_length);
-                bufpointer += pkt->data.play.serverbound.plugin_message.data_length;
-
-                *out_bytes_written = bufpointer - *buf;
-                return true;
+                    *out_bytes_written = bufpointer - *buf;
+                    return true;
+                }
             }
         }
     }
@@ -687,6 +693,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
 ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen)
 {
+    DEBUG_PRINT("in mcpr_decode_packet(state=%s, maxlen=%zu)", mcpr_state_to_string(state), maxlen);
+
     const void *ptr = in;
     size_t len_left = maxlen;
     int32_t packet_id;
@@ -694,11 +702,12 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
     if(bytes_read_1 < 0) return -1;
     len_left -= bytes_read_1;
     ptr += bytes_read_1;
+    DEBUG_PRINT("Decoding packet with id %ld", packet_id);
 
     *out = malloc(sizeof(struct mcpr_packet));
     if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }
     struct mcpr_packet *pkt = *out;
-    if(!mcpr_get_packet_type(&(pkt->id), packet_id, state)) { ninerr_set_err(ninerr_new("Invalid packet id %i", packet_id)); return -1; }
+    if(!mcpr_get_packet_type(&(pkt->id), packet_id, state)) { ninerr_set_err(ninerr_new("Invalid packet id %ld", (long) packet_id)); return -1; }
 
     IGNORE("-Wswitch")
     switch(state)
@@ -802,13 +811,83 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
                 }
             }
         }
+
+        case MCPR_STATE_PLAY:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_PL_SB_CLIENT_SETTINGS:
+                {
+                    ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.play.serverbound.client_settings.locale), ptr, len_left);
+                    if(bytes_read_2 < 0) { free(pkt); return -1; }
+                    ptr += bytes_read_2;
+                    len_left -= bytes_read_2;
+
+                    if(len_left < 1) { ninerr_set_err(ninerr_new("Max decoding length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    ssize_t bytes_read_3 = mcpr_decode_byte(&(pkt->data.play.serverbound.client_settings.view_distance), ptr);
+                    if(bytes_read_2 < 0) { free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    ptr += bytes_read_3;
+                    len_left -= bytes_read_3;
+
+                    int32_t chat_mode_int;
+                    ssize_t bytes_read_4 = mcpr_decode_varint(&chat_mode_int, ptr, len_left);
+                    if(bytes_read_4 < 0) { free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    switch(chat_mode_int)
+                    {
+                        case 0: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_ENABLED; break;
+                        case 1: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_COMMANDS_ONLY; break;
+                        case 2: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_HIDDEN; break;
+                        default: ninerr_set_err(ninerr_new("Invalid value %ld for chat mode in client settings packet.", (long) chat_mode_int)); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1;
+                    }
+                    ptr += bytes_read_4;
+                    len_left -= bytes_read_4;
+
+                    if(len_left < MCPR_BOOL_SIZE) { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    ssize_t bytes_read_5 = mcpr_decode_bool(&(pkt->data.play.serverbound.client_settings.chat_colors), ptr);
+                    if(bytes_read_5 < 0) { free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    ptr += bytes_read_5;
+                    len_left -= bytes_read_5;
+
+                    if(len_left < 1) { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    uint8_t displayed_skin_parts;
+                    ssize_t bytes_read_6 = mcpr_decode_ubyte(&displayed_skin_parts, ptr);
+                    if(bytes_read_6 < 0) { free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.cape_enabled = displayed_skin_parts & 0x01;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.jacket_enabled = displayed_skin_parts & 0x02;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_sleeve_enabled = displayed_skin_parts & 0x04;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_sleeve_enabled = displayed_skin_parts & 0x08;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.left_pants_enabled = displayed_skin_parts & 0x10;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.right_pants_enabled = displayed_skin_parts & 0x20;
+                    pkt->data.play.serverbound.client_settings.displayed_skin_parts.hat_enabled = displayed_skin_parts & 0x40;
+                    ptr += bytes_read_6;
+                    len_left -= bytes_read_6;
+
+                    int32_t main_hand;
+                    ssize_t bytes_read_7 = mcpr_decode_varint(&main_hand, ptr, len_left);
+                    if(bytes_read_7 < 0) { free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    switch(main_hand)
+                    {
+                        case 0: pkt->data.play.serverbound.client_settings.main_hand = MCPR_HAND_LEFT; break;
+                        case 1: pkt->data.play.serverbound.client_settings.main_hand = MCPR_HAND_RIGHT; break;
+                        default: ninerr_set_err(ninerr_new("Invalid value %ld for main hand in client settings packet.", (long) main_hand)); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1;
+                    }
+                    ptr += bytes_read_7;
+                    len_left -= bytes_read_7;
+
+                    return ptr - in;
+                }
+            }
+        }
     }
     END_IGNORE()
 
     // Shouldn't be reached anyway
-    abort();
+    DEBUG_PRINT("Decoding for packet is not implemented yet! (state: %s)", mcpr_state_to_string(state));
+    free(*out);
+    return -1;
 }
 
+// Last updated for 1.12.1 protocol
 bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_state state)
 {
     // only serverbound packets for now
@@ -841,24 +920,24 @@ bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_stat
             switch(id)
             {
                 case 0x00: *out = MCPR_PKT_PL_SB_TELEPORT_CONFIRM;          return true;
-                case 0x01: *out = MCPR_PKT_PL_SB_PREPARE_CRAFTING_GRID;     return true;
-                case 0x02: *out = MCPR_PKT_PL_SB_TAB_COMPLETE;              return true;
-                case 0x03: *out = MCPR_PKT_PL_SB_CHAT_MESSAGE;              return true;
-                case 0x04: *out = MCPR_PKT_PL_SB_CLIENT_STATUS;             return true;
-                case 0x05: *out = MCPR_PKT_PL_SB_CLIENT_SETTINGS;           return true;
-                case 0x06: *out = MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;       return true;
-                case 0x07: *out = MCPR_PKT_PL_SB_ENCHANT_ITEM;              return true;
-                case 0x08: *out = MCPR_PKT_PL_SB_CLICK_WINDOW;              return true;
-                case 0x09: *out = MCPR_PKT_PL_SB_CLOSE_WINDOW;              return true;
-                case 0x0A: *out = MCPR_PKT_PL_SB_PLUGIN_MESSAGE;            return true;
-                case 0x0B: *out = MCPR_PKT_PL_SB_USE_ENTITY;                return true;
-                case 0x0C: *out = MCPR_PKT_PL_SB_KEEP_ALIVE;                return true;
-                case 0x0D: *out = MCPR_PKT_PL_SB_PLAYER;                    return true;
-                case 0x0E: *out = MCPR_PKT_PL_SB_PLAYER_POSITION;           return true;
-                case 0x0F: *out = MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK;  return true;
-                case 0x10: *out = MCPR_PKT_PL_SB_PLAYER_LOOK;               return true;
-                case 0x11: *out = MCPR_PKT_PL_SB_VEHICLE_MOVE;              return true;
-                case 0x12: *out = MCPR_PKT_PL_SB_STEER_BOAT;                return true;
+                case 0x01: *out = MCPR_PKT_PL_SB_TAB_COMPLETE;              return true;
+                case 0x02: *out = MCPR_PKT_PL_SB_CHAT_MESSAGE;              return true;
+                case 0x03: *out = MCPR_PKT_PL_SB_CLIENT_STATUS;             return true;
+                case 0x04: *out = MCPR_PKT_PL_SB_CLIENT_SETTINGS;           return true;
+                case 0x05: *out = MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;       return true;
+                case 0x06: *out = MCPR_PKT_PL_SB_ENCHANT_ITEM;              return true;
+                case 0x07: *out = MCPR_PKT_PL_SB_CLICK_WINDOW;              return true;
+                case 0x08: *out = MCPR_PKT_PL_SB_CLOSE_WINDOW;              return true;
+                case 0x09: *out = MCPR_PKT_PL_SB_PLUGIN_MESSAGE;            return true;
+                case 0x0A: *out = MCPR_PKT_PL_SB_USE_ENTITY;                return true;
+                case 0x0B: *out = MCPR_PKT_PL_SB_KEEP_ALIVE;                return true;
+                case 0x0C: *out = MCPR_PKT_PL_SB_PLAYER;                    return true;
+                case 0x0D: *out = MCPR_PKT_PL_SB_PLAYER_POSITION;           return true;
+                case 0x0E: *out = MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK;  return true;
+                case 0x0F: *out = MCPR_PKT_PL_SB_PLAYER_LOOK;               return true;
+                case 0x10: *out = MCPR_PKT_PL_SB_VEHICLE_MOVE;              return true;
+                case 0x11: *out = MCPR_PKT_PL_SB_STEER_BOAT;                return true;
+                case 0x12: *out = MCPR_PKT_PL_SB_CRAFT_RECIPE_REQUEST;      return true;
                 case 0x13: *out = MCPR_PKT_PL_SB_PLAYER_ABILITIES;          return true;
                 case 0x14: *out = MCPR_PKT_PL_SB_PLAYER_DIGGING;            return true;
                 case 0x15: *out = MCPR_PKT_PL_SB_ENTITY_ACTION;             return true;
@@ -880,6 +959,7 @@ bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_stat
     return false; // Won't even be reached, but else the compiler will complain.
 }
 
+// Last update was for 1.12.1
 uint8_t mcpr_packet_type_to_byte(enum mcpr_packet_type id)
 {
     // only serverbound packets for now
@@ -896,11 +976,12 @@ uint8_t mcpr_packet_type_to_byte(enum mcpr_packet_type id)
         case MCPR_PKT_PL_CB_DISCONNECT:                 return 0x1A;
         case MCPR_PKT_PL_CB_KEEP_ALIVE:                 return 0x1F;
         case MCPR_PKT_PL_CB_JOIN_GAME:                  return 0x23;
-        case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:             return 0x0A;
-        case MCPR_PKT_PL_CB_SPAWN_POSITION:             return 0x45;
-        case MCPR_PKT_PL_CB_PLAYER_ABILITIES:           return 0x13;
-        case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:   return 0x2E;
-        default: fprintf(stderr, "Unimplemented packet id given in mcpr_packet_type_to_byte().. Aborting at mcpr.c:%i", __LINE__); abort();
+        case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:             return 0x18;
+        case MCPR_PKT_PL_CB_SPAWN_POSITION:             return 0x46;
+        case MCPR_PKT_PL_CB_PLAYER_ABILITIES:           return 0x2C;
+        case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:   return 0x2F;
+        case MCPR_PKT_PL_CB_CHUNK_DATA:                 return // TODO
+        default: DEBUG_PRINT("Unimplemented packet id given in mcpr_packet_type_to_byte().. Aborting at mcpr.c:%i", __LINE__); abort();
     }
     return 0; // Won't even be reached, but else the compiler will complain
 }

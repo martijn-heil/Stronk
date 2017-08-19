@@ -75,5 +75,7 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...);
 #endif
 
 void bstream_init_black_hole(struct bstream *stream);
+void bstream_open_memory(struct bstream *out, void *buf, size_t maxlen, char *mode); // TODO implement
+bool bstream_memory_writer(struct bstream *stream, void **buf, size_t initial_size); // TODO implement
 
 #endif

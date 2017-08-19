@@ -115,6 +115,7 @@ static bool logging_init_done = false;
 static bool thread_pooling_init_done = false;
 static bool networking_init_done = false;
 static bool curl_init_done = false;
+static bool openssl_init_done = false;
 
 static bool internal_clock_init_done = false;
 pthread_rwlock_t internal_clock_lock;
@@ -253,6 +254,20 @@ void cleanup_thread_pooling(void)
     thpool_destroy(main_threadpool);
 }
 
+void cleanup(void)
+{
+    if(networking_init_done) net_cleanup();
+    if(thread_pooling_init_done) cleanup_thread_pooling();
+    if(world_manager_init_done) world_manager_cleanup();
+
+    if(internal_clock_init_done) pthread_rwlock_destroy(&internal_clock_lock);
+    if(curl_init_done) { nlog_info("Cleaning up CURL.."); curl_global_cleanup(); }
+    if(openssl_init_done) { nlog_info("Cleaning up OpenSSL.."); EVP_cleanup(); } // make sure to do this after CURL cleanup.
+
+    if(logging_init_done) logging_cleanup(); // Logging alwas as last, apart from ninerr
+    ninerr_finish();
+}
+
 static void init(void)
 {
     if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr."); exit(EXIT_FAILURE); }
@@ -260,20 +275,20 @@ static void init(void)
     mapi_logger = nlogger;
     mcpr_logger = nlogger;
 
+    // TODO catch SIGINT signals and make sure cleanup is performed.
     if(atexit(cleanup) != 0) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");
 
     nlog_info("Intializing OpenSSL..");\
-    // TODO
     OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
 	SSL_library_init();
+    openssl_init_done = true;
 
     // Important we initialize CURL before we start more threads!
     nlog_info("Initializing CURL..");
     if(curl_global_init(CURL_GLOBAL_ALL) != 0)
     {
         nlog_fatal("Could not initialize CURL!");
-        cleanup();
         exit(EXIT_FAILURE);
     }
     curl_init_done = true;
@@ -288,8 +303,8 @@ static void init(void)
     internal_clock_init_done = true;
 
     init_thread_pooling();
-    if(net_init() < 0)              { cleanup(); exit(EXIT_FAILURE); } networking_init_done = true;
-    if(world_manager_init() < 0)    { cleanup(); exit(EXIT_FAILURE); } world_manager_init_done = true;
+    if(net_init() < 0)              { exit(EXIT_FAILURE); } networking_init_done = true;
+    if(world_manager_init() < 0)    { exit(EXIT_FAILURE); } world_manager_init_done = true;
 
 
     nlog_info("Setting Jansson memory allocation/freeing functions to extra-safe variants..");
@@ -338,18 +353,6 @@ void server_start(void)
            }
        }
    }
-}
-
-void cleanup(void)
-{
-    if(networking_init_done) net_cleanup();
-    if(thread_pooling_init_done) cleanup_thread_pooling();
-    if(world_manager_init_done) world_manager_cleanup();
-
-    if(internal_clock_init_done) pthread_rwlock_destroy(&internal_clock_lock);
-    if(curl_init_done) { nlog_info("Cleaning up CURL.."); curl_global_cleanup(); }
-
-    if(logging_init_done) logging_cleanup(); // Logging alwas as last.
 }
 
 static void server_tick(void)

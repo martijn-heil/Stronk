@@ -49,7 +49,8 @@
 #include <logging/logging.h>
 #include <network/packethandlers/packethandlers.h>
 #include <world/entity.h>
-#include <util.h>
+#include "../../util.h"
+#include "../../server.h"
 
 static bool is_auth_required(const char *username)
 {
@@ -191,6 +192,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
     player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
     player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
+    player_abilities_pkt.data.play.clientbound.player_abilities.creative_mode = false;
 
     if(mcpr_connection_write_packet(conn->conn, &player_abilities_pkt) < 0)
     {
@@ -371,7 +373,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
     {
         nlog_info("Connection at %p is not required to do authentication.", (void *) conn);
         struct ninuuid uuid;
-        if(!ninuuid_generate(&uuid, 4)) // TODO should not actually be version 4
+        if(!ninuuid_generate(&uuid, 4)) // TODO should not actually be version 4 but version 3
         {
             nlog_error("Could not generate new UUID for player.");
             struct hp_result result;
@@ -385,7 +387,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         response.id = MCPR_PKT_LG_CB_LOGIN_SUCCESS;
         response.state = MCPR_STATE_LOGIN;
         response.data.login.clientbound.login_success.uuid = uuid;
-        response.data.login.clientbound.login_success.username = conn->tmp.username; // eh i think we should get the username from another source?
+        response.data.login.clientbound.login_success.username = conn->tmp.username;
 
         if(mcpr_connection_write_packet(conn->conn, &response) < 0)
         {
@@ -414,6 +416,14 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
                 return result;
             }
         }
+        // 42
+        // uint8_t buf[] = {
+        //     /* packet len: */                    0x2D,
+        //     /* packet id: (1 byte) */            0x02,
+        //     /* uuid: (36 bytes plus 1 byte prefix length) */      0x24,        0x35, 0x30, 0x64, 0x38, 0x66, 0x63, 0x66, 0x30, 0x2d, 0x31, 0x36, 0x36, 0x65, 0x2d, 0x34, 0x61, 0x62, 0x33, 0x2d, 0x39, 0x31, 0x37, 0x36, 0x2d, 0x63, 0x34, 0x31, 0x66, 0x62, 0x35, 0x37, 0x35, 0x30, 0x37, 0x31, 0x61,
+        //     /* username: (6 bytes plus 1 byte prefix length) */             0x06, 0x4e, 0x69, 0x6e, 0x6a, 0x6f, 0x68
+        // };
+        // mcpr_connection_write(conn->conn, buf, sizeof(buf));
 
         mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
 
@@ -435,15 +445,23 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         player->invulnerable = false;
         player->is_flying = false;
         player->allow_flying = false;
+        player->flying_speed = 0.0;
         player->gamemode = MCPR_GAMEMODE_SURVIVAL;
         player->client_settings_known = false;
-
         player->compass_target.x = 0;
         player->compass_target.y = 0;
         player->compass_target.z = 0;
-
+        player->pos.x = 0;
+        player->pos.y = 65;
+        player->pos.z = 0;
+        player->pos.yaw = 0;
+        player->pos.pitch = 0;
         player->entity_id = generate_new_entity_id();
+        server_get_internal_clock_time(&(player->last_keepalive_sent));
+        server_get_internal_clock_time(&(player->last_keepalive_received));
         conn->player = player;
+
+        nlog_debug("State for connection at %p (username: %s) switched to PLAY", conn, player->username);
 
         struct hp_result result = send_post_login_sequence(conn);
         if(result.result != HP_RESULT_OK) free(player);
@@ -633,14 +651,21 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         player->invulnerable = false;
         player->is_flying = false;
         player->allow_flying = false;
+        player->flying_speed = 0.0;
         player->gamemode = MCPR_GAMEMODE_SURVIVAL;
         player->client_settings_known = false;
-
         player->compass_target.x = 0;
         player->compass_target.y = 0;
         player->compass_target.z = 0;
+        player->pos.x = 0;
+        player->pos.y = 65;
+        player->pos.z = 0;
+        player->pos.yaw = 0;
+        player->pos.pitch = 0;
 
         player->entity_id = generate_new_entity_id();
+        server_get_internal_clock_time(&(player->last_keepalive_sent));
+        server_get_internal_clock_time(&(player->last_keepalive_received));
         conn->player = player;
 
         player_init = true;
