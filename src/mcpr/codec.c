@@ -50,51 +50,44 @@
 
 // TODO better logging
 
-ssize_t mcpr_encode_bool(void *out, bool b)
+void mcpr_encode_bool(void *out, bool b)
 {
     uint8_t tmp = (uint8_t) (b ? 0x01 : 0x00);
     memcpy(out, &tmp, sizeof(uint8_t));
-    return sizeof(uint8_t);
 }
 
-ssize_t mcpr_encode_byte(void *out, int8_t byte)
+void mcpr_encode_byte(void *out, int8_t byte)
 {
     memcpy(out, &byte, sizeof(byte));
-    return sizeof(byte);
 }
 
-ssize_t mcpr_encode_ubyte(void *out, uint8_t byte)
+void mcpr_encode_ubyte(void *out, uint8_t byte)
 {
     memcpy(out, &byte, sizeof(byte));
-    return sizeof(byte);
 }
 
-ssize_t mcpr_encode_short(void *out, int16_t i)
+void mcpr_encode_short(void *out, int16_t i)
 {
     i = hton16(i);
     memcpy(out, &i, sizeof(i));
-    return sizeof(i);
 }
 
-ssize_t mcpr_encode_ushort(void *out, uint16_t i)
+void mcpr_encode_ushort(void *out, uint16_t i)
 {
     i = hton16(i);
     memcpy(out, &i, sizeof(i));
-    return sizeof(i);
 }
 
-ssize_t mcpr_encode_int(void *out, int32_t i)
+void mcpr_encode_int(void *out, int32_t i)
 {
     i = hton32(i);
     memcpy(out, &i, sizeof(i));
-    return sizeof(i);
 }
 
-ssize_t mcpr_encode_long(void *out, int64_t i)
+void mcpr_encode_long(void *out, int64_t i)
 {
     i = hton64(i);
     memcpy(out, &i, sizeof(i));
-    return sizeof(i);
 }
 
 
@@ -143,7 +136,7 @@ ssize_t mcpr_encode_chat(void *out, const char *chat)
     return mcpr_encode_string(out, chat);
 }
 
-ssize_t mcpr_encode_varint(void *output, int32_t value)
+size_t mcpr_encode_varint(void *output, int32_t value)
 {
     unsigned char *out = output;
 
@@ -165,7 +158,7 @@ ssize_t mcpr_encode_varint(void *output, int32_t value)
     return i;
 }
 
-ssize_t mcpr_varint_bounds(int32_t value)
+size_t mcpr_varint_bounds(int32_t value)
 {
     size_t i = 0;
     do
@@ -183,7 +176,7 @@ ssize_t mcpr_varint_bounds(int32_t value)
     return i;
 }
 
-ssize_t mcpr_encode_varlong(void *output, int64_t value) {
+size_t mcpr_encode_varlong(void *output, int64_t value) {
     unsigned char *out = output;
 
     size_t i = 0;
@@ -201,21 +194,21 @@ ssize_t mcpr_encode_varlong(void *output, int64_t value) {
         i++;
     } while(value != 0);
 
-    return (ssize_t) i;
+    return i;
 }
 
-ssize_t mcpr_encode_position(void *out, const struct mcpr_position *in)
+void mcpr_encode_position(void *out, const struct mcpr_position *in)
 {
     int64_t pos = ((((*in).x & 0x3FFFFFF) << 38) | (((*in).y & 0xFFF) << 26) | ((*in).z & 0x3FFFFFF));
-    return mcpr_encode_long(out, pos);
+    mcpr_encode_long(out, pos);
 }
 
-ssize_t mcpr_encode_angle(void *out, uint8_t angle)
+void mcpr_encode_angle(void *out, uint8_t angle)
 {
     return mcpr_encode_ubyte(out, angle);
 }
 
-ssize_t mcpr_encode_uuid(void *out, const struct ninuuid *in)
+void mcpr_encode_uuid(void *out, const struct ninuuid *in)
 {
     memcpy(out, in->bytes, 16);
     return 16;
@@ -225,52 +218,46 @@ ssize_t mcpr_encode_uuid(void *out, const struct ninuuid *in)
 
 
 
-ssize_t mcpr_decode_bool(bool *out, const void *in)
+void mcpr_decode_bool(bool *out, const void *in)
 {
     uint8_t b;
     memcpy(&b, in, sizeof(b));
+    if(b != 0x01 && b != 0x00) return -1;
     *out = (b == 0x01 ? true : false);
-    return sizeof(b);
 }
 
-ssize_t mcpr_decode_byte(int8_t *out, const void *in)
+void mcpr_decode_byte(int8_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int8_t));
-    return sizeof(int8_t);
 }
 
-ssize_t mcpr_decode_ubyte(uint8_t *out, const void *in)
+void mcpr_decode_ubyte(uint8_t *out, const void *in)
 {
     memcpy(out, in, sizeof(uint8_t));
-    return sizeof(uint8_t);
 }
 
-ssize_t mcpr_decode_short(int16_t *out, const void *in)
+void mcpr_decode_short(int16_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int16_t));
     *out = ntoh16(*out);
-    return sizeof(int16_t);
 }
 
-ssize_t mcpr_decode_ushort(uint16_t *out, const void *in)
+void mcpr_decode_ushort(uint16_t *out, const void *in)
 {
     memcpy(out, in, sizeof(uint16_t));
     *out = ntoh16(*out);
-    return sizeof(uint16_t);
 }
 
-ssize_t mcpr_decode_int(int32_t *out, const void *in)
+void mcpr_decode_int(int32_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int32_t));
     *out = ntoh32(*out);
-    return sizeof(int32_t);
 }
 
-ssize_t mcpr_decode_long(int64_t *out, const void *in)
+void mcpr_decode_long(int64_t *out, const void *in)
 {
     memcpy(out, in, sizeof(int64_t));
     *out = ntoh64(*out);
-    return sizeof(int64_t);
 }
 
 ssize_t mcpr_decode_float(float *out, const void *in)
@@ -373,7 +360,7 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
     return i;
 }
 
-ssize_t mcpr_decode_position(struct mcpr_position *out, const void *in)
+void mcpr_decode_position(struct mcpr_position *out, const void *in)
 {
     int64_t iin;
     memcpy(&iin, in, sizeof(int64_t));
@@ -386,16 +373,14 @@ ssize_t mcpr_decode_position(struct mcpr_position *out, const void *in)
     out->x = x;
     out->y = y;
     out->z = z;
-    return sizeof(int64_t);
 }
 
-ssize_t mcpr_decode_angle(uint8_t *out, const void *in)
+void mcpr_decode_angle(uint8_t *out, const void *in)
 {
-    return mcpr_decode_ubyte(out, in);
+    mcpr_decode_ubyte(out, in);
 }
 
-ssize_t mcpr_decode_uuid(struct ninuuid *out, const void *in)
+void mcpr_decode_uuid(struct ninuuid *out, const void *in)
 {
     memcpy(out, in, 16);
-    return 16;
 }

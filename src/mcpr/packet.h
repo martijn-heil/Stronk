@@ -20,8 +20,8 @@
     SOFTWARE.
 */
 
-#ifndef MCPR_packet_H
-#define MCPR_packet_H
+#ifndef MCPR_PACKET_H
+#define MCPR_PACKET_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -2199,10 +2199,10 @@ struct mcpr_packet
                     int32_t chunk_x, chunk_z;
                     bool ground_up_continuous;
                     int32_t primary_bit_mask;
-                    int32_t size;
+                    size_t size; // amount of chunk sections
                     struct mcpr_chunk_section *chunk_sections;
-                    uint8_t *biomes; // or NULL
-                    int32_t block_entity_count;
+                    uint8_t *biomes; // or NULL if ground_up_continuous is false, 256 bytes if present.
+                    int32_t block_entity_count; // Should be 0 when block_entities is NULL
                     nbt_node *block_entities; // or NULL
                 } chunk_data;
 

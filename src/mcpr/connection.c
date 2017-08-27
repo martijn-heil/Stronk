@@ -20,6 +20,13 @@
     SOFTWARE.
 */
 
+/*
+    mcpr connection handles easy reading & writing of packets, mainly for the encryption and compression.
+    Due to how the Minecraft protocol works, we need some buffering for this,
+    which would be annoying to have to implement yourself everytime.
+    A mcpr connection either be client side or server side.
+*/
+
 #ifndef MCPR_CONNECTION_H
 #define MCPR_CONNECTION_H
 
@@ -45,8 +52,9 @@
 
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cfb8())
 
+typedef void mcpr_connection;
+
 // TODO COMPRESSION!!!
-typedef void mcpr_connection; // temporary.. should be removed when actually compiling TODO
 struct conn
 {
     bool is_closed;
@@ -232,7 +240,7 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         {
             DEBUG_PRINT("Received packet in mcpr_connection_update\n");
             struct mcpr_packet *pkt;
-            ssize_t bytes_read = mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, conn->receiving_buf.size - result);
+            ssize_t bytes_read = mcpr_decode_packet(&pkt, conn->receiving_buf.content + result, conn->state, (size_t) pktlen);
             if(bytes_read == -1) { mcpr_connection_close(tmpconn, NULL); return false; }
             memmove(conn->receiving_buf.content, conn->receiving_buf.content + bytes_read + result, conn->receiving_buf.size - bytes_read - result);
             conn->receiving_buf.size -= bytes_read + result;
@@ -319,9 +327,8 @@ bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_pa
     if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return false; }
     buf = tmp;
     memmove(buf + mcpr_varint_bounds((int32_t) pktlen), buf, pktlen);
-    ssize_t bytes_written_1 = mcpr_encode_varint(buf, (int32_t) pktlen);
-    if(bytes_written_1 < 0) { free(buf); return false; }
-    DEBUG_PRINT("Writing packet, total size: %zu, initial size: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
+    size_t bytes_written_1 = mcpr_encode_varint(buf, (int32_t) pktlen);
+    DEBUG_PRINT("Writing packet, total size: %zu, size before prefixed length: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
     if(!mcpr_connection_write(tmpconn, buf, pktlen + bytes_written_1)) { free(buf); return false; }
     free(buf);
     return true;

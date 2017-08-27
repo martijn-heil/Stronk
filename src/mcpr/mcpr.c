@@ -122,7 +122,7 @@ char *mcpr_as_chat(const char *message_fmt, ...)
     va_end(args2);
     if(message_length < 0) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_new("vsprintf failed.")); return NULL; }
 
-    char *fmt = "{\"text\":\"%s\"}";
+    const char *fmt = "{\"text\":\"%s\"}";
     char *buf = malloc(12 + message_length); // Important! Change 12 if you change the fmt above.
     if(buf == NULL) { if(free_message ) { free(message); } va_end(args); ninerr_set_err(ninerr_from_errno()); return NULL; }
     int result = sprintf(buf, fmt, message);

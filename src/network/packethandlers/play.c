@@ -121,6 +121,7 @@ struct hp_result handle_pl_client_settings(const struct mcpr_packet *pkt, struct
 
     struct mcpr_packet response;
     response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
+    response.state = MCPR_STATE_PLAY;
     response.data.play.clientbound.player_position_and_look.x = player->pos.x;
     response.data.play.clientbound.player_position_and_look.y = player->pos.y;
     response.data.play.clientbound.player_position_and_look.z = player->pos.z;
@@ -187,6 +188,7 @@ struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struc
     {
         struct mcpr_packet response;
         response.id = MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK;
+        response.state = MCPR_STATE_PLAY;
         response.data.play.clientbound.player_position_and_look.x = player->pos.x;
         response.data.play.clientbound.player_position_and_look.y = player->pos.y;
         response.data.play.clientbound.player_position_and_look.z = player->pos.z;
