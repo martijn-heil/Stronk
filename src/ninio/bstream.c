@@ -317,6 +317,10 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...)
         {
             mode = "r";
         }
+        else
+        {
+            return NULL;
+        }
 
         cookie_io_functions_t funcs;
         funcs.seek = NULL;
@@ -336,9 +340,9 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...)
 #endif
 
 
-static ssize_t bstream_black_hole_write(void *cookie, const char *buf, size_t size)
+static bool bstream_black_hole_write(struct bstream *stream, const void *in, size_t size)
 {
-    return size;
+    return true;
 }
 
 void bstream_init_black_hole(struct bstream *stream)

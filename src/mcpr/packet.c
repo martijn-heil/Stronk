@@ -878,26 +878,26 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
 
                 case MCPR_PKT_PL_SB_PLAYER_POSITION:
                 {
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
                     ssize_t bytes_read_2 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.x), ptr);
                     if(bytes_read_2 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_2;
                     len_left -= bytes_read_2;
 
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
                     ssize_t bytes_read_3 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.feet_y), ptr);
                     if(bytes_read_3 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_3;
                     len_left -= bytes_read_3;
 
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
                     ssize_t bytes_read_4 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.z), ptr);
                     if(bytes_read_4 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_4;
                     len_left -= bytes_read_4;
 
-                    if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    mcpr_decode_bool(&(pkt->data.play.serverbound.player_position.on_ground), ptr);
+                    if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    mcpr_decode_bool(&(pkt->data.play.serverbound.player_position_and_look.on_ground), ptr);
                     ptr += MCPR_BOOL_SIZE;
 
                     return ptr - in;
@@ -905,38 +905,38 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
 
                 case MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK:
                 {
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    ssize_t bytes_read_2 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.x), ptr);
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_2 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position_and_look.x), ptr);
                     if(bytes_read_2 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_2;
                     len_left -= bytes_read_2;
 
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    ssize_t bytes_read_3 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.feet_y), ptr);
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_3 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position_and_look.feet_y), ptr);
                     if(bytes_read_3 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_3;
                     len_left -= bytes_read_3;
 
-                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    ssize_t bytes_read_4 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position.z), ptr);
+                    if(len_left < MCPR_DOUBLE_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_4 = mcpr_decode_double(&(pkt->data.play.serverbound.player_position_and_look.z), ptr);
                     if(bytes_read_4 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_4;
                     len_left -= bytes_read_4;
 
-                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    ssize_t bytes_read_5 = mcpr_decode_float(&(pkt->data.play.serverbound.player_position.yaw), ptr);
+                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_5 = mcpr_decode_float(&(pkt->data.play.serverbound.player_position_and_look.yaw), ptr);
                     if(bytes_read_5 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_5;
                     len_left -= bytes_read_5;
 
-                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    ssize_t bytes_read_6 = mcpr_decode_float(&(pkt->data.play.serverbound.player_position.pitch), ptr);
+                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_6 = mcpr_decode_float(&(pkt->data.play.serverbound.player_position_and_look.pitch), ptr);
                     if(bytes_read_6 < 0) { free(pkt); return -1; }
                     ptr += bytes_read_6;
                     len_left -= bytes_read_6;
 
-                    if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Not enough length left.")); return -1; }
-                    mcpr_decode_bool(&(pkt->data.play.serverbound.player_position.on_ground), ptr);
+                    if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    mcpr_decode_bool(&(pkt->data.play.serverbound.player_position_and_look.on_ground), ptr);
                     ptr += MCPR_BOOL_SIZE;
 
                     return ptr - in;

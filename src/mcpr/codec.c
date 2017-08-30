@@ -205,13 +205,12 @@ void mcpr_encode_position(void *out, const struct mcpr_position *in)
 
 void mcpr_encode_angle(void *out, uint8_t angle)
 {
-    return mcpr_encode_ubyte(out, angle);
+    mcpr_encode_ubyte(out, angle);
 }
 
 void mcpr_encode_uuid(void *out, const struct ninuuid *in)
 {
     memcpy(out, in->bytes, 16);
-    return 16;
 }
 
 
@@ -222,7 +221,7 @@ void mcpr_decode_bool(bool *out, const void *in)
 {
     uint8_t b;
     memcpy(&b, in, sizeof(b));
-    if(b != 0x01 && b != 0x00) return -1;
+    if(b != 0x01 && b != 0x00) return;
     *out = (b == 0x01 ? true : false);
 }
 
@@ -272,8 +271,6 @@ ssize_t mcpr_decode_double(double *out, const void *in)
     return sizeof(double);
 }
 
-// TODO detect len automatically
-IGNORE("-Wtype-limits")
 ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
 {
     int32_t len;
@@ -292,7 +289,6 @@ ssize_t mcpr_decode_string(char **out, const void *in, size_t maxlen)
 
     return final_bytes_read;
 }
-END_IGNORE()
 
 ssize_t mcpr_decode_chat(char **out, const void *in, size_t maxsize)
 {
