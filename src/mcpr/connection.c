@@ -89,20 +89,11 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
     {
         if(conn->state == MCPR_STATE_LOGIN || conn->state == MCPR_STATE_PLAY) {
             struct mcpr_packet pkt;
-            if(conn->state == MCPR_STATE_LOGIN) {
-                pkt.id = MCPR_PKT_LG_CB_DISCONNECT;
-                pkt.state = MCPR_STATE_LOGIN;
-                IGNORE("-Wdiscarded-qualifiers")
-                pkt.data.login.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
-                END_IGNORE()
-            } else if(conn->state == MCPR_STATE_PLAY) {
-                pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
-                pkt.state = MCPR_STATE_PLAY;
-                IGNORE("-Wdiscarded-qualifiers")
-                pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "disconnected";
-                END_IGNORE()
-            }
-
+            pkt.id = MCPR_PKT_PL_CB_DISCONNECT;
+            pkt.state = (conn->state == MCPR_STATE_PLAY) ? MCPR_STATE_PLAY : MCPR_STATE_LOGIN;
+            IGNORE("-Wdiscarded-qualifiers")
+            pkt.data.play.clientbound.disconnect.reason = (reason != NULL) ? reason : "{\"text\":\"Disconnected by server.\"}";
+            END_IGNORE()
             mcpr_connection_write_packet(conn, &pkt);
         }
 

@@ -281,10 +281,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
         mcpr_chunk_section->palette_length = 0;
         mcpr_chunk_section->palette = NULL;
 
-        // 1024 longs, the formula used to get at that number is as follows: BLOCKS_PER_CHUNK_SECTION / (64 / 13)
-        // Where BLOCKS_PER_CHUNK_SECTION is obviously 4096 with the current setup.
-        // Note that this formula requires floating point.
-        void *membuf2 = (send_sky_light) ? malloc(BLOCKS_PER_CHUNK_SECTION / 2 * 2 + 1024 * sizeof(uint64_t)) : malloc(BLOCKS_PER_CHUNK_SECTION / 2 + 1024 * sizeof(uint64_t));
+        void *membuf2 = (send_sky_light) ? malloc(BLOCKS_PER_CHUNK_SECTION / 2 * 2 + 832 * sizeof(uint64_t)) : malloc(BLOCKS_PER_CHUNK_SECTION / 2 + 832 * sizeof(uint64_t));
         if(membuf2 == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
@@ -305,7 +302,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
 
 
         mcpr_chunk_section->blocks = (send_sky_light) ? membuf2 + BLOCKS_PER_CHUNK_SECTION / 2 * 2 : membuf2 + BLOCKS_PER_CHUNK_SECTION / 2;
-        mcpr_chunk_section->block_array_length = 1024;
+        mcpr_chunk_section->block_array_length = 832;
 
         encode_chunk_section_blocks(mcpr_chunk_section->blocks, section);
     }
@@ -342,10 +339,8 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
     pkt.data.play.clientbound.chunk_data.block_entities = NULL;
     pkt.data.play.clientbound.chunk_data.size = 1;
 
-    // 1024 longs, the formula used to get at that number is as follows: BLOCKS_PER_CHUNK_SECTION / (64 / 13)
-    // Where BLOCKS_PER_CHUNK_SECTION is obviously 4096 with the current setup.
-    // Note that this formula requires floating point.
-    void *membuf = malloc(sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2 + 1024 * sizeof(uint64_t));
+
+    void *membuf = malloc(sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2 + 832 * sizeof(uint64_t));
     if(membuf == NULL)
     {
         nlog_error("Could not allocate memory. (%s)", strerror(errno));
@@ -364,7 +359,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
     memset(mcpr_chunk_section.block_light, 0, BLOCKS_PER_CHUNK_SECTION / 2); // TODO block light.
 
     mcpr_chunk_section.blocks = membuf + sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2;
-    mcpr_chunk_section.block_array_length = 1024;
+    mcpr_chunk_section.block_array_length = 832;
     encode_chunk_section_blocks(mcpr_chunk_section.blocks, section);
 
     pkt.data.play.clientbound.chunk_data.chunk_sections[section_y] = mcpr_chunk_section;
@@ -394,7 +389,7 @@ int32_t generate_new_entity_id(void)
 
 static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_section *section)
 {
-    unsigned char bits_used = 0;
+    uint_fast8_t bits_used = 0;
     uint64_t tmp_result = 0;
     size_t block_data_index = 0;
     for(int i2 = 0; i2 < BLOCKS_PER_CHUNK_SECTION; i2++)
@@ -402,7 +397,7 @@ static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_sectio
         const struct block *block = &(section->blocks[i2]);
 
         uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->data));
-        tmp_result = tmp_result | (current_block_data << bits_used);
+        tmp_result |= (current_block_data << bits_used);
         bits_used += 13;
 
         if(bits_used >= 64 || i2 == BLOCKS_PER_CHUNK_SECTION - 1)

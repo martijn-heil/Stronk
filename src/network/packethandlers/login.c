@@ -57,6 +57,40 @@ static bool is_auth_required(const char *username)
     return false;
 }
 
+static struct player *create_player(struct connection *conn, struct ninuuid uuid)
+{
+    struct player *player = malloc(sizeof(struct player));
+    if(player == NULL)
+    {
+        nlog_error("Could not allocate memory. (%s)", strerror(errno));
+        return NULL;
+    }
+    player->uuid = uuid;
+    player->username = conn->tmp.username;
+    player->conn = conn;
+    player->client_brand = NULL;
+    player->invulnerable = true;
+    player->is_flying = true;
+    player->allow_flying = true;
+    player->flying_speed = 1.0;
+    player->gamemode = MCPR_GAMEMODE_SURVIVAL;
+    player->client_settings_known = false;
+    player->compass_target.x = 0;
+    player->compass_target.y = 0;
+    player->compass_target.z = 0;
+    player->pos.x = 0;
+    player->pos.y = 70;
+    player->pos.z = 0;
+    player->pos.yaw = 0;
+    player->pos.pitch = 0;
+
+    player->entity_id = generate_new_entity_id();
+    server_get_internal_clock_time(&(player->last_keepalive_sent));
+    server_get_internal_clock_time(&(player->last_keepalive_received));
+    conn->player = player;
+    return player;
+}
+
 
 static struct hp_result send_post_login_sequence(struct connection *conn)
 {
@@ -427,39 +461,15 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
 
-
-        struct player *player = malloc(sizeof(struct player));
+        struct player *player = create_player(conn, uuid);
         if(player == NULL)
         {
-            nlog_error("Could not allocate memory. (%s)", strerror(errno));
             struct hp_result result;
             result.result = HP_RESULT_FATAL;
             result.disconnect_message = NULL;
             result.free_disconnect_message = false;
             return result;
         }
-        player->uuid = uuid;
-        player->username = conn->tmp.username;
-        player->conn = conn;
-        player->client_brand = NULL;
-        player->invulnerable = false;
-        player->is_flying = false;
-        player->allow_flying = false;
-        player->flying_speed = 0.0;
-        player->gamemode = MCPR_GAMEMODE_SURVIVAL;
-        player->client_settings_known = false;
-        player->compass_target.x = 0;
-        player->compass_target.y = 0;
-        player->compass_target.z = 0;
-        player->pos.x = 0;
-        player->pos.y = 65;
-        player->pos.z = 0;
-        player->pos.yaw = 0;
-        player->pos.pitch = 0;
-        player->entity_id = generate_new_entity_id();
-        server_get_internal_clock_time(&(player->last_keepalive_sent));
-        server_get_internal_clock_time(&(player->last_keepalive_received));
-        conn->player = player;
 
         nlog_debug("State for connection at %p (username: %s) switched to PLAY", conn, player->username);
 
@@ -638,36 +648,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
 
 
-        player = malloc(sizeof(struct player));
-        if(player == NULL)
-        {
-            nlog_error("Could not allocate memory. (%s)", strerror(errno));
-            goto err;
-        }
-        player->uuid = mapi_result->id;
-        player->username = conn->tmp.username;
-        player->conn = conn;
-        player->client_brand = NULL;
-        player->invulnerable = false;
-        player->is_flying = false;
-        player->allow_flying = false;
-        player->flying_speed = 0.0;
-        player->gamemode = MCPR_GAMEMODE_SURVIVAL;
-        player->client_settings_known = false;
-        player->compass_target.x = 0;
-        player->compass_target.y = 0;
-        player->compass_target.z = 0;
-        player->pos.x = 0;
-        player->pos.y = 65;
-        player->pos.z = 0;
-        player->pos.yaw = 0;
-        player->pos.pitch = 0;
-
-        player->entity_id = generate_new_entity_id();
-        server_get_internal_clock_time(&(player->last_keepalive_sent));
-        server_get_internal_clock_time(&(player->last_keepalive_received));
-        conn->player = player;
-
+        player = create_player(conn, mapi_result->id);
+        if(player == NULL) goto err;
         player_init = true;
 
         struct hp_result send_post_login_sequence_result = send_post_login_sequence(conn);

@@ -365,7 +365,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_DISCONNECT));
 
-                    ssize_t bytes_written_2 = mcpr_encode_string(*buf, reason);
+                    ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, reason);
                     if(bytes_written_2 < 0) { free(*buf); return false; }
                     bufpointer += bytes_written_2;
 
@@ -380,7 +380,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     void *bufpointer = *buf;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_KEEP_ALIVE));
-                    bufpointer += mcpr_encode_varint(*buf, pkt->data.play.clientbound.keep_alive.keep_alive_id);
+                    bufpointer += mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.keep_alive.keep_alive_id);
 
                     *out_bytes_written = bufpointer - *buf;
                     return true;
@@ -646,6 +646,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                             memcpy(bufpointer, section->sky_light, 2048); bufpointer += 2048;
                         }
                     }
+
                     if(pkt->data.play.clientbound.chunk_data.ground_up_continuous)
                     {
                         memcpy(bufpointer, pkt->data.play.clientbound.chunk_data.biomes, 256); bufpointer += 256;
@@ -657,7 +658,6 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     }
 
                     if(raw_block_entities != NULL) buffer_free(raw_block_entities);
-                    DEBUG_PRINT("Size of raw chunk data packet: %zu", bufpointer - *buf)
                     *out_bytes_written = bufpointer - *buf;
                     return true;
                 }
@@ -937,6 +937,35 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
 
                     if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
                     mcpr_decode_bool(&(pkt->data.play.serverbound.player_position_and_look.on_ground), ptr);
+                    ptr += MCPR_BOOL_SIZE;
+
+                    return ptr - in;
+                }
+
+                case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:
+                {
+                    ssize_t bytes_read_2 = mcpr_decode_varint(&(pkt->data.play.serverbound.teleport_confirm.teleport_id), ptr, len_left);
+                    if(bytes_read_2 < 0) { free(pkt); return -1; }
+                    ptr += bytes_read_2;
+                    return ptr - in;
+                }
+
+                case MCPR_PKT_PL_SB_PLAYER_LOOK:
+                {
+                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_2 = mcpr_decode_float(&(pkt->data.play.serverbound.player_look.yaw), ptr);
+                    if(bytes_read_2 < 0) { free(pkt); return -1; }
+                    ptr += bytes_read_2;
+                    len_left -= bytes_read_2;
+
+                    if(len_left < MCPR_FLOAT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    ssize_t bytes_read_3 = mcpr_decode_float(&(pkt->data.play.serverbound.player_look.pitch), ptr);
+                    if(bytes_read_3 < 0) { free(pkt); return -1; }
+                    ptr += bytes_read_3;
+                    len_left -= bytes_read_3;
+
+                    if(len_left < MCPR_BOOL_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    mcpr_decode_bool(&(pkt->data.play.serverbound.player_look.on_ground), ptr);
                     ptr += MCPR_BOOL_SIZE;
 
                     return ptr - in;

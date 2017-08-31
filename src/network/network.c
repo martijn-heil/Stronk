@@ -418,6 +418,7 @@ static void update_client(struct connection *conn)
             struct mcpr_packet keep_alive;
 
             keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
+            keep_alive.state = MCPR_STATE_PLAY;
             keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
 
 
