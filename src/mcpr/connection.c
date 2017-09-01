@@ -313,7 +313,7 @@ bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_pa
     size_t required_size = MCPR_VARINT_SIZE_MAX + mcpr_encode_packet_bounds(pkt);
     void *buf = malloc(required_size);
     if(buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-    size_t pktlen = mcpr_encode_packet(buf, pkt);
+    size_t pktlen = mcpr_encode_packet(buf + MCPR_VARINT_SIZE_MAX, pkt);
     if(pktlen == 0) { free(buf); return false; }
     if(pktlen > INT32_MAX) { free(buf); ninerr_set_err(ninerr_arithmetic_new()); return false; }
 
