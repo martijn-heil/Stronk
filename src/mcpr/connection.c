@@ -317,7 +317,7 @@ bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_pa
     if(pktlen == 0) { free(buf); return false; }
     if(pktlen > INT32_MAX) { free(buf); ninerr_set_err(ninerr_arithmetic_new()); return false; }
 
-    size_t skip = MCPR_VARINT_SIZE_MAX - mcpr_varint_bounds((int32_t) pktlen) - 1;
+    size_t skip = MCPR_VARINT_SIZE_MAX - mcpr_varint_bounds((int32_t) pktlen);
     size_t bytes_written_1 = mcpr_encode_varint(buf + skip, (int32_t) pktlen);
     DEBUG_PRINT("Writing packet, total size: %zu, size before prefixed length: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
     if(!mcpr_connection_write(tmpconn, buf + skip, pktlen + bytes_written_1)) { free(buf); return false; }

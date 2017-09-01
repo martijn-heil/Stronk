@@ -26,6 +26,9 @@
 #include <string.h>
 #include <inttypes.h>
 
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <ninerr/ninerr.h>
 
 #include <nbt/nbt.h>
@@ -359,9 +362,11 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                     void *bufpointer = out;
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_ST_CB_RESPONSE));
                     bufpointer += mcpr_encode_varint(bufpointer, len);
-                    memcpy(bufpointer, response, len);
-                    bufpointer += len;
+                    memcpy(bufpointer, response, len); bufpointer += len;
                     free(response);
+                    int devnull = open("/dev/null", O_RDONLY);
+                    write(devnull, out, bufpointer - out);
+
                     return bufpointer - out;
                 }
             }
