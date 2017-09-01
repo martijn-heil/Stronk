@@ -326,17 +326,13 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 case MCPR_PKT_HS_SB_HANDSHAKE:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_HS_SB_HANDSHAKE));
                     bufpointer += mcpr_encode_varint(bufpointer, MCPR_PROTOCOL_VERSION);
-
                     ssize_t bytes_written_3 = mcpr_encode_string(bufpointer, pkt->data.handshake.serverbound.handshake.server_address);
                     if(bytes_written_3 < 0) { return 0; }
                     bufpointer += bytes_written_3;
-
                     mcpr_encode_ushort(bufpointer, pkt->data.handshake.serverbound.handshake.server_port); bufpointer += MCPR_USHORT_SIZE;
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.handshake.serverbound.handshake.next_state);
-
                     return bufpointer - out;
                 }
             }
@@ -349,10 +345,8 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 case MCPR_PKT_ST_CB_PONG:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_ST_CB_PONG));
                     mcpr_encode_long(bufpointer, pkt->data.status.clientbound.pong.payload); bufpointer += MCPR_LONG_SIZE;
-
                     return bufpointer - out;
                 }
 
@@ -362,11 +356,8 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                     if(response == NULL) { return 0; }
                     DEBUG_PRINT("Response: %s\n", response);
                     size_t len = strlen(response);
-
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_ST_CB_RESPONSE));
-
                     bufpointer += mcpr_encode_varint(bufpointer, len);
                     memcpy(bufpointer, response, len);
                     bufpointer += len;
@@ -383,20 +374,16 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 case MCPR_PKT_LG_CB_DISCONNECT:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_DISCONNECT));
-
                     ssize_t bytes_written_2 = mcpr_encode_chat(bufpointer, pkt->data.login.clientbound.disconnect.reason);
                     if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
-
                     return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_ENCRYPTION_REQUEST));
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.login.clientbound.encryption_request.server_id);
                     if(bytes_written_2 < 0) { return 0; }
@@ -407,14 +394,12 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.encryption_request.verify_token_length);
                     memcpy(bufpointer, pkt->data.login.clientbound.encryption_request.verify_token, pkt->data.login.clientbound.encryption_request.verify_token_length);
                     bufpointer += pkt->data.login.clientbound.encryption_request.verify_token_length;
-
                     return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_CB_LOGIN_SUCCESS:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_LOGIN_SUCCESS));
 
                     char uuid_string[37];
@@ -433,22 +418,17 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 case MCPR_PKT_LG_CB_SET_COMPRESSION:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_SET_COMPRESSION));
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.set_compression.threshold);
-
                     return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_SB_LOGIN_START:
                 {
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_SB_LOGIN_START));
-
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer ,pkt->data.login.serverbound.login_start.name);
                     if(bytes_written_2 < 0) { return 0; }
-
                     return bufpointer - out;
                 }
 
@@ -456,15 +436,12 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 {
                     int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
                     int32_t verify_token_length = pkt->data.login.serverbound.encryption_response.verify_token_length;
-
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE));
                     bufpointer += mcpr_encode_varint(bufpointer, shared_secret_length);
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.shared_secret, shared_secret_length); bufpointer += shared_secret_length;
                     bufpointer += mcpr_encode_varint(bufpointer, verify_token_length);
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.verify_token, verify_token_length); bufpointer += verify_token_length;
-
                     return bufpointer - out;
                 }
             }
@@ -478,13 +455,10 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                 {
                     const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
                     void *bufpointer = out;
-
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_DISCONNECT));
-
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, reason);
                     if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
-
                     return bufpointer - out;
                 }
 
