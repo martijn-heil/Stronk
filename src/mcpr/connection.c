@@ -310,17 +310,17 @@ bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t byte
 bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_packet *pkt)
 {
     DEBUG_PRINT("Writing packet (numerical ID: 0x%02x, state: %s) to mcpr_connection at address %p\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state), tmpconn);
-    void *buf;
-    size_t pktlen;
-    if(!mcpr_encode_packet(&buf, &pktlen, pkt)) return false;
+    size_t required_size = MCPR_VARINT_SIZE_MAX + mcpr_encode_packet_bounds(pkt);
+    void *buf = malloc(required_size);
+    if(buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
+    size_t pktlen = mcpr_encode_packet(buf, pkt);
+    if(pktlen == 0) { free(buf); return false; }
     if(pktlen > INT32_MAX) { free(buf); ninerr_set_err(ninerr_arithmetic_new()); return false; }
-    void *tmp = realloc(buf, pktlen + MCPR_VARINT_SIZE_MAX);
-    if(tmp == NULL) { ninerr_set_err(ninerr_from_errno()); free(buf); return false; }
-    buf = tmp;
-    memmove(buf + mcpr_varint_bounds((int32_t) pktlen), buf, pktlen);
-    size_t bytes_written_1 = mcpr_encode_varint(buf, (int32_t) pktlen);
+
+    size_t skip = MCPR_VARINT_SIZE_MAX - mcpr_varint_bounds((int32_t) pktlen) - 1;
+    size_t bytes_written_1 = mcpr_encode_varint(buf + skip, (int32_t) pktlen);
     DEBUG_PRINT("Writing packet, total size: %zu, size before prefixed length: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
-    if(!mcpr_connection_write(tmpconn, buf, pktlen + bytes_written_1)) { free(buf); return false; }
+    if(!mcpr_connection_write(tmpconn, buf + skip, pktlen + bytes_written_1)) { free(buf); return false; }
     free(buf);
     return true;
 }

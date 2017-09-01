@@ -167,8 +167,152 @@ static char *server_list_response_to_json(const struct mcpr_packet *pkt)
     }
 }
 
+IGNORE("-Wswitch")
+size_t mcpr_encode_packet_bounds(const struct mcpr_packet *pkt)
+{
+    switch(pkt->state)
+    {
+        case MCPR_STATE_HANDSHAKE:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_HS_SB_HANDSHAKE:
+                    return 12 + strlen(pkt->data.handshake.serverbound.handshake.server_address);
+            }
+        }
 
-bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr_packet *pkt)
+        case MCPR_STATE_STATUS:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_ST_CB_PONG: return MCPR_VARINT_SIZE_MAX + MCPR_LONG_SIZE;
+
+                case MCPR_PKT_ST_CB_RESPONSE:
+                {
+                    char *response = server_list_response_to_json(pkt);
+                    if(response == NULL) { return 0; }
+                    size_t len = strlen(response);
+
+                    return MCPR_VARINT_SIZE_MAX + MCPR_VARINT_SIZE_MAX + len;
+                }
+            }
+        }
+
+        case MCPR_STATE_LOGIN:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_LG_CB_DISCONNECT: return 10 + strlen(pkt->data.login.clientbound.disconnect.reason);
+
+                case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:
+                    return 20 +
+                        strlen(pkt->data.login.clientbound.encryption_request.server_id) +
+                        pkt->data.login.clientbound.encryption_request.public_key_length +
+                        pkt->data.login.clientbound.encryption_request.verify_token_length;
+
+                case MCPR_PKT_LG_CB_LOGIN_SUCCESS:
+                    return 51 + strlen(pkt->data.login.clientbound.login_success.username);
+
+                case MCPR_PKT_LG_CB_SET_COMPRESSION:
+                    return 10;
+
+                case MCPR_PKT_LG_SB_LOGIN_START:
+                    return 10 + strlen(pkt->data.login.serverbound.login_start.name);
+
+                case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
+                    return 15 + pkt->data.login.serverbound.encryption_response.shared_secret_length +
+                        pkt->data.login.serverbound.encryption_response.verify_token_length;
+            }
+        }
+
+        case MCPR_STATE_PLAY:
+        {
+            switch(pkt->id)
+            {
+                case MCPR_PKT_PL_CB_DISCONNECT:
+                    return 10 +
+                        strlen(pkt->data.play.clientbound.disconnect.reason);
+
+                case MCPR_PKT_PL_CB_KEEP_ALIVE:
+                    return 10;
+
+                case MCPR_PKT_PL_CB_JOIN_GAME:
+                    return 33;
+
+                case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
+                    return 10 +
+                        strlen(pkt->data.play.clientbound.plugin_message.channel) +
+                         pkt->data.play.clientbound.plugin_message.data_length;
+
+                case MCPR_PKT_PL_CB_SPAWN_POSITION:
+                    return MCPR_VARINT_SIZE_MAX +
+                        MCPR_POSITION_SIZE;
+
+                case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
+                    return MCPR_VARINT_SIZE_MAX +
+                        MCPR_BYTE_SIZE +
+                        MCPR_FLOAT_SIZE +
+                        MCPR_FLOAT_SIZE;
+
+                case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
+                    return MCPR_VARINT_SIZE_MAX +
+                        MCPR_DOUBLE_SIZE * 3 +
+                        MCPR_FLOAT_SIZE * 2 +
+                        MCPR_BYTE_SIZE +
+                        MCPR_VARINT_SIZE_MAX;
+
+                case MCPR_PKT_PL_SB_KEEP_ALIVE:
+                    return 10;
+
+                case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
+                    return 10 +
+                        strlen(pkt->data.play.serverbound.plugin_message.channel) +
+                        pkt->data.play.serverbound.plugin_message.data_length;
+
+                case MCPR_PKT_PL_CB_CHUNK_DATA:
+                {
+                    size_t raw_block_entities_size = 0;
+                    struct buffer *raw_block_entities = NULL;
+                    if(pkt->data.play.clientbound.chunk_data.block_entities != NULL)
+                    {
+                        struct buffer tmp = nbt_dump_binary(pkt->data.play.clientbound.chunk_data.block_entities);
+                        raw_block_entities = &tmp;
+                        raw_block_entities_size = tmp.len;
+                    }
+
+                    int32_t data_size = 0;
+                    if(pkt->data.play.clientbound.chunk_data.ground_up_continuous) data_size += 256;
+                    for(size_t i = 0; i < pkt->data.play.clientbound.chunk_data.size; i++) // TODO what if integer overflow occurs here.
+                    {
+                        struct mcpr_chunk_section *section = pkt->data.play.clientbound.chunk_data.chunk_sections + i;
+                        data_size += MCPR_UBYTE_SIZE;
+                        data_size += mcpr_varint_bounds(section->palette_length);
+                        data_size += section->palette_length * MCPR_VARINT_SIZE_MAX;
+                        data_size += mcpr_varint_bounds(section->block_array_length);
+                        data_size += section->block_array_length * 8;
+                        data_size += 2048; // block light, half a byte per block in 16x16x16 chunk section.
+                        if(section->sky_light != NULL) data_size += 2048;// sky light, half a byte per block in 16x16x16 chunk section.
+                    }
+
+                    return MCPR_INT_SIZE +
+                        MCPR_INT_SIZE +
+                        MCPR_BOOL_SIZE +
+                        MCPR_VARINT_SIZE_MAX +
+                        MCPR_VARINT_SIZE_MAX +
+                        data_size +
+                        MCPR_VARINT_SIZE_MAX +
+                        raw_block_entities_size;
+                }
+            }
+        }
+    }
+
+    fprintf(stderr, "Packet bounds checking for packet with enum id (not packet id) %i is not implemented yet! (state: %s)\n", pkt->id, mcpr_state_to_string(pkt->state));
+    abort();
+}
+END_IGNORE()
+
+size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
 {
     DEBUG_PRINT("In mcpr_encode_packet, numerical packet ID: 0x%02x, state: %s\n", mcpr_packet_type_to_byte(pkt->id), mcpr_state_to_string(pkt->state));
     IGNORE("-Wswitch")
@@ -181,22 +325,19 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
             {
                 case MCPR_PKT_HS_SB_HANDSHAKE:
                 {
-                    *buf = malloc(12 + strlen(pkt->data.handshake.serverbound.handshake.server_address));
-                    if(buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_HS_SB_HANDSHAKE));
                     bufpointer += mcpr_encode_varint(bufpointer, MCPR_PROTOCOL_VERSION);
 
                     ssize_t bytes_written_3 = mcpr_encode_string(bufpointer, pkt->data.handshake.serverbound.handshake.server_address);
-                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    if(bytes_written_3 < 0) { return 0; }
                     bufpointer += bytes_written_3;
 
                     mcpr_encode_ushort(bufpointer, pkt->data.handshake.serverbound.handshake.server_port); bufpointer += MCPR_USHORT_SIZE;
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.handshake.serverbound.handshake.next_state);
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
             }
         }
@@ -207,27 +348,22 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
             {
                 case MCPR_PKT_ST_CB_PONG:
                 {
-                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_LONG_SIZE);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(*buf); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_ST_CB_PONG));
                     mcpr_encode_long(bufpointer, pkt->data.status.clientbound.pong.payload); bufpointer += MCPR_LONG_SIZE;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_ST_CB_RESPONSE:
                 {
                     char *response = server_list_response_to_json(pkt);
-                    if(response == NULL) { return false; }
+                    if(response == NULL) { return 0; }
                     DEBUG_PRINT("Response: %s\n", response);
                     size_t len = strlen(response);
 
-                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_VARINT_SIZE_MAX + len);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); free(*buf); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_ST_CB_RESPONSE));
 
@@ -235,8 +371,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     memcpy(bufpointer, response, len);
                     bufpointer += len;
                     free(response);
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
             }
         }
@@ -247,29 +382,24 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
             {
                 case MCPR_PKT_LG_CB_DISCONNECT:
                 {
-                    *buf = malloc(10 + strlen(pkt->data.login.clientbound.disconnect.reason));
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_DISCONNECT));
 
                     ssize_t bytes_written_2 = mcpr_encode_chat(bufpointer, pkt->data.login.clientbound.disconnect.reason);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:
                 {
-                    *buf = malloc(20 + strlen(pkt->data.login.clientbound.encryption_request.server_id) + pkt->data.login.clientbound.encryption_request.public_key_length + pkt->data.login.clientbound.encryption_request.verify_token_length);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_ENCRYPTION_REQUEST));
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.login.clientbound.encryption_request.server_id);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.encryption_request.public_key_length);
                     memcpy(bufpointer, pkt->data.login.clientbound.encryption_request.public_key, pkt->data.login.clientbound.encryption_request.public_key_length);
@@ -278,67 +408,56 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     memcpy(bufpointer, pkt->data.login.clientbound.encryption_request.verify_token, pkt->data.login.clientbound.encryption_request.verify_token_length);
                     bufpointer += pkt->data.login.clientbound.encryption_request.verify_token_length;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_CB_LOGIN_SUCCESS:
                 {
-                    *buf = malloc(51 + strlen(pkt->data.login.clientbound.login_success.username));
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_LOGIN_SUCCESS));
 
                     char uuid_string[37];
                     ninuuid_to_string(&(pkt->data.login.clientbound.login_success.uuid), uuid_string, LOWERCASE, false);
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, uuid_string);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
                     ssize_t bytes_written_3 = mcpr_encode_string(bufpointer, pkt->data.login.clientbound.login_success.username);
-                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    if(bytes_written_3 < 0) { return 0; }
                     bufpointer += bytes_written_3;
 
-                    *out_bytes_written = bufpointer - *buf;;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_CB_SET_COMPRESSION:
                 {
-                    *buf = malloc(10);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_CB_SET_COMPRESSION));
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.login.clientbound.set_compression.threshold);
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_SB_LOGIN_START:
                 {
-                    *buf = malloc(10 + strlen(pkt->data.login.serverbound.login_start.name));
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_SB_LOGIN_START));
 
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer ,pkt->data.login.serverbound.login_start.name);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:
                 {
                     int32_t shared_secret_length = pkt->data.login.serverbound.encryption_response.shared_secret_length;
                     int32_t verify_token_length = pkt->data.login.serverbound.encryption_response.verify_token_length;
-                    *buf = malloc(15 + shared_secret_length + verify_token_length);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE));
                     bufpointer += mcpr_encode_varint(bufpointer, shared_secret_length);
@@ -346,8 +465,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     bufpointer += mcpr_encode_varint(bufpointer, verify_token_length);
                     memcpy(bufpointer, pkt->data.login.serverbound.encryption_response.verify_token, verify_token_length); bufpointer += verify_token_length;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
             }
         }
@@ -359,38 +477,28 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                 case MCPR_PKT_PL_CB_DISCONNECT:
                 {
                     const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
-                    *buf = malloc(10 + strlen(reason));
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_DISCONNECT));
 
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, reason);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_KEEP_ALIVE:
                 {
-                    *buf = malloc(10);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
-
+                    void *bufpointer = out;
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_KEEP_ALIVE));
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.keep_alive.keep_alive_id);
-
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_JOIN_GAME:
                 {
-                    *buf = malloc(33);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_JOIN_GAME));
                     mcpr_encode_int(bufpointer, pkt->data.play.clientbound.join_game.entity_id); bufpointer += MCPR_INT_SIZE;
@@ -402,7 +510,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                         case MCPR_GAMEMODE_CREATIVE:    gamemode = 0x01; break;
                         case MCPR_GAMEMODE_ADVENTURE:   gamemode = 0x02; break;
                         case MCPR_GAMEMODE_SPECTATOR:   gamemode = 0x03; break;
-                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                        default: abort(); return 0; // Won't be reached, but else the compiler will complain.
                     }
                     if(pkt->data.play.clientbound.join_game.hardcore) gamemode = gamemode | 0x08;
                     mcpr_encode_ubyte(bufpointer, gamemode); bufpointer += MCPR_UBYTE_SIZE;
@@ -413,7 +521,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                         case MCPR_DIMENSION_NETHER:     dimension = -1; break;
                         case MCPR_DIMENSION_OVERWORLD:  dimension = 0;  break;
                         case MCPR_DIMENSION_END:        dimension = 1;  break;
-                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                        default: abort(); return 0; // Won't be reached, but else the compiler will complain.
                     }
                     mcpr_encode_int(bufpointer, dimension); bufpointer += MCPR_INT_SIZE;
 
@@ -424,7 +532,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                         case MCPR_DIFFICULTY_EASY:      difficulty = 1; break;
                         case MCPR_DIFFICULTY_NORMAL:    difficulty = 2; break;
                         case MCPR_DIFFICULTY_HARD:      difficulty = 3; break;
-                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                        default: abort(); return 0; // Won't be reached, but else the compiler will complain.
                     }
                     mcpr_encode_ubyte(bufpointer, difficulty); bufpointer += MCPR_UBYTE_SIZE;
                     mcpr_encode_ubyte(bufpointer, pkt->data.play.clientbound.join_game.max_players); bufpointer += MCPR_UBYTE_SIZE;
@@ -437,16 +545,15 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                         case MCPR_LEVEL_LARGE_BIOMES:   level_type = "largeBiomes"; break;
                         case MCPR_LEVEL_AMPLIFIED:      level_type = "amplified";   break;
                         case MCPR_LEVEL_DEFAULT_1_1:    level_type = "default_1_1"; break;
-                        default: abort(); return false; // Won't be reached, but else the compiler will complain.
+                        default: abort(); return 0; // Won't be reached, but else the compiler will complain.
                     }
                     ssize_t bytes_written_7 = mcpr_encode_string(bufpointer, level_type);
-                    if(bytes_written_7 < 0) { free(*buf); return false; }
+                    if(bytes_written_7 < 0) { return 0; }
                     bufpointer += bytes_written_7;
 
                     mcpr_encode_bool(bufpointer, pkt->data.play.clientbound.join_game.reduced_debug_info); bufpointer += MCPR_BOOL_SIZE;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:
@@ -454,41 +561,33 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     size_t channel_len = strlen(pkt->data.play.clientbound.plugin_message.channel);
                     if(channel_len > 20) { DEBUG_PRINT("Error for clientbound plugin message packet! Channel string length is greater than 20."); abort(); }
 
-                    *buf = malloc(10 + channel_len + pkt->data.play.clientbound.plugin_message.data_length);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLUGIN_MESSAGE));
 
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.clientbound.plugin_message.channel);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
                     memcpy(bufpointer, pkt->data.play.clientbound.plugin_message.data, pkt->data.play.clientbound.plugin_message.data_length);
                     bufpointer += pkt->data.play.clientbound.plugin_message.data_length;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_SPAWN_POSITION:
                 {
-                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_POSITION_SIZE);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_SPAWN_POSITION));
                     mcpr_encode_position(bufpointer, &(pkt->data.play.clientbound.spawn_position.location)); bufpointer += MCPR_POSITION_SIZE;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_PLAYER_ABILITIES:
                 {
-                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_BYTE_SIZE + MCPR_FLOAT_SIZE + MCPR_FLOAT_SIZE);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_ABILITIES));
 
@@ -500,43 +599,40 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     mcpr_encode_byte(bufpointer, flags); bufpointer += MCPR_BYTE_SIZE;
 
                     ssize_t bytes_written_3 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.flying_speed);
-                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    if(bytes_written_3 < 0) { return 0; }
                     bufpointer += bytes_written_3;
 
                     ssize_t bytes_written_4 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_abilities.field_of_view_modifier);
-                    if(bytes_written_4 < 0) { free(*buf); return false; }
+                    if(bytes_written_4 < 0) { return 0; }
                     bufpointer += bytes_written_4;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:
                 {
-                    *buf = malloc(MCPR_VARINT_SIZE_MAX + MCPR_DOUBLE_SIZE * 3 + MCPR_FLOAT_SIZE * 2 + MCPR_BYTE_SIZE + MCPR_VARINT_SIZE_MAX);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK));
 
                     ssize_t bytes_written_2 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.x);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
                     ssize_t bytes_written_3 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.y);
-                    if(bytes_written_3 < 0) { free(*buf); return false; }
+                    if(bytes_written_3 < 0) { return 0; }
                     bufpointer += bytes_written_3;
 
                     ssize_t bytes_written_4 = mcpr_encode_double(bufpointer, pkt->data.play.clientbound.player_position_and_look.z);
-                    if(bytes_written_4 < 0) { free(*buf); return false; }
+                    if(bytes_written_4 < 0) { return 0; }
                     bufpointer += bytes_written_4;
 
                     ssize_t bytes_written_5 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.yaw);
-                    if(bytes_written_5 < 0) { free(*buf); return false; }
+                    if(bytes_written_5 < 0) { return 0; }
                     bufpointer += bytes_written_5;
 
                     ssize_t bytes_written_6 = mcpr_encode_float(bufpointer, pkt->data.play.clientbound.player_position_and_look.pitch);
-                    if(bytes_written_6 < 0) { free(*buf); return false; }
+                    if(bytes_written_6 < 0) { return 0; }
                     bufpointer += bytes_written_6;
 
                     int8_t flags = 0;
@@ -550,40 +646,31 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
                     bufpointer += mcpr_encode_varint(bufpointer, pkt->data.play.clientbound.player_position_and_look.teleport_id);
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_SB_KEEP_ALIVE:
                 {
-                    *buf = malloc(10);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
-
+                    void *bufpointer = out;
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_KEEP_ALIVE));
-                    bufpointer += mcpr_encode_varint(*buf, pkt->data.play.serverbound.keep_alive.keep_alive_id);
-
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    bufpointer += mcpr_encode_varint(bufpointer, pkt->data.play.serverbound.keep_alive.keep_alive_id);
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:
                 {
-                    *buf = malloc(10+ strlen(pkt->data.play.serverbound.plugin_message.channel) + pkt->data.play.serverbound.plugin_message.data_length);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_SB_PLUGIN_MESSAGE));
 
                     ssize_t bytes_written_2 = mcpr_encode_string(bufpointer, pkt->data.play.serverbound.plugin_message.channel);
-                    if(bytes_written_2 < 0) { free(*buf); return false; }
+                    if(bytes_written_2 < 0) { return 0; }
                     bufpointer += bytes_written_2;
 
                     memcpy(bufpointer, pkt->data.play.serverbound.plugin_message.data, pkt->data.play.serverbound.plugin_message.data_length);
                     bufpointer += pkt->data.play.serverbound.plugin_message.data_length;
 
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
 
                 case MCPR_PKT_PL_CB_CHUNK_DATA:
@@ -611,10 +698,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                         if(section->sky_light != NULL) data_size += 2048;// sky light, half a byte per block in 16x16x16 chunk section.
                     }
 
-                    *buf = malloc(MCPR_INT_SIZE + MCPR_INT_SIZE + MCPR_BOOL_SIZE + MCPR_VARINT_SIZE_MAX + MCPR_VARINT_SIZE_MAX + data_size +
-                         MCPR_VARINT_SIZE_MAX + raw_block_entities_size);
-                    if(*buf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-                    void *bufpointer = *buf;
+                    void *bufpointer = out;
 
                     bufpointer += mcpr_encode_varint(bufpointer, mcpr_packet_type_to_byte(MCPR_PKT_PL_CB_CHUNK_DATA));
                     mcpr_encode_int(bufpointer, pkt->data.play.clientbound.chunk_data.chunk_x); bufpointer += MCPR_INT_SIZE;
@@ -632,7 +716,8 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
 
                         if(section->palette_length > 0)
                         {
-                            if((uint32_t) section->palette_length > SIZE_MAX) { free(*buf); ninerr_set_err(ninerr_new("palette length of mcpr_chunk_section does not fit within size_t type.")); return false; }
+                            if((uint32_t) section->palette_length > SIZE_MAX)
+                                { ninerr_set_err(ninerr_new("palette length of mcpr_chunk_section does not fit within size_t type.")); return 0; }
                             for(size_t j = 0; j < (size_t) section->palette_length; j++)
                             {
                                 bufpointer += mcpr_encode_varint(bufpointer, section->palette[j]);
@@ -658,8 +743,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                     }
 
                     if(raw_block_entities != NULL) buffer_free(raw_block_entities);
-                    *out_bytes_written = bufpointer - *buf;
-                    return true;
+                    return bufpointer - out;
                 }
             }
         }
@@ -815,17 +899,20 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
                         case 0: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_ENABLED; break;
                         case 1: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_COMMANDS_ONLY; break;
                         case 2: pkt->data.play.serverbound.client_settings.chat_mode = MCPR_CHAT_MODE_HIDDEN; break;
-                        default: ninerr_set_err(ninerr_new("Invalid value %ld for chat mode in client settings packet.", (long) chat_mode_int)); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1;
+                        default: ninerr_set_err(ninerr_new("Invalid value %ld for chat mode in client settings packet.",
+                            (long) chat_mode_int)); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1;
                     }
                     ptr += bytes_read_4;
                     len_left -= bytes_read_4;
 
-                    if(len_left < MCPR_BOOL_SIZE) { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    if(len_left < MCPR_BOOL_SIZE)
+                        { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
                     mcpr_decode_bool(&(pkt->data.play.serverbound.client_settings.chat_colors), ptr);
                     ptr += MCPR_BOOL_SIZE;
                     len_left -= MCPR_BOOL_SIZE;
 
-                    if(len_left < 1) { ninerr_set_err(ninerr_new("Max packet length exceeded.")); free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
+                    if(len_left < 1) { ninerr_set_err(ninerr_new("Max packet length exceeded."));
+                     free(pkt); free(pkt->data.play.serverbound.client_settings.locale); return -1; }
                     uint8_t displayed_skin_parts;
                     mcpr_decode_ubyte(&displayed_skin_parts, ptr);
                     pkt->data.play.serverbound.client_settings.displayed_skin_parts.cape_enabled = displayed_skin_parts & 0x01;
@@ -862,7 +949,8 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
                     len_left -= bytes_read_2;
 
                     pkt->data.play.serverbound.plugin_message.data = malloc(len_left);
-                    if(pkt->data.play.serverbound.plugin_message.data == NULL) { free(pkt->data.play.serverbound.plugin_message.channel); free(pkt); ninerr_set_err(ninerr_from_errno()); return -1; }
+                    if(pkt->data.play.serverbound.plugin_message.data == NULL)
+                        { free(pkt->data.play.serverbound.plugin_message.channel); free(pkt); ninerr_set_err(ninerr_from_errno()); return -1; }
                     memcpy(pkt->data.play.serverbound.plugin_message.data, ptr, len_left);
                     ptr += len_left;
                     return ptr - in;
