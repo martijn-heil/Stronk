@@ -639,7 +639,7 @@ bool mcpr_encode_packet(void **buf, size_t *out_bytes_written, const struct mcpr
                             }
                         }
                         bufpointer += mcpr_encode_varint(bufpointer, section->block_array_length);
-                        memcpy(bufpointer, section->blocks, section->block_array_length * sizeof(uint64_t)); bufpointer += section->block_array_length * sizeof(uint64_t);
+                        memcpy(bufpointer, section->blocks, section->block_array_length * 8); bufpointer += section->block_array_length * 8;
                         memcpy(bufpointer, section->block_light, 2048); bufpointer += 2048;
                         if(section->sky_light != NULL)
                         {

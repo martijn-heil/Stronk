@@ -26,8 +26,12 @@
 #include <stdbool.h>
 #include <errno.h>
 
+#include <inttypes.h>
+
 #include <sys/types.h>
 #include <pthread.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <algo/hash-ull.h>
 #include <algo/compare-ull.h>
@@ -48,7 +52,7 @@
 #include "../util.h"
 
 int32_t entity_id_counter = INT32_MIN;
-pthread_mutex_t entity_id_counter_mutex;
+pthread_mutex_t entity_id_counter_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 //#define block_xz_to_index(x, z) ((z-1) * 16 + x - 1)
 
@@ -133,6 +137,7 @@ struct chunk
 {
     unsigned long long last_update;
     struct chunk_section sections[CHUNK_SECTIONS_PER_CHUNK]; // 16 high indexed bottom to top.
+    uint8_t biomes[256];
 };
 
 #define get_chunk_key(x, z) ((unsigned long long) (((unsigned long long) x) << 32 | ((unsigned long long) z)))
@@ -153,38 +158,20 @@ int world_manager_init(void)
 
     default_world->chunks = hash_table_new(ull_hash, ull_equal);
     if(default_world->chunks == NULL) { nlog_fatal("Could not create hash table. (%s ?)", strerror(errno)); free(default_world); return -1; }
-
-    if(pthread_mutex_init(&entity_id_counter_mutex, NULL) != 0)
-    {
-        nlog_fatal("Could not initialize entity id counter mutex.");
-        hash_table_free(default_world->chunks);
-        free(default_world);
-        return -1;
-    }
     default_world->dimension = MCPR_DIMENSION_OVERWORLD;
     return 1;
 }
 
 void world_manager_cleanup(void)
 {
-    pthread_mutex_destroy(&entity_id_counter_mutex);
     // TODO free memory from world
 }
 
 static struct chunk *get_chunk(world *w, long x, long z)
 {
     unsigned long long key = get_chunk_key(x, z);
-    struct chunk *chunk1 = hash_table_lookup(default_world->chunks, &key);
-    if(chunk1 != HASH_TABLE_NULL)
-    {
-        return chunk1;
-    }
-    else
-    {
-        struct chunk *chunk2 = load_chunk(w, x, z);
-        if(chunk2 == NULL) return NULL;
-        return chunk2;
-    }
+    struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
+    return (chunk != HASH_TABLE_NULL) ? chunk : load_chunk(w, x, z);
 }
 
 IGNORE("-Wunused-parameter")
@@ -197,7 +184,7 @@ static struct chunk *load_chunk(world *world, long x, long z)
     chunk->last_update = 0; // TODO
 
     // Fill the bottom 8 chunk sections with solid stone.
-    for(size_t i = 0; i < 8; i++)
+    /*for(size_t i = 0; i < 8; i++)
     {
         struct chunk_section *chunk_section = &(chunk->sections[i]);
 
@@ -218,7 +205,20 @@ static struct chunk *load_chunk(world *world, long x, long z)
             chunk_section->blocks[i].type_id = 0;
             chunk_section->blocks[i].data = 0;
         }
+    }*/
+
+    for(size_t i = 0; i < 16; i++)
+    {
+        struct chunk_section *chunk_section = &(chunk->sections[i]);
+	for(size_t j = 0; j < BLOCKS_PER_CHUNK_SECTION; j++)
+	{
+	    chunk_section->blocks[j].type_id = 1;
+	    chunk_section->blocks[j].data = 0;
+	}
     }
+
+    // Fill in biome data.
+    memset(chunk->biomes, 127, 256);
 
     unsigned long long key = get_chunk_key(x, z);
     int result = hash_table_insert(((struct world *) world)->chunks, &key, chunk);
@@ -261,7 +261,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
     pkt.data.play.clientbound.chunk_data.size = CHUNK_SECTIONS_PER_CHUNK;
     pkt.data.play.clientbound.chunk_data.block_entities = NULL;
     pkt.data.play.clientbound.chunk_data.block_entity_count = 0;
-    void *membuf = malloc(CHUNK_SECTIONS_PER_CHUNK * sizeof(struct mcpr_chunk_section) + 256);
+    void *membuf = malloc(CHUNK_SECTIONS_PER_CHUNK * sizeof(struct mcpr_chunk_section));
     if(membuf == NULL)
     {
         nlog_error("Could not allocate memory. (%s)", strerror(errno));
@@ -269,8 +269,8 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
     }
 
     pkt.data.play.clientbound.chunk_data.chunk_sections = membuf;
-    pkt.data.play.clientbound.chunk_data.biomes = membuf + CHUNK_SECTIONS_PER_CHUNK * sizeof(struct mcpr_chunk_section);
-    memset(pkt.data.play.clientbound.chunk_data.biomes, 127, 256);
+    pkt.data.play.clientbound.chunk_data.biomes = chunk->biomes;
+
 
     for(size_t i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
     {
@@ -305,6 +305,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
         mcpr_chunk_section->block_array_length = 832;
 
         encode_chunk_section_blocks(mcpr_chunk_section->blocks, section);
+	    //memset(mcpr_chunk_section->blocks, 0, 832 * sizeof(uint64_t));
     }
 
     const struct connection *conn = player_get_connection(p);
@@ -387,29 +388,100 @@ int32_t generate_new_entity_id(void)
     return tmp;
 }
 
+void print_bits(size_t const size, void const * const ptr)
+{
+    unsigned char *b = (unsigned char*) ptr;
+    unsigned char byte;
+    int i, j;
+
+    for (i=size-1;i>=0;i--)
+    {
+        for (j=7;j>=0;j--)
+        {
+            byte = (b[i] >> j) & 1;
+            printf("%u", byte);
+        }
+    }
+}
+
+
+void nintest(void)
+{
+    fprintf(stdout, "in nintest");
+    struct chunk *chunk = malloc(sizeof(struct chunk));
+    if(chunk == NULL) { fprintf(stderr, "Could not allocate memory."); abort(); }
+
+    chunk->last_update = 0;
+
+    // Fill the bottom 8 chunk sections with solid stone.
+    for(size_t i = 0; i < 8; i++)
+    {
+        struct chunk_section *chunk_section = &(chunk->sections[i]);
+
+        for(int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
+        {
+            chunk_section->blocks[i].type_id = 1;
+            chunk_section->blocks[i].data = 0;
+        }
+    }
+
+    // Fill the top 8 chunk sections with air.
+    for(size_t i = 8; i < 16; i++)
+    {
+        struct chunk_section *chunk_section = &(chunk->sections[i]);
+
+        for(int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
+        {
+            chunk_section->blocks[i].type_id = 0;
+            chunk_section->blocks[i].data = 0;
+        }
+    }
+
+    uint64_t *buf = malloc(832 * sizeof(uint64_t));
+    if(buf == NULL) { fprintf(stderr, "Could not allocate memory."); abort(); }
+    encode_chunk_section_blocks(buf, &(chunk->sections[0]));
+    //int fd = open("./tmp2.bin", O_WRONLY | O_CREAT, 0644);
+    //write(fd, buf, 832 * sizeof(uint64_t));
+    printf("Final result:\n");
+    for(unsigned int i = 0; i < 832; i++)
+    {
+        print_bits(8, buf + i);
+        printf("\n");
+    }
+    abort();
+}
+
 static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_section *section)
 {
     uint_fast8_t bits_used = 0;
     uint64_t tmp_result = 0;
     size_t block_data_index = 0;
-    for(int i2 = 0; i2 < BLOCKS_PER_CHUNK_SECTION; i2++)
+    for(unsigned int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
     {
-        const struct block *block = &(section->blocks[i2]);
-
-        uint64_t current_block_data = (((uint64_t) block->type_id) << 4 | ((uint64_t) block->data));
+        const struct block *block = &(section->blocks[i]);
+        //printf("Loop\n");
+        uint64_t current_block_data = ((((uint64_t) block->type_id) << 4) | ((uint64_t) block->data)); // This line has been tested, it works.
+        //printf("Current block data: "); print_bits(sizeof(current_block_data), &current_block_data); printf("\n");
+        //printf("Bits used before increment: %u\n", bits_used);
         tmp_result |= (current_block_data << bits_used);
+        //printf("Current tmp_result: "); print_bits(sizeof(tmp_result), &tmp_result); printf("\n");
         bits_used += 13;
 
-        if(bits_used >= 64 || i2 == BLOCKS_PER_CHUNK_SECTION - 1)
+        if(bits_used >= 64 || i == BLOCKS_PER_CHUNK_SECTION - 1)
         {
+            //printf("bits_used > 64 || i == BLOCKS_PER_CHUNK_SECTION - 1\n");
+            //printf("tmp_result: "); print_bits(sizeof(tmp_result), &tmp_result); printf("\n");
+            //printf("block_data_index = %zu\n", block_data_index);
             out[block_data_index] = tmp_result;
             block_data_index++;
-            tmp_result = 0;
 
             if(bits_used > 64) // It overflowed, we need to continue the last block in the next long.
             {
-                unsigned char overflowed_bits = bits_used - 64;
+                //printf("We had a overflow.\n");
+                uint_fast8_t overflowed_bits = bits_used - 64;
+                //printf("overflowed_bits = %u\n", overflowed_bits);
                 tmp_result = current_block_data >> (13 - overflowed_bits);
+                //printf("new tmp_result: "); print_bits(sizeof(tmp_result), &tmp_result); printf("\n");
                 bits_used = overflowed_bits;
             }
             else
@@ -419,4 +491,11 @@ static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_sectio
             }
         }
     }
+    static bool tmp = true;
+    //if(tmp) {
+    //    int fd = open("./tmp.bin", O_WRONLY | O_CREAT, 0644);
+    //    write(fd, out, 832 * sizeof(uint64_t));
+    //    tmp = false;
+    //    abort();
+    //}
 }

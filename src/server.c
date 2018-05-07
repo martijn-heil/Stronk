@@ -270,10 +270,12 @@ void cleanup(void)
 
 static void init(void)
 {
-    if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr."); exit(EXIT_FAILURE); }
-    if(logging_init() < 0) { cleanup(); ninerr_finish(); fprintf(stderr, "Could not initialize logging module."); exit(EXIT_FAILURE); }
+    if(!ninerr_init()) { fprintf(stderr, "Could not initialize ninerr.\n"); exit(EXIT_FAILURE); }
+    if(logging_init() < 0) { cleanup(); ninerr_finish(); fprintf(stderr, "Could not initialize logging module.\n"); exit(EXIT_FAILURE); }
     mapi_logger = nlogger;
     mcpr_logger = nlogger;
+
+    nlog_info("Starting Stronk (Minecraft version: %s, Protocol version: %u)", MCPR_MINECRAFT_VERSION, MCPR_PROTOCOL_VERSION);
 
     // TODO catch SIGINT signals and make sure cleanup is performed.
     if(atexit(cleanup) != 0) nlog_warn("Could not register atexit cleanup function, shutdown and/or crashing may not be graceful, and may cause data loss!");

@@ -24,6 +24,7 @@
 
 #include "server.h"
 
+void nintest(void);
 
 /*
     System & architecture requirements:
@@ -41,6 +42,7 @@
 
 int main(void)
 {
+    nintest();
     server_start();
     return EXIT_SUCCESS;
 }

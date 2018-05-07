@@ -55,7 +55,7 @@ extern struct bstream *bstream_notice;
 extern struct bstream *bstream_info;
 extern struct bstream *bstream_debug;
 
-// these function pointer variants are sub-optimal, only use them if you really have no other choice.
+// these file pointer variants are sub-optimal, only use them if you really have no other choice.
 extern FILE *fp_fatal;
 extern FILE *fp_error;
 extern FILE *fp_warn;
