@@ -42,7 +42,6 @@ void nintest(void);
 
 int main(void)
 {
-    nintest();
     server_start();
     return EXIT_SUCCESS;
 }

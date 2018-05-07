@@ -73,6 +73,8 @@ struct player {
 
     } client_settings;
 
+    uint8_t selected_slot;
+
     long last_teleport_id;
     struct timespec last_keepalive_received; // Based on server_get_internal_clock_time()
     struct timespec last_keepalive_sent; // Based on server_get_internal_clock_time()
