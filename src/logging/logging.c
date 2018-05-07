@@ -163,7 +163,7 @@ int logging_init(void)
     _zc = zlog_get_category("stronk");
     if(!_zc)
     {
-        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.");
+        fprintf(stderr, "Could not get category 'stronk' for zlog from /etc/zlog.conf, if you have not yet defined this category, define it.\n");
         zlog_fini();
         return -1;
     }

@@ -364,8 +364,6 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                     bufpointer += mcpr_encode_varint(bufpointer, len);
                     memcpy(bufpointer, response, len); bufpointer += len;
                     free(response);
-                    int devnull = open("/dev/null", O_RDONLY);
-                    write(devnull, out, bufpointer - out);
 
                     return bufpointer - out;
                 }
@@ -703,7 +701,7 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
                             }
                         }
                         bufpointer += mcpr_encode_varint(bufpointer, section->block_array_length);
-                        memcpy(bufpointer, section->blocks, section->block_array_length * sizeof(uint64_t)); bufpointer += section->block_array_length * sizeof(uint64_t);
+                        memcpy(bufpointer, section->blocks, section->block_array_length * 8); bufpointer += section->block_array_length * 8;
                         memcpy(bufpointer, section->block_light, 2048); bufpointer += 2048;
                         if(section->sky_light != NULL)
                         {
