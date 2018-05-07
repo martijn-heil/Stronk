@@ -1035,6 +1035,15 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
 
                     return ptr - in;
                 }
+
+                case MCPR_PKT_PL_SB_HELD_ITEM_CHANGE:
+                {
+                    if(len_left < MCPR_SHORT_SIZE) { free(pkt); ninerr_set_err(ninerr_new("Max packet length exceeded.")); return -1; }
+                    mcpr_decode_short(&(pkt->data.play.serverbound.held_item_change.slot), ptr);
+                    ptr += MCPR_SHORT_SIZE;
+                    len_left -= MCPR_SHORT_SIZE;
+                    return ptr - in;
+                }
             }
         }
     }

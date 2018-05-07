@@ -364,6 +364,7 @@ struct hp_result handle_pl_resource_pack_status(const struct mcpr_packet *pkt, s
 
 struct hp_result handle_pl_held_item_change(const struct mcpr_packet *pkt, struct connection *conn)
 {
+    conn->player->selected_slot = (uint8_t) pkt->data.play.serverbound.held_item_change.slot;
     struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
     return result;
 }
