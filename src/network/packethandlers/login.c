@@ -76,10 +76,10 @@ static struct player *create_player(struct connection *conn, struct ninuuid uuid
     player->gamemode = MCPR_GAMEMODE_SURVIVAL;
     player->client_settings_known = false;
     player->compass_target.x = 0;
-    player->compass_target.y = 0;
+    player->compass_target.y = 70;
     player->compass_target.z = 0;
     player->pos.x = 0;
-    player->pos.y = 70;
+    player->pos.y = 128;
     player->pos.z = 0;
     player->pos.yaw = 0;
     player->pos.pitch = 0;

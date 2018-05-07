@@ -93,17 +93,21 @@ void mcpr_encode_long(void *out, int64_t i)
 
 ssize_t mcpr_encode_float(void *out, float f)
 {
-    memcpy(out, &f, sizeof(f));
-    return sizeof(f);
+    uint32_t netfloat;
+    memcpy(&netfloat, &f, 4);
+    netfloat = hton64(netfloat);
+    memcpy(out, &netfloat, 4);
+    return 4;
 }
 
 ssize_t mcpr_encode_double(void *out, double d)
 {
-    memcpy(out, &d, sizeof(d));
-    return sizeof(d);
+    uint64_t netdouble;
+    memcpy(&netdouble, &d, 8);
+    netdouble = hton64(netdouble);
+    memcpy(out, &netdouble, 8);
+    return 8;
 }
-
-
 
 
 ssize_t mcpr_encode_string(void *out, const char *utf8Str)
