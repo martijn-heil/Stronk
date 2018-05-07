@@ -54,7 +54,7 @@
 
 static bool is_auth_required(const char *username)
 {
-    return false;
+    return true;
 }
 
 static struct player *create_player(struct connection *conn, struct ninuuid uuid)
@@ -450,14 +450,6 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
                 return result;
             }
         }
-        // 42
-        // uint8_t buf[] = {
-        //     /* packet len: */                    0x2D,
-        //     /* packet id: (1 byte) */            0x02,
-        //     /* uuid: (36 bytes plus 1 byte prefix length) */      0x24,        0x35, 0x30, 0x64, 0x38, 0x66, 0x63, 0x66, 0x30, 0x2d, 0x31, 0x36, 0x36, 0x65, 0x2d, 0x34, 0x61, 0x62, 0x33, 0x2d, 0x39, 0x31, 0x37, 0x36, 0x2d, 0x63, 0x34, 0x31, 0x66, 0x62, 0x35, 0x37, 0x35, 0x30, 0x37, 0x31, 0x61,
-        //     /* username: (6 bytes plus 1 byte prefix length) */             0x06, 0x4e, 0x69, 0x6e, 0x6a, 0x6f, 0x68
-        // };
-        // mcpr_connection_write(conn->conn, buf, sizeof(buf));
 
         mcpr_connection_set_state(conn->conn, MCPR_STATE_PLAY);
 
@@ -606,11 +598,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             nlog_error("Could not finalize SHA-1 hash.");
             goto err;
         }
-        nlog_debug("Value before mcpr_crypto_stringify_sha1: %p", (void *) conn);
         mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
-        nlog_debug("Value after mcpr_crypto_stringify_sha1: %p", (void *) conn);
         struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(conn->tmp.username, stringified_server_id_hash, conn->server_address_used);
-        nlog_debug("Value after mapi_minecraft_has_joined: %p", (void *) conn);
         if(mapi_result == NULL)
         {
             // TODO handle legit non error case where a failure happened.

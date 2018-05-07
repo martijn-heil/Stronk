@@ -532,10 +532,11 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
     // if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
 
 
+    // TODO: escape username
     //char *escaped_username = curl_easy_escape(username, );
     // curl_easy_cleanup(curl);
 
-    char url[strlen(server_id_hash) + strlen(fmt) + strlen(username) + strlen(ip) + 1];
+    char url[strlen(server_id_hash) + 84 + strlen(username) + strlen(ip) + 1];
     sprintf(url, fmt, username, server_id_hash, ip);
     json_t *response;
     int status = mapi_make_api_request(&response, url, MAPI_HTTP_GET, NULL, 0, NULL);
@@ -745,7 +746,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
 
     json_error_t json_error;
 
-    #if DEBUG
+    #ifdef DEBUG
         char tmp[curl_buf.size + 1];
         memcpy(tmp, curl_buf.content, curl_buf.size);
         tmp[curl_buf.size] = '\0';
