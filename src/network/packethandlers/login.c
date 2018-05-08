@@ -574,31 +574,12 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
 
         SHA_CTX sha_ctx;
-        if(unlikely(SHA1_Init(&sha_ctx) == 0))
-        {
-            nlog_error("Could not initialize SHA-1 hash.");
-            goto err;
-        }
-        if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_length) == 0)
-        {
-            nlog_error("Could not update SHA-1 hash.");
-            uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
-            SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
-            goto err;
-        }
-        if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0)
-        {
-            nlog_error("Could not update SHA-1 hash.");
-            uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH];
-            SHA1_Final(ignored_tmpbuf, &sha_ctx); // clean up
-            goto err;
-        }
-        if(SHA1_Final(server_id_hash, &sha_ctx) == 0)
-        {
-            nlog_error("Could not finalize SHA-1 hash.");
-            goto err;
-        }
+        if(unlikely(SHA1_Init(&sha_ctx) == 0)) { nlog_error("Could not initialize SHA-1 hash."); goto err; }
+        if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_length) == 0) { nlog_error("Could not update SHA-1 hash."); uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH]; /* needed for cleanup */ SHA1_Final(ignored_tmpbuf, &sha_ctx); goto err; }
+        if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0) { nlog_error("Could not update SHA-1 hash."); uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH]; /* needed for cleanup */ SHA1_Final(ignored_tmpbuf, &sha_ctx); goto err; }
+        if(unlikely(SHA1_Final(server_id_hash, &sha_ctx) == 0)) { nlog_error("Could not finalize SHA-1 hash."); goto err; }
         mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);
+        nlog_debug("Server id hash: %s", stringified_server_id_hash);
         struct mapi_minecraft_has_joined_response *mapi_result = mapi_minecraft_has_joined(conn->tmp.username, stringified_server_id_hash, conn->server_address_used);
         if(mapi_result == NULL)
         {
