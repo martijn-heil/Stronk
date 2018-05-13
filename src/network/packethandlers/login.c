@@ -524,8 +524,8 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             nlog_error("Shared secret length is greater than RSA_size(rsa)");
             goto err;
         }
-        int size = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_NO_PADDING);
-        if(size < 0)
+        int decrypted_shared_secret_length = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_NO_PADDING);
+        if(decrypted_shared_secret_length < 0)
         {
             nlog_error("Could not decrypt shared secret.");
             ERR_print_errors_fp(fp_error);
@@ -575,7 +575,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
 
         SHA_CTX sha_ctx;
         if(unlikely(SHA1_Init(&sha_ctx) == 0)) { nlog_error("Could not initialize SHA-1 hash."); goto err; }
-        if(SHA1_Update(&sha_ctx, decrypted_shared_secret, shared_secret_length) == 0) { nlog_error("Could not update SHA-1 hash."); uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH]; /* needed for cleanup */ SHA1_Final(ignored_tmpbuf, &sha_ctx); goto err; }
+        if(SHA1_Update(&sha_ctx, decrypted_shared_secret, decrypted_shared_secret_length) == 0) { nlog_error("Could not update SHA-1 hash."); uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH]; /* needed for cleanup */ SHA1_Final(ignored_tmpbuf, &sha_ctx); goto err; }
         if(SHA1_Update(&sha_ctx, encoded_public_key, encoded_public_key_len) == 0) { nlog_error("Could not update SHA-1 hash."); uint8_t ignored_tmpbuf[SHA_DIGEST_LENGTH]; /* needed for cleanup */ SHA1_Final(ignored_tmpbuf, &sha_ctx); goto err; }
         if(unlikely(SHA1_Final(server_id_hash, &sha_ctx) == 0)) { nlog_error("Could not finalize SHA-1 hash."); goto err; }
         mcpr_crypto_stringify_sha1(stringified_server_id_hash, server_id_hash);

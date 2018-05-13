@@ -25,6 +25,8 @@
 
 #include <stdint.h>
 
+#include <netinet/in.h>
+
 #include <mcpr/connection.h>
 #include <ninio/bstream.h>
 
@@ -34,6 +36,7 @@
 struct connection
 {
     int fd;
+    struct sockaddr_storage client_address;
     struct bstream *iostream;
     uint16_t port_used; // Will only be set after having switched to a different state from HANDSHAKE
     char *server_address_used; // Will only be set after having switched to a different state from HANDSHAKE, else it will be NULL

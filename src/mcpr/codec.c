@@ -39,7 +39,7 @@
 
 #include <ninerr/ninerr.h>
 #include <ninuuid/ninuuid.h>
-#include <safe_math.h>
+#include <psnip/safe-math/safe-math.h>
 
 #include "mcpr/codec.h"
 #include "mcpr/mcpr.h"

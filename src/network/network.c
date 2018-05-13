@@ -140,7 +140,7 @@ void net_tick(void)
 
 static int make_server_socket (uint16_t port)
 {
-    struct sockaddr_in name;
+    struct sockaddr_in6 name;
 
     // Create the socket.
     int sockfd = socket(PF_INET, SOCK_STREAM, 0);
@@ -151,9 +151,9 @@ static int make_server_socket (uint16_t port)
     }
 
     // Give the socket a name.
-    name.sin_family = AF_INET;
-    name.sin_port = hton16(port);
-    name.sin_addr.s_addr = hton32(INADDR_ANY);
+    name.sin6_family = AF_INET6;
+    name.sin6_port = hton16(port);
+    name.sin6_addr = in6addr_any;
     if (bind(sockfd, (struct sockaddr *) &name, sizeof (name)) < 0)
     {
         nlog_error("Could not bind socket to address. (%s)", strerror(errno));
@@ -324,9 +324,12 @@ static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
 
 static void accept_incoming_connections(void)
 {
+    char ip_str_buf[128];
     while(true)
     {
-        int newfd = accept(server_socket, NULL, NULL);
+        struct sockaddr_storage clientname;
+        size_t clientname_size = sizeof(clientname);
+        int newfd = accept(server_socket, (struct sockaddr *) &clientname, &clientname_size);
         if(newfd == -1)
         {
             if(errno == EAGAIN || errno == EWOULDBLOCK) // There are no incoming connections in the queue.
@@ -343,6 +346,11 @@ static void accept_incoming_connections(void)
                 continue;
             }
         }
+        nlog_info("Accepted incoming connection from %s:%u (fd = %d)",
+            sockaddr_ip_str((struct sockaddr *) &clientname, ip_str_buf, 128),
+            (clientname.ss_family == AF_INET6) ?
+                ntohs(((struct sockaddr_in *) &clientname)->sin_port) :
+                ntohs(((struct sockaddr_in6 *) &clientname)->sin6_port), newfd);
 
         if(fcntl(newfd, F_SETFL, O_NONBLOCK) == -1)
         {
@@ -387,6 +395,7 @@ static void accept_incoming_connections(void)
         conn2->iostream = stream;
         conn2->server_address_used = NULL;
         conn2->tmp_present = false;
+        conn2->client_address = clientname;
 
         if(slist_append(&clients, conn2) == NULL)
         {
@@ -398,7 +407,10 @@ static void accept_incoming_connections(void)
             continue;
         }
         client_count++;
-        nlog_info("Socket with fd %d connected.", newfd);
+        nlog_info("Client from %s:%u (fd = %d) connected successfully.", sockaddr_ip_str((struct sockaddr *) &clientname, ip_str_buf, 128),
+        (clientname.ss_family == AF_INET6) ?
+            ntohs(((struct sockaddr_in *) &clientname)->sin_port) :
+            ntohs(((struct sockaddr_in6 *) &clientname)->sin6_port), newfd);
     }
 }
 

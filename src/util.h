@@ -36,6 +36,8 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
+#include <psnip/endian/endian.h>
+
 #include "warnings.h"
 
 
@@ -115,13 +117,13 @@
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
 
-#define hton16(x) htons(x)
-#define hton32(x) htonl(x)
-#define hton64(x) htonll(x)
+#define hton16(x) psnip_endian_be16(x)
+#define hton32(x) psnip_endian_be32(x)
+#define hton64(x) psnip_endian_be64(x)
 
-#define ntoh16(x) ntohs(x)
-#define ntoh32(x) ntohl(x)
-#define ntoh64(x) ntohll(x)
+#define ntoh16(x) psnip_endian_be16(x)
+#define ntoh32(x) psnip_endian_be32(x)
+#define ntoh64(x) psnip_endian_be64(x)
 
 
 void bswap(void *what, size_t n);
@@ -144,6 +146,28 @@ void timeval_to_timespec(struct timespec *ts, const struct timeval *tv);
  * More than zero if t1 is found to be greater than t2.
  */
 int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
+
+
+// Convert a struct sockaddr address to a string, IPv4 and IPv6:
+static inline const char *sockaddr_ip_str(const struct sockaddr *sa, char *s, size_t maxlen)
+{
+    switch(sa->sa_family)
+    {
+        case AF_INET: {
+            struct sockaddr_in addr;
+            memcpy(&addr, sa, sizeof(addr));
+            return inet_ntop(AF_INET, &(addr.sin_addr), s, maxlen);
+        }
+
+        case AF_INET6: {
+            struct sockaddr_in6 addr;
+            memcpy(&addr, sa, sizeof(addr));
+            return inet_ntop(AF_INET6, &(addr.sin6_addr), s, maxlen);
+        }
+
+        default: strncpy(s, "Unknown AF", maxlen); return s;
+    }
+}
 
 #ifndef HAVE_ASPRINTF
     static int asprintf(char **strp, const char *fmt, ...)
