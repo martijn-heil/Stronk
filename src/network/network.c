@@ -68,23 +68,64 @@ static size_t client_count = 0;
 static pthread_rwlock_t clients_lock;
 static SListEntry *clients = NULL; // List of clients.
 static char *motd;
+static struct addrinfo *addressinfo;
 
 
 static void accept_incoming_connections(void);
-static int make_server_socket (uint16_t port);
 static void serve_client_batch(void *arg);
 static void serve_clients(void);
 
 
 int net_init(void) {
-    uint16_t port = 25565; // TODO configuration of port.
+    const char *service = "25565"; // TODO configuration of port.
+    nlog_info("Creating server socket..");
 
-    nlog_info("Creating server socket on port %i..", port);
-    server_socket = make_server_socket(port);
-    if(server_socket < 0)
+    struct addrinfo hints;
+
+    // first, load up address structs with getaddrinfo():
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC; // use IPv4 or IPv6, whichever
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE; // fill in my IP for me
+
+    int getaddrinfo_result = getaddrinfo(NULL, service, &hints, &addressinfo);
+    if(getaddrinfo_result != 0)
     {
-        nlog_fatal("Could not create server socket. (%s ?)", strerror(errno));
+        nlog_fatal("Could not set up inbound socket address, getaddrinfo() returned an error: %s", gai_strerror(getaddrinfo_result));
         return -1;
+    }
+
+    // make a socket:
+    server_socket = socket(addressinfo->ai_family, addressinfo->ai_socktype, addressinfo->ai_protocol);
+    if(server_socket == -1)
+    {
+        nlog_fatal("Could not create server socket. (%s)", strerror(errno));
+        return -1;
+    }
+
+    // bind it to the port we passed in to getaddrinfo():
+    if(bind(server_socket, addressinfo->ai_addr, addressinfo->ai_addrlen) == -1)
+    {
+        nlog_fatal("Could not bind socket. (%s)", strerror(errno));
+        return -1;
+    }
+    if(addressinfo->ai_addr->sa_family == AF_INET6)
+    {
+        char buf[INET6_ADDRSTRLEN];
+        const char *ip = inet_ntop(AF_INET6, addressinfo->ai_addr, buf, addressinfo->ai_addrlen);
+        if(ip != NULL)
+        {
+            nlog_info("Successfully bound socket to [%s]:%hu", ip, ntoh16(((struct sockaddr_in6 *) addressinfo->ai_addr)->sin6_port));
+        }
+    }
+    else if(addressinfo->ai_addr->sa_family == AF_INET)
+    {
+        char buf[INET_ADDRSTRLEN];
+        const char *ip = inet_ntop(AF_INET, addressinfo->ai_addr, buf, addressinfo->ai_addrlen);
+        if(ip != NULL)
+        {
+            nlog_info("Successfully bound socket to %s:%hu", ip, ntoh16(((struct sockaddr_in *) addressinfo->ai_addr)->sin_port));
+        }
     }
 
 
@@ -102,10 +143,10 @@ int net_init(void) {
     new_actn.sa_flags = 0;
     sigaction (SIGPIPE, &new_actn, &old_actn);
 
-    nlog_info("Setting backlog for server socket to 5..");
-    if(listen(server_socket, 5) == -1)
+    nlog_info("Listening on server socket with a backlog of 20..");
+    if(listen(server_socket, 20) == -1)
     {
-        nlog_fatal("Could not set backlog for server socket.");
+        nlog_fatal("Could not listen on server socket. (%s)", strerror(errno));
         return -1;
     }
 
@@ -128,6 +169,7 @@ int net_init(void) {
 
 void net_cleanup(void)
 {
+    freeaddrinfo(addressinfo);
     // TODO
 }
 
@@ -135,32 +177,6 @@ void net_tick(void)
 {
     accept_incoming_connections();
     serve_clients();
-}
-
-
-static int make_server_socket (uint16_t port)
-{
-    struct sockaddr_in6 name;
-
-    // Create the socket.
-    int sockfd = socket(PF_INET6, SOCK_STREAM, 0);
-    if (sockfd < 0)
-    {
-        nlog_error("Could not create socket. (%s)", strerror(errno));
-        return -1;
-    }
-
-    // Give the socket a name.
-    name.sin6_family = AF_INET6;
-    name.sin6_port = hton16(port);
-    name.sin6_addr = in6addr_any;
-    if (bind(sockfd, (struct sockaddr *) &name, sizeof(name)) < 0)
-    {
-        nlog_error("Could not bind socket to address. (%s)", strerror(errno));
-        return -1;
-    }
-
-    return sockfd;
 }
 
 void connection_close(struct connection *conn, const char *disconnect_message)
@@ -328,7 +344,7 @@ static void accept_incoming_connections(void)
     while(true)
     {
         struct sockaddr_storage clientname;
-        size_t clientname_size = sizeof(clientname);
+        socklen_t clientname_size = (socklen_t) sizeof(clientname);
         int newfd = accept(server_socket, (struct sockaddr *) &clientname, &clientname_size);
         if(newfd == -1)
         {
