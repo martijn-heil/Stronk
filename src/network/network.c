@@ -450,7 +450,7 @@ static void update_client(struct connection *conn)
             keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
 
 
-            if(mcpr_connection_write_packet(conn->conn, &keep_alive) < 0)
+            if(!mcpr_connection_write_packet(conn->conn, &keep_alive))
             {
                 if(strcmp(ninerr->type, "ninerr_closed") == 0)
                 {

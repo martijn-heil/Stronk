@@ -136,7 +136,7 @@ struct hp_result handle_pl_client_settings(const struct mcpr_packet *pkt, struct
 
     response.data.play.clientbound.player_position_and_look.teleport_id = 0;
 
-    if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &response))
     {
         if(ninerr != NULL && strcmp(ninerr->message, "ninerr_closed") == 0)
         {
@@ -203,7 +203,7 @@ struct hp_result handle_pl_teleport_confirm(const struct mcpr_packet *pkt, struc
 
         response.data.play.clientbound.player_position_and_look.teleport_id = 0;
 
-        if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+        if(!mcpr_connection_write_packet(conn->conn, &response))
         {
             if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
             {

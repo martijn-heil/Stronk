@@ -108,7 +108,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
     join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
 
-    if(mcpr_connection_write_packet(conn->conn, &join_game_pkt) < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &join_game_pkt))
     {
         if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
@@ -157,7 +157,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
     pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
 
-    if(mcpr_connection_write_packet(conn->conn, &pm_brand) < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &pm_brand))
     {
         if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
@@ -190,7 +190,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     spawn_position_pkt.state = MCPR_STATE_PLAY;
     spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
 
-    if(mcpr_connection_write_packet(conn->conn, &spawn_position_pkt) < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &spawn_position_pkt))
     {
         if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
@@ -228,7 +228,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
     player_abilities_pkt.data.play.clientbound.player_abilities.creative_mode = false;
 
-    if(mcpr_connection_write_packet(conn->conn, &player_abilities_pkt) < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &player_abilities_pkt))
     {
         if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
         {
@@ -341,7 +341,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         response.data.login.clientbound.encryption_request.verify_token = verify_token;
 
 
-        if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+        if(!mcpr_connection_write_packet(conn->conn, &response))
         {
             if(ninerr != NULL && ninerr->message != NULL && strcmp(ninerr->message, "ninerr_closed") == 0)
             {
@@ -423,7 +423,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         response.data.login.clientbound.login_success.uuid = uuid;
         response.data.login.clientbound.login_success.username = conn->tmp.username;
 
-        if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+        if(!mcpr_connection_write_packet(conn->conn, &response))
         {
             if(strcmp(ninerr->type, "ninerr_closed") == 0)
             {
@@ -595,7 +595,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
         response.data.login.clientbound.login_success.uuid = mapi_result->id;
         response.data.login.clientbound.login_success.username = conn->tmp.username; // eh i think we should get the username from another source?
 
-        if(mcpr_connection_write_packet(conn->conn, &response) < 0)
+        if(!mcpr_connection_write_packet(conn->conn, &response))
         {
             if(strcmp(ninerr->type, "ninerr_closed") == 0)
             {

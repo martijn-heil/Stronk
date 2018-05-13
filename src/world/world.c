@@ -299,8 +299,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
     }
 
     const struct connection *conn = player_get_connection(p);
-    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
-    if(result < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &pkt))
     {
         nlog_error("Could not send chunk data packet.");
         ninerr_print(ninerr);
@@ -356,8 +355,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
     pkt.data.play.clientbound.chunk_data.chunk_sections[section_y] = mcpr_chunk_section;
 
     struct connection *conn = p->conn;
-    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
-    if(result < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &pkt))
     {
         nlog_error("Could not send chunk data packet.");
         ninerr_print(ninerr);
@@ -366,7 +364,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
 
     // Clean up..
     free(membuf);
-    return 1;
+    return true;
 }
 
 
