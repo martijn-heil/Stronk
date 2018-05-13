@@ -143,7 +143,7 @@ static int make_server_socket (uint16_t port)
     struct sockaddr_in6 name;
 
     // Create the socket.
-    int sockfd = socket(PF_INET, SOCK_STREAM, 0);
+    int sockfd = socket(PF_INET6, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
         nlog_error("Could not create socket. (%s)", strerror(errno));
@@ -154,7 +154,7 @@ static int make_server_socket (uint16_t port)
     name.sin6_family = AF_INET6;
     name.sin6_port = hton16(port);
     name.sin6_addr = in6addr_any;
-    if (bind(sockfd, (struct sockaddr *) &name, sizeof (name)) < 0)
+    if (bind(sockfd, (struct sockaddr *) &name, sizeof(name)) < 0)
     {
         nlog_error("Could not bind socket to address. (%s)", strerror(errno));
         return -1;
