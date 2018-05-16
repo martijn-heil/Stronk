@@ -133,22 +133,22 @@ bool ninuuid_from_string(struct ninuuid *out, const char *in)
     }
 
     int result = sscanf(in, fmt,
-        out->bytes[0],
-        out->bytes[1],
-        out->bytes[2],
-        out->bytes[3],
-        out->bytes[4],
-        out->bytes[5],
-        out->bytes[6],
-        out->bytes[7],
-        out->bytes[8],
-        out->bytes[9],
-        out->bytes[10],
-        out->bytes[11],
-        out->bytes[12],
-        out->bytes[13],
-        out->bytes[14],
-        out->bytes[15]
+        out->bytes + 0,
+        out->bytes + 1,
+        out->bytes + 2,
+        out->bytes + 3,
+        out->bytes + 4,
+        out->bytes + 5,
+        out->bytes + 6,
+        out->bytes + 7,
+        out->bytes + 8,
+        out->bytes + 9,
+        out->bytes + 10,
+        out->bytes + 11,
+        out->bytes + 12,
+        out->bytes + 13,
+        out->bytes + 14,
+        out->bytes + 15
     );
     if(result == EOF || result < 16) return false;
 
