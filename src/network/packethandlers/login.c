@@ -524,7 +524,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
             nlog_error("Shared secret length is greater than RSA_size(rsa)");
             goto err;
         }
-        int decrypted_shared_secret_length = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_NO_PADDING);
+        int decrypted_shared_secret_length = RSA_private_decrypt((int) shared_secret_length, (unsigned char *) shared_secret, (unsigned char *) decrypted_shared_secret, conn->tmp.rsa, RSA_PKCS1_PADDING);
         if(decrypted_shared_secret_length < 0)
         {
             nlog_error("Could not decrypt shared secret.");

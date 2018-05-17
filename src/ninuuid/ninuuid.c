@@ -125,11 +125,11 @@ bool ninuuid_from_string(struct ninuuid *out, const char *in)
     const char *fmt;
     if(compressed)
     {
-        fmt = "%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX%hhX";
+        fmt = "%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX";
     }
     else
     {
-        fmt = "%hhX%hhX%hhX%hhX-%hhX%hhX-%hhX%hhX-%hhX%hhX-%hhX%hhX%hhX%hhX%hhX%hhX";
+        fmt = "%02hhX%02hhX%02hhX%02hhX-%02hhX%02hhX-%02hhX%02hhX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX";
     }
 
     int result = sscanf(in, fmt,

@@ -527,7 +527,8 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
 {
     DEBUG_PRINT("in mapi_minecraft_has_joined(username = %s, server_id_hash = %s, ip = %s)", username, server_id_hash, ip);
 
-    const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
+    //const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
+    const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s";
     // CURL *curl = curl_easy_init();
     // if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
 
@@ -699,7 +700,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload);
     }
 
-    chunk = curl_slist_append(chunk, "Accept: application/json");
+    //chunk = curl_slist_append(chunk, "Accept: application/json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
 
@@ -750,7 +751,7 @@ static int mapi_make_api_request(json_t **output, const char *url, enum mapi_htt
         char tmp[curl_buf.size + 1];
         memcpy(tmp, curl_buf.content, curl_buf.size);
         tmp[curl_buf.size] = '\0';
-        DEBUG_PRINT("Content of curl buf: %s\n", tmp);
+        DEBUG_PRINT("Content of curl buf(len = %zu): %s\n", curl_buf.size, tmp);
     #endif
     *output = json_loadb(curl_buf.content, curl_buf.size, 0, &json_error);
     if(*output == NULL)
@@ -1407,6 +1408,7 @@ static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_resp
 
     const char *id = json_string_value(id_json);
     if(id == NULL) { ninerr_set_err(NULL); return NULL; }
+    if(strlen(id) < NINUUID_STRING_SIZE_COMPRESSED) { ninerr_set_err(NULL); return NULL; }
 
     json_t *name_json = json_object_get(json, "name");
     if(name_json == NULL) { ninerr_set_err(NULL); return NULL; }
@@ -1473,7 +1475,8 @@ static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_resp
     resp->properties.signature = signature_buf;
     resp->properties.skin_blob_base64 = value_buf;
 
-    if(!ninuuid_from_string(&(resp->id), id)) { ninerr_set_err(NULL); return NULL; }
+    DEBUG_PRINT("id: %s", id);
+    if(!ninuuid_from_string(&(resp->id), id)) { ninerr_set_err(ninerr_new("ninuuid_from_string() failed")); return NULL; }
 
     return resp;
 }
