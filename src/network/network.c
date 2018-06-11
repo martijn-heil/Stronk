@@ -103,6 +103,15 @@ int net_init(void) {
         return -1;
     }
 
+    int yes=1;
+    //char yes='1'; // Solaris people use this
+
+    // lose the pesky "Address already in use" error message
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1) {
+        nlog_fatal("Could not setsockopt");
+        return -1;
+    }
+
     // bind it to the port we passed in to getaddrinfo():
     if(bind(server_socket, addressinfo->ai_addr, addressinfo->ai_addrlen) == -1)
     {
