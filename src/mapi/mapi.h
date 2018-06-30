@@ -1,29 +1,29 @@
 /*
-    MIT License
+  MIT License
 
-    Copyright (c) 2016-2018 Martijn Heil
+  Copyright (c) 2016-2018 Martijn Heil
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
 
 
 
-    mapi.h - C interface to Mojang's web API. Short for *M*ojang *API*
+  mapi.h - C interface to Mojang's web API. Short for *M*ojang *API*
 */
 #ifndef MCPR_MOJANG_API_H
 #define MCPR_MOJANG_API_H
@@ -40,70 +40,70 @@ extern struct logger *mapi_logger; // set to non null value to enable logging, s
 
 struct mapi_profile
 {
-    struct ninuuid uuid;       // Should be free'd
-    char *name;     // Should be free'd
-    bool legacy;
+  struct ninuuid uuid;     // Should be free'd
+  char *name;   // Should be free'd
+  bool legacy;
 };
 
 struct mapi_auth_response
 {
-    char *access_token; // Should be free'd
-    char *client_token; // Should be free'd
+  char *access_token; // Should be free'd
+  char *client_token; // Should be free'd
 
-    size_t available_profiles_amount;
-    struct mapi_profile *available_profiles; // Array of available profiles, the structs themselves should be free'd, may not be NULL.
-    struct mapi_profile selected_profile;
+  size_t available_profiles_amount;
+  struct mapi_profile *available_profiles; // Array of available profiles, the structs themselves should be free'd, may not be NULL.
+  struct mapi_profile selected_profile;
 
-    bool user_present;
-    struct
-    {
-        char *id; // should be free'd.
+  bool user_present;
+  struct
+  {
+    char *id; // should be free'd.
 
-        char *preferred_language; // might be NULL. Should be free'd.
-        char *twitch_access_token; // might be NULL. Should be free'd.
-    } user; // only present if request_user was specified
+    char *preferred_language; // might be NULL. Should be free'd.
+    char *twitch_access_token; // might be NULL. Should be free'd.
+  } user; // only present if request_user was specified
 };
 void mapi_auth_response_destroy(struct mapi_auth_response *response);
 
 
 struct mapi_refresh_response
 {
-    char *access_token;
-    char *client_token;
+  char *access_token;
+  char *client_token;
 
-    struct
-    {
-        char *id;
-        char *name;
-    } selected_profile;
+  struct
+  {
+    char *id;
+    char *name;
+  } selected_profile;
 
-    bool user_present;
-    struct
-    {
-        char *id;
+  bool user_present;
+  struct
+  {
+    char *id;
 
-        char *preferred_language; // Might be NULL.
-        char *twitch_access_token; // Might be NULL.
-    } user;
+    char *preferred_language; // Might be NULL.
+    char *twitch_access_token; // Might be NULL.
+  } user;
 };
 void mapi_refresh_response_destroy(struct mapi_refresh_response *response);
 
 struct mapi_minecraft_has_joined_response
 {
-    struct ninuuid id;
-    char *player_name;
-    struct
-    {
-        char *skin_blob_base64;
-        char *signature;
-    } properties;
+  struct ninuuid id;
+  char *player_name;
+  struct
+  {
+    char *skin_blob_base64;
+    char *signature;
+  } properties;
 };
 void mapi_minecraft_has_joined_response_destroy(struct mapi_minecraft_has_joined_response *response);
 
 enum mapi_agent
 {
-    MAPI_AGENT_MINECRAFT,
-    MAPI_AGENT_SCROLLS,
+  MAPI_AGENT_MINECRAFT,
+  MAPI_AGENT_SCROLLS,
 };
 
 
@@ -139,9 +139,9 @@ struct mapi_refresh_response *mapi_auth_refresh(const char *restrict access_toke
 
 enum mapi_auth_validate_result
 {
-    MAPI_AUTH_VALIDATE_RESULT_SUCCESS,
-    MAPI_AUTH_VALIDATE_RESULT_ERROR,
-    MAPI_AUTH_VALIDATE_RESULT_FAILED
+  MAPI_AUTH_VALIDATE_RESULT_SUCCESS,
+  MAPI_AUTH_VALIDATE_RESULT_ERROR,
+  MAPI_AUTH_VALIDATE_RESULT_FAILED
 };
 /**
  * Checks if an access token is usable for authentication with a Minecraft server.
@@ -198,11 +198,11 @@ bool mapi_username_to_uuid(struct ninuuid *out, const char *restrict player_name
 
 struct mapi_err_authserver_err
 {
-    struct ninerr super;
-    char *error;
-    char *friendly_error_message;
-    char *cause_message; // may be NULL.
-    int http_code;
+  struct ninerr super;
+  char *error;
+  char *friendly_error_message;
+  char *cause_message; // may be NULL.
+  int http_code;
 };
 struct mapi_err_authserver_err *mapi_err_authserver_err_new(const char *error, const char *friendly_error_message, const char *cause_message, int http_code);
 

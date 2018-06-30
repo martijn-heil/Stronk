@@ -1,29 +1,29 @@
 /*
-    MIT License
+  MIT License
 
-    Copyright (c) 2016-2018 Martijn Heil
+  Copyright (c) 2016-2018 Martijn Heil
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
 
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
 
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
 
 
 
-    mcpr.c - Minecraft Protocol functions
+  mcpr.c - Minecraft Protocol functions
 */
 
 #ifndef MCPR_H
@@ -39,8 +39,8 @@
 #include <arpa/inet.h>
 
 /*
-    Minecraft Protocol (http://wiki.vg/Protocol)
-    MCPR = MineCraft PRotocol.
+  Minecraft Protocol (http://wiki.vg/Protocol)
+  MCPR = MineCraft PRotocol.
 */
 
 #define MCPR_PROTOCOL_VERSION 340
@@ -77,23 +77,23 @@ size_t mcpr_compress_bounds(size_t len);
 
 
 enum mcpr_state {
-    MCPR_STATE_HANDSHAKE = 0,
-    MCPR_STATE_STATUS = 1,
-    MCPR_STATE_LOGIN = 2,
-    MCPR_STATE_PLAY = 3
+  MCPR_STATE_HANDSHAKE = 0,
+  MCPR_STATE_STATUS = 1,
+  MCPR_STATE_LOGIN = 2,
+  MCPR_STATE_PLAY = 3
 };
 const char *mcpr_state_to_string(enum mcpr_state state);
 
 
 enum mcpr_connection_type {
-    MCPR_CONNECTION_TYPE_SERVERBOUND,
-    MCPR_CONNECTION_TYPE_CLIENTBOUND
+  MCPR_CONNECTION_TYPE_SERVERBOUND,
+  MCPR_CONNECTION_TYPE_CLIENTBOUND
 };
 
 struct mcpr_position {
-    long long int x;
-    long long int y;
-    long long int z;
+  long long int x;
+  long long int y;
+  long long int z;
 };
 
 char *mcpr_as_chat(const char *message_fmt, ...);

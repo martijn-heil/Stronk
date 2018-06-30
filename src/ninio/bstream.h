@@ -1,23 +1,23 @@
 /*
-    MIT License
+  MIT License
 
-    Copyright (c) 2017-2018 Martijn Heil
+  Copyright (c) 2017-2018 Martijn Heil
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-    The above copyright notice and this permission notice shall be included in all
-    copies or substantial portions of the Software.
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-    SOFTWARE.
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
 */
 
 #ifndef NINIO_BSTREAM_H
@@ -31,26 +31,26 @@
 
 struct bstream
 {
-    void *private; // may be NULL
-    bool (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    ssize_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
-    bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    ssize_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
-    bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
-    void (*incref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
-    void (*decref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
-    bool (*is_available)(struct bstream *stream, size_t amount); // may be NULL
+  void *private; // may be NULL
+  bool (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
+  ssize_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+  bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
+  ssize_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
+  bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
+  void (*incref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
+  void (*decref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
+  bool (*is_available)(struct bstream *stream, size_t amount); // may be NULL
 };
 
 /*
-    Returns a bstream for the given file descriptor.
-    Provided functionality:
-    read
-    read_max
-    write
-    incref
-    decref
-    is_available? TODO
+  Returns a bstream for the given file descriptor.
+  Provided functionality:
+  read
+  read_max
+  write
+  incref
+  decref
+  is_available? TODO
 */
 struct bstream *bstream_from_fd(int fd);
 
@@ -70,8 +70,8 @@ int bstream_vprintf(struct bstream *stream, const char *fmt, va_list ap);
 int bstream_printf(struct bstream *stream, const char *fmt, ...);
 
 #ifdef HAVE_FOPENCOOKIE
-    #define HAVE_FP_FROM_BSTREAM
-    FILE *fp_from_bstream(struct bstream *stream);
+  #define HAVE_FP_FROM_BSTREAM
+  FILE *fp_from_bstream(struct bstream *stream);
 #endif
 
 void bstream_init_black_hole(struct bstream *stream);
