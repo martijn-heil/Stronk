@@ -20,6 +20,9 @@
   SOFTWARE.
 */
 
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "fileutils.h"
 
 struct fmux_cookie
