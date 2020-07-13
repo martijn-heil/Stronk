@@ -111,6 +111,7 @@ bool chat_broadcast(struct chat_entry entry, enum chat_type t)
   }
   free(players);
   pthread_rwlock_unlock(players_lock);
+  nlog_info("[CHAT BROADCAST] %s", entry.msg);
   return true;
 }
 
@@ -130,5 +131,6 @@ bool chat_broadcast_forced(struct chat_entry entry)
   }
   free(players);
   pthread_rwlock_unlock(players_lock);
+  nlog_info("[CHAT BROADCAST (forced)] %s", entry.msg);
   return true;
 }
