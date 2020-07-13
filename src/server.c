@@ -382,3 +382,15 @@ void server_get_internal_clock_time(struct timespec *out)
 
   pthread_rwlock_unlock(&internal_clock_lock);
 }
+
+
+void server_get_players(struct player ***out_players, size_t *out_players_count)
+{
+
+}
+
+pthread_rwlock_t *server_get_players_lock(void)
+{
+  nlog_fatal("Unimplemented!");
+  abort();
+}

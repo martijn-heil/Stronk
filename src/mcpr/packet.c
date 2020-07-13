@@ -454,6 +454,26 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
     {
       switch(pkt->id)
       {
+        case MCPR_PKT_PL_CB_CHAT_MESSAGE:
+        {
+          const char *json_data = pkt->data.play.clientbound.chat_message.json_data;
+          enum mcpr_chat_position position = pkt->data.play.clientbound.chat_message.position;
+          void *bufpointer = out;
+          ssize_t bytes_written_2 = mcpr_encode_chat(bufpointer, json_data);
+          if(bytes_written_2 < 0) { return 0; }
+          bufpointer += bytes_written_2;
+          uint8_t position_byte;
+          switch(position)
+          {
+            case MCPR_CHAT_POSITION_CHAT: { position_byte = 0; break; }
+            case MCPR_CHAT_POSITION_SYSTEM: { position_byte = 1; break; }
+            case MCPR_CHAT_POSITION_HOTBAR: { position_byte = 2; break; }
+          }
+          mcpr_encode_byte(bufpointer, position_byte);
+          bufpointer += MCPR_BYTE_SIZE;
+          return bufpointer - out;
+        }
+
         case MCPR_PKT_PL_CB_DISCONNECT:
         {
           const char *reason = pkt->data.play.clientbound.disconnect.reason; // It's JSON chat, not a normal string
@@ -1132,22 +1152,23 @@ uint8_t mcpr_packet_type_to_byte(enum mcpr_packet_type id)
 {
   switch(id)
   {
-    case MCPR_PKT_ST_CB_RESPONSE:           return 0x00;
-    case MCPR_PKT_ST_CB_PONG:             return 0x01;
+    case MCPR_PKT_ST_CB_RESPONSE:                 return 0x00;
+    case MCPR_PKT_ST_CB_PONG:                     return 0x01;
 
-    case MCPR_PKT_LG_CB_DISCONNECT:         return 0x00;
-    case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:     return 0x01;
-    case MCPR_PKT_LG_CB_LOGIN_SUCCESS:        return 0x02;
-    case MCPR_PKT_LG_CB_SET_COMPRESSION:      return 0x03;
+    case MCPR_PKT_LG_CB_DISCONNECT:               return 0x00;
+    case MCPR_PKT_LG_CB_ENCRYPTION_REQUEST:       return 0x01;
+    case MCPR_PKT_LG_CB_LOGIN_SUCCESS:            return 0x02;
+    case MCPR_PKT_LG_CB_SET_COMPRESSION:          return 0x03;
 
-    case MCPR_PKT_PL_CB_DISCONNECT:         return 0x1A;
-    case MCPR_PKT_PL_CB_KEEP_ALIVE:         return 0x1F;
-    case MCPR_PKT_PL_CB_JOIN_GAME:          return 0x23;
-    case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:       return 0x18;
-    case MCPR_PKT_PL_CB_SPAWN_POSITION:       return 0x46;
-    case MCPR_PKT_PL_CB_CHUNK_DATA:         return 0x20;
-    case MCPR_PKT_PL_CB_PLAYER_ABILITIES:       return 0x2C;
-    case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK:   return 0x2F;
+    case MCPR_PKT_PL_CB_DISCONNECT:               return 0x1A;
+    case MCPR_PKT_PL_CB_KEEP_ALIVE:               return 0x1F;
+    case MCPR_PKT_PL_CB_JOIN_GAME:                return 0x23;
+    case MCPR_PKT_PL_CB_PLUGIN_MESSAGE:           return 0x18;
+    case MCPR_PKT_PL_CB_SPAWN_POSITION:           return 0x46;
+    case MCPR_PKT_PL_CB_CHUNK_DATA:               return 0x20;
+    case MCPR_PKT_PL_CB_PLAYER_ABILITIES:         return 0x2C;
+    case MCPR_PKT_PL_CB_PLAYER_POSITION_AND_LOOK: return 0x2F;
+    case MCPR_PKT_PL_CB_CHAT_MESSAGE:             return 0x0F;
     default: DEBUG_PRINT("Unimplemented packet id given in mcpr_packet_type_to_byte().. Aborting at mcpr.c:%i", __LINE__); abort();
   }
   return 0; // Won't even be reached, but else the compiler will complain

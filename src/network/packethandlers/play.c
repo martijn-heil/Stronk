@@ -28,6 +28,7 @@
 #include <mcpr/codec.h>
 #include <mcpr/connection.h>
 
+#include <chat/chat.h>
 #include <network/packethandlers/packethandlers.h>
 #include <server.h>
 #include <world/world.h>
@@ -256,6 +257,14 @@ struct hp_result handle_pl_tab_complete(const struct mcpr_packet *pkt, struct co
 
 struct hp_result handle_pl_chat_message(const struct mcpr_packet *pkt, struct connection *conn)
 {
+  const char *msg = pkt->data.play.serverbound.chat_message.message;
+  char *chat_json = mcpr_as_chat("%s", msg);
+  struct chat_entry entry;
+  entry.msg = msg;
+  entry.position = MCPR_CHAT_POSITION_CHAT;
+  chat_broadcast(entry, CHAT_TYPE_CHAT);
+  free(chat_json);
+
   struct hp_result result = { .result = HP_RESULT_OK, .disconnect_message = NULL, .free_disconnect_message = false };
   return result;
 }

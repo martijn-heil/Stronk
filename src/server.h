@@ -23,11 +23,19 @@
 #ifndef STRONK_SERVER_H
 #define STRONK_SERVER_H
 
+#include <stddef.h>
+#include <pthread.h>
 #include <time.h>
+
+#include <network/player.h>
 
 void server_start(void);
 void server_crash(void);
 void server_shutdown(int status);
+
+// TODO.. thread safety
+void server_get_players(struct player ***out_players, size_t *out_players_count);
+pthread_rwlock_t *server_get_players_lock(void);
 
 
 void server_get_internal_clock_time(struct timespec *out);
