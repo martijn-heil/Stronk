@@ -71,6 +71,8 @@ static bool should_send(enum mcpr_chat_mode mode, enum chat_type t)
 bool chat_send(struct connection *conn, struct chat_entry entry)
 {
   struct mcpr_packet pkt;
+  pkt.id = MCPR_PKT_PL_CB_CHAT_MESSAGE;
+  pkt.state = MCPR_STATE_PLAY;
   pkt.data.play.clientbound.chat_message.json_data = entry.msg;
   pkt.data.play.clientbound.chat_message.position = entry.position;
 
