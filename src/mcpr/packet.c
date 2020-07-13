@@ -876,6 +876,15 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
     {
       switch(pkt->id)
       {
+        case MCPR_PKT_PL_SB_CHAT_MESSAGE:
+        {
+          ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.play.serverbound.chat_message.message), ptr, len_left);
+          if(bytes_read_2 < 0) { free(pkt); return -1; }
+          ptr += bytes_read_2;
+          len_left -= bytes_read_2;
+          return ptr - in;
+        }
+
         case MCPR_PKT_PL_SB_CLIENT_SETTINGS:
         {
           ssize_t bytes_read_2 = mcpr_decode_string(&(pkt->data.play.serverbound.client_settings.locale), ptr, len_left);
