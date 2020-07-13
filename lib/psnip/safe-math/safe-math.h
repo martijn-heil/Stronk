@@ -65,13 +65,39 @@
 #endif
 
 #if !defined(PSNIP_SAFE_NO_FIXED)
+/* For maximum portability include the exact-int module from
+   portable snippets. */
 #  if \
-  !defined(psnip_uint8_t)  || !defined(psnip_int8_t)  || \
-  !defined(psnip_uint16_t) || !defined(psnip_int16_t) || \
-  !defined(psnip_uint32_t) || !defined(psnip_int32_t) || \
-  !defined(psnip_uint64_t) || !defined(psnip_int64_t)
-#    include "../exact-int/exact-int.h"
-#endif
+    !defined(psnip_int64_t) || !defined(psnip_uint64_t) || \
+    !defined(psnip_int32_t) || !defined(psnip_uint32_t) || \
+    !defined(psnip_int16_t) || !defined(psnip_uint16_t) || \
+    !defined(psnip_int8_t)  || !defined(psnip_uint8_t)
+#    include <stdint.h>
+#    if !defined(psnip_int64_t)
+#      define psnip_int64_t int64_t
+#    endif
+#    if !defined(psnip_uint64_t)
+#      define psnip_uint64_t uint64_t
+#    endif
+#    if !defined(psnip_int32_t)
+#      define psnip_int32_t int32_t
+#    endif
+#    if !defined(psnip_uint32_t)
+#      define psnip_uint32_t uint32_t
+#    endif
+#    if !defined(psnip_int16_t)
+#      define psnip_int16_t int16_t
+#    endif
+#    if !defined(psnip_uint16_t)
+#      define psnip_uint16_t uint16_t
+#    endif
+#    if !defined(psnip_int8_t)
+#      define psnip_int8_t int8_t
+#    endif
+#    if !defined(psnip_uint8_t)
+#      define psnip_uint8_t uint8_t
+#    endif
+#  endif
 #endif /* !defined(PSNIP_SAFE_NO_FIXED) */
 #include <limits.h>
 #include <stdlib.h>
@@ -460,7 +486,7 @@ PSNIP_SAFE_DEFINE_LARGER_UNSIGNED_OPS(psnip_uint64_t, uint64)
   PSNIP_SAFE__FUNCTION psnip_safe_bool \
   psnip_safe_##name##_add (T* res, T a, T b) { \
     psnip_safe_bool r = !( ((b > 0) && (a > (max - b))) ||   \
-                 ((b < 0) && (a < (max - b))) ); \
+                 ((b < 0) && (a < (min - b))) ); \
     if(PSNIP_SAFE_LIKELY(r)) \
         *res = a + b; \
     return r; \
@@ -476,8 +502,8 @@ PSNIP_SAFE_DEFINE_LARGER_UNSIGNED_OPS(psnip_uint64_t, uint64)
 #define PSNIP_SAFE_DEFINE_SIGNED_SUB(T, name, min, max) \
   PSNIP_SAFE__FUNCTION psnip_safe_bool \
   psnip_safe_##name##_sub (T* res, T a, T b) { \
-      psnip_safe_bool r = !((b > 0 && a < min + b) || \
-                  (b < 0 && a > max + b)); \
+      psnip_safe_bool r = !((b > 0 && a < (min + b)) || \
+                  (b < 0 && a > (max + b))); \
       if(PSNIP_SAFE_LIKELY(r)) \
           *res = a - b; \
       return r; \
@@ -1020,26 +1046,26 @@ PSNIP_SAFE_DEFINE_UNSIGNED_MOD(psnip_uint64_t, uint64, 0xffffffffffffffffULL)
 #endif
 
 #if !defined(PSNIP_SAFE_HAVE_BUILTINS) && (defined(PSNIP_SAFE_EMULATE_NATIVE) || defined(PSNIP_BUILTIN_EMULATE_NATIVE))
-#  define __builtin_sadd_overflow(a, b, res)   psnip_safe_int_add(res, a, b)
-#  define __builtin_saddl_overflow(a, b, res)  psnip_safe_long_add(res, a, b)
-#  define __builtin_saddll_overflow(a, b, res) psnip_safe_llong_add(res, a, b)
-#  define __builtin_uadd_overflow(a, b, res)   psnip_safe_uint_add(res, a, b)
-#  define __builtin_uaddl_overflow(a, b, res)  psnip_safe_ulong_add(res, a, b)
-#  define __builtin_uaddll_overflow(a, b, res) psnip_safe_ullong_add(res, a, b)
+#  define __builtin_sadd_overflow(a, b, res)   (!psnip_safe_int_add(res, a, b))
+#  define __builtin_saddl_overflow(a, b, res)  (!psnip_safe_long_add(res, a, b))
+#  define __builtin_saddll_overflow(a, b, res) (!psnip_safe_llong_add(res, a, b))
+#  define __builtin_uadd_overflow(a, b, res)   (!psnip_safe_uint_add(res, a, b))
+#  define __builtin_uaddl_overflow(a, b, res)  (!psnip_safe_ulong_add(res, a, b))
+#  define __builtin_uaddll_overflow(a, b, res) (!psnip_safe_ullong_add(res, a, b))
 
-#  define __builtin_ssub_overflow(a, b, res)   psnip_safe_int_sub(res, a, b)
-#  define __builtin_ssubl_overflow(a, b, res)  psnip_safe_long_sub(res, a, b)
-#  define __builtin_ssubll_overflow(a, b, res) psnip_safe_llong_sub(res, a, b)
-#  define __builtin_usub_overflow(a, b, res)   psnip_safe_uint_sub(res, a, b)
-#  define __builtin_usubl_overflow(a, b, res)  psnip_safe_ulong_sub(res, a, b)
-#  define __builtin_usubll_overflow(a, b, res) psnip_safe_ullong_sub(res, a, b)
+#  define __builtin_ssub_overflow(a, b, res)   (!psnip_safe_int_sub(res, a, b))
+#  define __builtin_ssubl_overflow(a, b, res)  (!psnip_safe_long_sub(res, a, b))
+#  define __builtin_ssubll_overflow(a, b, res) (!psnip_safe_llong_sub(res, a, b))
+#  define __builtin_usub_overflow(a, b, res)   (!psnip_safe_uint_sub(res, a, b))
+#  define __builtin_usubl_overflow(a, b, res)  (!psnip_safe_ulong_sub(res, a, b))
+#  define __builtin_usubll_overflow(a, b, res) (!psnip_safe_ullong_sub(res, a, b))
 
-#  define __builtin_smul_overflow(a, b, res)   psnip_safe_int_mul(res, a, b)
-#  define __builtin_smull_overflow(a, b, res)  psnip_safe_long_mul(res, a, b)
-#  define __builtin_smulll_overflow(a, b, res) psnip_safe_llong_mul(res, a, b)
-#  define __builtin_umul_overflow(a, b, res)   psnip_safe_uint_mul(res, a, b)
-#  define __builtin_umull_overflow(a, b, res)  psnip_safe_ulong_mul(res, a, b)
-#  define __builtin_umulll_overflow(a, b, res) psnip_safe_ullong_mul(res, a, b)
+#  define __builtin_smul_overflow(a, b, res)   (!psnip_safe_int_mul(res, a, b))
+#  define __builtin_smull_overflow(a, b, res)  (!psnip_safe_long_mul(res, a, b))
+#  define __builtin_smulll_overflow(a, b, res) (!psnip_safe_llong_mul(res, a, b))
+#  define __builtin_umul_overflow(a, b, res)   (!psnip_safe_uint_mul(res, a, b))
+#  define __builtin_umull_overflow(a, b, res)  (!psnip_safe_ulong_mul(res, a, b))
+#  define __builtin_umulll_overflow(a, b, res) (!psnip_safe_ullong_mul(res, a, b))
 #endif
 
 #endif /* !defined(PSNIP_SAFE_H) */

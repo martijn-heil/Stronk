@@ -99,16 +99,18 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
   struct mcpr_packet join_game_pkt;
   join_game_pkt.id = MCPR_PKT_PL_CB_JOIN_GAME;
   join_game_pkt.state = MCPR_STATE_PLAY;
-  join_game_pkt.data.play.clientbound.join_game.entity_id = player->entity_id;
-  join_game_pkt.data.play.clientbound.join_game.gamemode = player->gamemode;
-  join_game_pkt.data.play.clientbound.join_game.hardcore = false;
-  join_game_pkt.data.play.clientbound.join_game.dimension = MCPR_DIMENSION_OVERWORLD;
-  join_game_pkt.data.play.clientbound.join_game.difficulty = MCPR_DIFFICULTY_PEACEFUL;
-  join_game_pkt.data.play.clientbound.join_game.max_players = 255;
-  join_game_pkt.data.play.clientbound.join_game.level_type = MCPR_LEVEL_DEFAULT;
-  join_game_pkt.data.play.clientbound.join_game.reduced_debug_info = false;
+  #define pkt_ (join_game_pkt.data.play.clientbound.join_game)
+  pkt_.entity_id = player->entity_id;
+  pkt_.gamemode = player->gamemode;
+  pkt_.hardcore = false;
+  pkt_.dimension = MCPR_DIMENSION_OVERWORLD;
+  pkt_.difficulty = MCPR_DIFFICULTY_PEACEFUL;
+  pkt_.max_players = 255;
+  pkt_.level_type = MCPR_LEVEL_DEFAULT;
+  pkt_.reduced_debug_info = false;
+  #undef pkt_
 
-  if(!mcpr_connection_write_packet(conn->conn, &join_game_pkt))
+  if(fwrite(&join_game_pkt, sizeof(join_game_pkt), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {
@@ -153,11 +155,13 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
   struct mcpr_packet pm_brand;
   pm_brand.id = MCPR_PKT_PL_CB_PLUGIN_MESSAGE;
   pm_brand.state = MCPR_STATE_PLAY;
-  pm_brand.data.play.clientbound.plugin_message.channel = "MC|BRAND";
-  pm_brand.data.play.clientbound.plugin_message.data_length = (size_t) encode_str_result;
-  pm_brand.data.play.clientbound.plugin_message.data = server_brand_buf;
+  #define pkt_ (pm_brand.data.play.clientbound.plugin_message)
+  pkt_.channel = "MC|BRAND";
+  pkt_.data_length = (size_t) encode_str_result;
+  pkt_.data = server_brand_buf;
+  #undef pkt_
 
-  if(!mcpr_connection_write_packet(conn->conn, &pm_brand))
+  if(fwrite(&pm_brand, sizeof(pm_brand), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {
@@ -190,7 +194,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
   spawn_position_pkt.state = MCPR_STATE_PLAY;
   spawn_position_pkt.data.play.clientbound.spawn_position.location = player->compass_target;
 
-  if(!mcpr_connection_write_packet(conn->conn, &spawn_position_pkt))
+  if(fwrite(&spawn_position_pkt, sizeof(spawn_position_pkt), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {
@@ -228,7 +232,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
   player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
   player_abilities_pkt.data.play.clientbound.player_abilities.creative_mode = false;
 
-  if(!mcpr_connection_write_packet(conn->conn, &player_abilities_pkt))
+  if(fwrite(&player_abilities_pkt, sizeof(player_abilities_pkt), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {
@@ -341,7 +345,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
     response.data.login.clientbound.encryption_request.verify_token = verify_token;
 
 
-    if(!mcpr_connection_write_packet(conn->conn, &response))
+    if(fwrite(&response, sizeof(response), 1, conn->pktstream) == 0)
     {
       if(ninerr != NULL && ninerr->message != NULL && strcmp(ninerr->message, "ninerr_closed") == 0)
       {
@@ -423,7 +427,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
     response.data.login.clientbound.login_success.uuid = uuid;
     response.data.login.clientbound.login_success.username = conn->tmp.username;
 
-    if(!mcpr_connection_write_packet(conn->conn, &response))
+    if(fwrite(&response, sizeof(response), 1, conn->pktstream) == 0)
     {
       if(strcmp(ninerr->type, "ninerr_closed") == 0)
       {
@@ -595,7 +599,7 @@ struct hp_result handle_lg_login_start(const struct mcpr_packet *pkt, struct con
     response.data.login.clientbound.login_success.uuid = mapi_result->id;
     response.data.login.clientbound.login_success.username = conn->tmp.username; // eh i think we should get the username from another source?
 
-    if(!mcpr_connection_write_packet(conn->conn, &response))
+    if(fwrite(&response, sizeof(response), 1, conn->pktstream) == 0)
     {
       if(strcmp(ninerr->type, "ninerr_closed") == 0)
       {

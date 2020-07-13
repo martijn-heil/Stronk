@@ -53,8 +53,7 @@ struct hp_result handle_st_request(const struct mcpr_packet *pkt, struct connect
   response.data.status.clientbound.response.favicon = NULL;
   nlog_info("Motd: %s", net_get_motd());
 
-
-  if(!mcpr_connection_write_packet(conn->conn, &response))
+  if(fwrite(&response, sizeof(response), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {
@@ -93,7 +92,7 @@ struct hp_result handle_st_ping(const struct mcpr_packet *pkt, struct connection
   response.state = MCPR_STATE_STATUS;
   response.data.status.clientbound.pong.payload = pkt->data.status.serverbound.ping.payload;
 
-  if(!mcpr_connection_write_packet(conn->conn, &response))
+  if(fwrite(&response, sizeof(response), 1, conn->pktstream) == 0)
   {
     if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
     {

@@ -25,6 +25,10 @@ same.  For each type and operation, we define:
 psnip_safe_bool psnip_safe_{type_identifier}_{operation} ({T}* result, {T} a, {T} b);
 ```
 
+which returns true if the operation succeeded, or false if it resulted
+in an overflow (which is the opposite of how e.g.
+`__builtin_*_overflow` builtins work).
+
 For example, for addition on signed integers, there is
 
 ```c
@@ -80,10 +84,14 @@ things to watch out for if you choose this:
  * The type-generic functions (`__builtin_add_overflow`,
    `__builtin_sub_overflow`, and `__builtin_mul_overflow`) will only
    be available in C11 mode.
- * The argument order is slightly different, with the result coming
-   last instead of first.  We prefer the result to come first so the
-   call looks a bit more like an assignment operation, but GCC made a
-   different choice.
+ * The argument order in GCC's API is slightly different, with the
+   result coming last instead of first.  We prefer the result to come
+   first so the call looks a bit more like an assignment operation,
+   but GCC made a different choice.
+
+   In other words, `__builtin_*_overflow(a, b, res)` are macros
+   defined to `(!psnip_safe_*(res, a, b))` so existing code needn't
+   be altered.
 
 ## The `safe_larger_*` API
 
@@ -139,6 +147,23 @@ mode since there was no standard way to implement them until C11.
 
 Even if you request emulation of the GCC builtins, we cannot provide
 the `__builtin_*_overflow_p` functions.
+
+## Dependencies
+
+To maximize portability you should #include the exact-int module
+before including safe-math.h, but if you don't want to add the extra
+file to your project you can omit it and this module will simply rely
+on <stdint.h>.  As an alternative you may define the following macros
+to appropriate values yourself:
+
+ * `psnip_int8_t`
+ * `psnip_uint8_t`
+ * `psnip_int16_t`
+ * `psnip_uint16_t`
+ * `psnip_int32_t`
+ * `psnip_uint32_t`
+ * `psnip_int64_t`
+ * `psnip_uint64_t`
 
 # Alternatives
 

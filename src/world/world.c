@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <errno.h>
 
 #include <inttypes.h>
@@ -299,7 +300,7 @@ static bool send_chunk_data(const struct player *p, const struct chunk *chunk, l
   }
 
   const struct connection *conn = player_get_connection(p);
-  if(!mcpr_connection_write_packet(conn->conn, &pkt))
+  if(fwrite(&pkt, sizeof(pkt), 1, conn->pktstream) == 0)
   {
     nlog_error("Could not send chunk data packet.");
     ninerr_print(ninerr);
@@ -355,7 +356,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
   pkt.data.play.clientbound.chunk_data.chunk_sections[section_y] = mcpr_chunk_section;
 
   struct connection *conn = p->conn;
-  if(!mcpr_connection_write_packet(conn->conn, &pkt))
+  if(fwrite(&pkt, sizeof(pkt), 1, conn->pktstream) == 0)
   {
     nlog_error("Could not send chunk data packet.");
     ninerr_print(ninerr);

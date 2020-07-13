@@ -24,6 +24,7 @@
 #define STRONK_CONNECTION_H
 
 #include <stdint.h>
+#include <stdio.h>
 
 #include <netinet/in.h>
 
@@ -37,10 +38,11 @@ struct connection
 {
   int fd;
   struct sockaddr_storage client_address;
-  struct bstream *iostream;
+  FILE *rawstream;
   uint16_t port_used; // Will only be set after having switched to a different state from HANDSHAKE
   char *server_address_used; // Will only be set after having switched to a different state from HANDSHAKE, else it will be NULL
   mcpr_connection *conn;
+  FILE *pktstream;
   struct player *player; // may be NULL
   bool auth_required;
 

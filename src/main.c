@@ -34,6 +34,8 @@ void nintest(void);
   Pthreads must be available.
   Preferrably GCC, but other compilers should work too.
 
+  fopencookie (can possibly be emulated with custom stdio library)
+  sane FILE* buffering (can possibly be emulated with custom stdio library)
   two's complement integers.
   char and unsigned char should be exactly 8 bits wide.
 

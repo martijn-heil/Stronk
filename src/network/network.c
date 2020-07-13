@@ -205,47 +205,18 @@ void connection_close(struct connection *conn, const char *disconnect_message)
   client_count--;
   pthread_rwlock_unlock(&clients_lock);
   mcpr_connection_close(conn->conn, disconnect_message);
+  fclose(conn->rawstream);
   if(close(conn->fd) == -1) nlog_warn("Error whilst closing a socket: %s", strerror(errno));
-  bstream_decref(conn->iostream);
-  mcpr_connection_decref(conn->conn);
   free(conn->server_address_used);
   free(conn);
 
   nlog_info("Connection at address %p closed.", (void *) conn);
 }
 
-static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
+static bool packet_handler(const struct mcpr_packet *pkt, struct connection *conn2)
 {
   nlog_debug("Received a packet! at packet_handler");
-
-  struct connection *conn2 = NULL;
-
-  int lock_result;
-  do {
-    lock_result = pthread_rwlock_rdlock(&clients_lock);
-    if(lock_result != 0) { nlog_warn("Could not lock clients lock. Retrying.."); }
-  } while(lock_result != 0);
-
-  for(unsigned int i = 0; i < client_count; i++)
-  {
-    struct connection *tmp = (struct connection *) slist_nth_data(clients, i);
-    if(tmp == NULL)
-    {
-      nlog_fatal("Fatal error, aborting..");
-      server_crash();
-    }
-    if(tmp->conn == conn)
-    {
-      conn2 = tmp;
-      break;
-    }
-  }
-  pthread_rwlock_unlock(&clients_lock);
-  if(conn2 == NULL)
-  {
-    nlog_error("Could not find connection struct for given mcpr_connection.");
-    return true;
-  }
+  mcpr_connection *conn = conn2->conn;
 
   struct hp_result result;
   IGNORE("-Wswitch")
@@ -264,8 +235,8 @@ static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     {
       switch(pkt->id)
       {
-        case MCPR_PKT_ST_SB_REQUEST: { result = handle_st_request(pkt, conn2); goto finish; }
-        case MCPR_PKT_ST_SB_PING: { result = handle_st_ping(pkt, conn2); goto finish; }
+        case MCPR_PKT_ST_SB_REQUEST:  { result = handle_st_request(pkt, conn2); goto finish; }
+        case MCPR_PKT_ST_SB_PING:     { result = handle_st_ping(pkt, conn2);    goto finish; }
       }
       break;
     }
@@ -274,8 +245,8 @@ static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     {
       switch(pkt->id)
       {
-        case MCPR_PKT_LG_SB_LOGIN_START: { result = handle_lg_login_start(pkt, conn2); goto finish; }
-        case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE: { result = handle_lg_encryption_response(pkt, conn2); goto finish; }
+        case MCPR_PKT_LG_SB_LOGIN_START:          { result = handle_lg_login_start(pkt, conn2);         goto finish; }
+        case MCPR_PKT_LG_SB_ENCRYPTION_RESPONSE:  { result = handle_lg_encryption_response(pkt, conn2); goto finish; }
       }
       break;
     }
@@ -284,36 +255,36 @@ static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
     {
       switch(pkt->id)
       {
-        case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:         { result = handle_pl_teleport_confirm(pkt, conn2);        goto finish; }
-        case MCPR_PKT_PL_SB_TAB_COMPLETE:           { result = handle_pl_tab_complete(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_CHAT_MESSAGE:           { result = handle_pl_chat_message(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_CLIENT_STATUS:          { result = handle_pl_client_status(pkt, conn2);         goto finish; }
-        case MCPR_PKT_PL_SB_CLIENT_SETTINGS:        { result = handle_pl_client_settings(pkt, conn2);         goto finish; }
-        case MCPR_PKT_PL_SB_CONFIRM_TRANSACTION:      { result = handle_pl_confirm_transaction(pkt, conn2);       goto finish; }
-        case MCPR_PKT_PL_SB_ENCHANT_ITEM:           { result = handle_pl_enchant_item(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_CLICK_WINDOW:           { result = handle_pl_click_window(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_CLOSE_WINDOW:           { result = handle_pl_close_window(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:         { result = handle_pl_plugin_message(pkt, conn2);        goto finish; }
-        case MCPR_PKT_PL_SB_USE_ENTITY:           { result = handle_pl_use_entity(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_KEEP_ALIVE:           { result = handle_pl_keep_alive(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER_POSITION:        { result = handle_pl_player_position(pkt, conn2);         goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK:     { result = handle_pl_player_position_and_look(pkt, conn2);    goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER_LOOK:          { result = handle_pl_player_look(pkt, conn2);           goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER:             { result = handle_pl_player(pkt, conn2);            goto finish; }
-        case MCPR_PKT_PL_SB_VEHICLE_MOVE:           { result = handle_pl_vehicle_move(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_STEER_BOAT:           { result = handle_pl_steer_boat(pkt, conn2);          goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER_ABILITIES:         { result = handle_pl_player_abilities(pkt, conn2);        goto finish; }
-        case MCPR_PKT_PL_SB_PLAYER_DIGGING:         { result = handle_pl_player_digging(pkt, conn2);        goto finish; }
-        case MCPR_PKT_PL_SB_ENTITY_ACTION:          { result = handle_pl_entity_action(pkt, conn2);         goto finish; }
-        case MCPR_PKT_PL_SB_STEER_VEHICLE:          { result = handle_pl_steer_vehicle(pkt, conn2);         goto finish; }
+        case MCPR_PKT_PL_SB_TELEPORT_CONFIRM:           { result = handle_pl_teleport_confirm(pkt, conn2);          goto finish; }
+        case MCPR_PKT_PL_SB_TAB_COMPLETE:               { result = handle_pl_tab_complete(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_CHAT_MESSAGE:               { result = handle_pl_chat_message(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_CLIENT_STATUS:              { result = handle_pl_client_status(pkt, conn2);             goto finish; }
+        case MCPR_PKT_PL_SB_CLIENT_SETTINGS:            { result = handle_pl_client_settings(pkt, conn2);           goto finish; }
+        case MCPR_PKT_PL_SB_CONFIRM_TRANSACTION:        { result = handle_pl_confirm_transaction(pkt, conn2);       goto finish; }
+        case MCPR_PKT_PL_SB_ENCHANT_ITEM:               { result = handle_pl_enchant_item(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_CLICK_WINDOW:               { result = handle_pl_click_window(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_CLOSE_WINDOW:               { result = handle_pl_close_window(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_PLUGIN_MESSAGE:             { result = handle_pl_plugin_message(pkt, conn2);            goto finish; }
+        case MCPR_PKT_PL_SB_USE_ENTITY:                 { result = handle_pl_use_entity(pkt, conn2);                goto finish; }
+        case MCPR_PKT_PL_SB_KEEP_ALIVE:                 { result = handle_pl_keep_alive(pkt, conn2);                goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER_POSITION:            { result = handle_pl_player_position(pkt, conn2);           goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK:   { result = handle_pl_player_position_and_look(pkt, conn2);  goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER_LOOK:                { result = handle_pl_player_look(pkt, conn2);               goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER:                     { result = handle_pl_player(pkt, conn2);                    goto finish; }
+        case MCPR_PKT_PL_SB_VEHICLE_MOVE:               { result = handle_pl_vehicle_move(pkt, conn2);              goto finish; }
+        case MCPR_PKT_PL_SB_STEER_BOAT:                 { result = handle_pl_steer_boat(pkt, conn2);                goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER_ABILITIES:           { result = handle_pl_player_abilities(pkt, conn2);          goto finish; }
+        case MCPR_PKT_PL_SB_PLAYER_DIGGING:             { result = handle_pl_player_digging(pkt, conn2);            goto finish; }
+        case MCPR_PKT_PL_SB_ENTITY_ACTION:              { result = handle_pl_entity_action(pkt, conn2);             goto finish; }
+        case MCPR_PKT_PL_SB_STEER_VEHICLE:              { result = handle_pl_steer_vehicle(pkt, conn2);             goto finish; }
         case MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS:       { result = handle_pl_resource_pack_status(pkt, conn2);      goto finish; }
-        case MCPR_PKT_PL_SB_HELD_ITEM_CHANGE:         { result = handle_pl_held_item_change(pkt, conn2);        goto finish; }
-        case MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION:    { result = handle_pl_creative_inventory_action(pkt, conn2);   goto finish; }
-        case MCPR_PKT_PL_SB_UPDATE_SIGN:          { result = handle_pl_update_sign(pkt, conn2);           goto finish; }
-        case MCPR_PKT_PL_SB_ANIMATION:            { result = handle_pl_animation(pkt, conn2);           goto finish; }
-        case MCPR_PKT_PL_SB_SPECTATE:             { result = handle_pl_spectate(pkt, conn2);            goto finish; }
+        case MCPR_PKT_PL_SB_HELD_ITEM_CHANGE:           { result = handle_pl_held_item_change(pkt, conn2);          goto finish; }
+        case MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION:  { result = handle_pl_creative_inventory_action(pkt, conn2); goto finish; }
+        case MCPR_PKT_PL_SB_UPDATE_SIGN:                { result = handle_pl_update_sign(pkt, conn2);               goto finish; }
+        case MCPR_PKT_PL_SB_ANIMATION:                  { result = handle_pl_animation(pkt, conn2);                 goto finish; }
+        case MCPR_PKT_PL_SB_SPECTATE:                   { result = handle_pl_spectate(pkt, conn2);                  goto finish; }
         case MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT:     { result = handle_pl_player_block_placement(pkt, conn2);    goto finish; }
-        case MCPR_PKT_PL_SB_USE_ITEM:             { result = handle_pl_use_item(pkt, conn2);            goto finish; }
+        case MCPR_PKT_PL_SB_USE_ITEM:                   { result = handle_pl_use_item(pkt, conn2);                  goto finish; }
       }
       break;
     }
@@ -384,40 +355,31 @@ static void accept_incoming_connections(void)
       continue;
     }
 
-    struct bstream *stream = bstream_from_fd(newfd);
-    if(stream == NULL)
-    {
-      if(ninerr != NULL && ninerr->message != NULL)
-      {
-        nlog_error("Could not create bstream from new file descriptor. (%s)", ninerr->message);
-      }
-      else
-      {
-        nlog_error("Could not create bstream from new file descriptor.");
-      }
-    }
+    FILE *stream = fdopen(newfd, "r+");
+    if(stream == NULL) { nlog_error("fdopen() failed (%s)", strerror(errno)); continue; }
+    if(setvbuf(stream, NULL, _IONBF, 0) != 0) { nlog_error("setvbuf() failed (%s ?)", strerror(errno)); continue; }
     mcpr_connection *conn = mcpr_connection_new(stream);
     if(conn == NULL)
     {
       nlog_error("Could not create new connection object. (%s)", ninerr->message);
-      bstream_decref(stream);
+      fclose(stream);
       continue;
     }
-    mcpr_connection_set_packet_handler(conn, packet_handler);
 
     struct connection *conn2 = malloc(sizeof(struct connection));
     if(conn2 == NULL)
     {
       nlog_error("Could not allocate memory for connection. (%s)", strerror(errno));
       if(close(newfd) == -1) nlog_error("Error closing socket after memory allocation failure. (%s)", strerror(errno));
-      mcpr_connection_decref(conn);
-      bstream_decref(stream);
+      //mcpr_connection_decref(conn);
+      fclose(stream);
       continue;
     }
     conn2->player = NULL;
     conn2->conn = conn;
     conn2->fd = newfd;
-    conn2->iostream = stream;
+    conn2->rawstream = stream;
+    conn2->pktstream = mcpr_connection_get_stream(conn);
     conn2->server_address_used = NULL;
     conn2->tmp_present = false;
     conn2->client_address = clientname;
@@ -426,8 +388,8 @@ static void accept_incoming_connections(void)
     {
       nlog_error("Could not add incoming connection to connection storage.");
       if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", strerror(errno));
-      mcpr_connection_decref(conn);
-      bstream_decref(stream);
+      //mcpr_connection_decref(conn);
+      fclose(conn2->rawstream);
       free(conn2);
       continue;
     }
@@ -453,13 +415,12 @@ static void update_client(struct connection *conn)
     if(diff.tv_sec >= 10)
     {
       struct mcpr_packet keep_alive;
-
       keep_alive.id = MCPR_PKT_PL_CB_KEEP_ALIVE;
       keep_alive.state = MCPR_STATE_PLAY;
       keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
 
 
-      if(!mcpr_connection_write_packet(conn->conn, &keep_alive))
+      if(fwrite(&keep_alive, sizeof(keep_alive), 1, conn->pktstream) == 0)
       {
         if(strcmp(ninerr->type, "ninerr_closed") == 0)
         {
@@ -478,18 +439,8 @@ static void update_client(struct connection *conn)
     }
   }
 
-  if(!mcpr_connection_update(conn->conn))
-  {
-    nlog_error("Error whilst updating connection.");
-    ninerr_print(ninerr);
-    if(mcpr_connection_is_closed(conn->conn))
-    {
-      nlog_info("Client is closed, disconnecting.");
-      connection_close(conn, NULL);
-    }
-
-    return;
-  }
+  struct mcpr_packet pkt;
+  while(fread(&pkt, sizeof(pkt), 1, conn->pktstream) != EOF) packet_handler(&pkt, conn);
 
   if(player != NULL)
   {

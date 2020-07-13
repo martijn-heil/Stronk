@@ -23,27 +23,25 @@
 #ifndef MCPR_CONNECTION_H
 #define MCPR_CONNECTION_H
 
+#include <stdio.h>
 #include <stdbool.h>
 #include <openssl/evp.h>
-#include <ninio/bstream.h>
 #include <mcpr/mcpr.h>
 #include <mcpr/packet.h>
 
 typedef void mcpr_connection;
 
 // Calling any function on a closed connection is undefined behaviour.
-mcpr_connection *mcpr_connection_new(struct bstream *stream);
-void mcpr_connection_incref(mcpr_connection *conn);
-void mcpr_connection_decref(mcpr_connection *conn);
-bool mcpr_connection_update(mcpr_connection *conn);
-void mcpr_connection_set_packet_handler(mcpr_connection *conn, bool (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn));
-bool mcpr_connection_is_closed(mcpr_connection *conn);
-bool mcpr_connection_write_packet(mcpr_connection *conn, const struct mcpr_packet *pkt);
-void mcpr_connection_set_crypto(mcpr_connection *conn, EVP_CIPHER_CTX *ctx_encrypt, EVP_CIPHER_CTX *ctx_decrypt);
-void mcpr_connection_set_use_encryption(mcpr_connection *conn, bool value);
-void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression);
-enum mcpr_state mcpr_connection_get_state(mcpr_connection *conn);
-void mcpr_connection_set_state(mcpr_connection *conn, enum mcpr_state state);
-void mcpr_connection_close(mcpr_connection *conn, const char *reason);
+mcpr_connection *mcpr_connection_new      (FILE *stream);
+bool mcpr_connection_update               (mcpr_connection *conn);
+void mcpr_connection_set_packet_handler   (mcpr_connection *conn, bool (*on_packet)(const struct mcpr_packet *pkt, mcpr_connection *conn));
+bool mcpr_connection_is_closed            (mcpr_connection *conn);
+void mcpr_connection_set_crypto           (mcpr_connection *conn, EVP_CIPHER_CTX *ctx_encrypt, EVP_CIPHER_CTX *ctx_decrypt);
+void mcpr_connection_set_use_encryption   (mcpr_connection *conn, bool value);
+void mcpr_connection_set_compression      (mcpr_connection *conn, bool compression);
+enum mcpr_state mcpr_connection_get_state (mcpr_connection *conn);
+void mcpr_connection_set_state            (mcpr_connection *conn, enum mcpr_state state);
+void mcpr_connection_close                (mcpr_connection *conn, const char *reason);
+FILE *mcpr_connection_get_stream          (mcpr_connection *conn);
 
 #endif
