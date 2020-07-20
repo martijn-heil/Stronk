@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <netinet/in.h>
 
@@ -45,6 +46,7 @@ struct connection
   FILE *pktstream;
   struct player *player; // may be NULL
   bool auth_required;
+  time_t connected_at; // unix time
 
   bool tmp_present;
   struct {

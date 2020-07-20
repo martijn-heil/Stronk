@@ -99,7 +99,8 @@ int chat_send_if_appropiate(struct player *p, struct chat_entry entry, enum chat
 bool chat_broadcast(struct chat_entry entry, enum chat_type t)
 {
   pthread_rwlock_t *players_lock = server_get_players_lock();
-  again: if(pthread_rwlock_rdlock(players_lock) != 0) { nlog_warn("Could not lock server_get_players_lock() lock. Retrying.."); goto again; }
+  again: if(pthread_rwlock_rdlock(players_lock) != 0)
+         { nlog_warn("Could not lock server_get_players_lock() lock. Retrying.."); goto again; }
 
   size_t players_count;
   struct player **players;
@@ -118,7 +119,8 @@ bool chat_broadcast(struct chat_entry entry, enum chat_type t)
 bool chat_broadcast_forced(struct chat_entry entry)
 {
   pthread_rwlock_t *players_lock = server_get_players_lock();
-  again: if(pthread_rwlock_rdlock(players_lock) != 0) { nlog_warn("Could not lock server_get_players_lock() lock. Retrying.."); goto again; }
+  again: if(pthread_rwlock_rdlock(players_lock) != 0)
+         { nlog_warn("Could not lock server_get_players_lock() lock. Retrying.."); goto again; }
 
   size_t players_count;
   struct player **players;

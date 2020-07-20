@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -169,7 +170,7 @@ int net_init(void) {
   if(motd == NULL)
   {
     nlog_fatal("Could not generate MOTD.");
-    ninerr_print(ninerr);
+    ninerr_print_g();
     return -1;
   }
 
@@ -383,6 +384,7 @@ static void accept_incoming_connections(void)
     conn2->server_address_used = NULL;
     conn2->tmp_present = false;
     conn2->client_address = clientname;
+    conn2->connected_at = time(NULL);
 
     if(slist_append(&clients, conn2) == NULL)
     {
@@ -399,6 +401,25 @@ static void accept_incoming_connections(void)
       ntohs(((struct sockaddr_in *) &clientname)->sin_port) :
       ntohs(((struct sockaddr_in6 *) &clientname)->sin6_port), newfd);
   }
+}
+
+static void do_timeout(struct connection *conn)
+{
+  struct player *p = conn->player;
+  if(p != NULL)
+  {
+    char uuid[37];
+    ninuuid_to_string(&(p->uuid), uuid, LOWERCASE, false);
+    nlog_warn("Player with UUID %s timed out. (server-side)", uuid);
+  }
+  else
+  {
+    nlog_warn("Connection %p timed out. (server-side)", conn);
+  }
+
+  char *reason = mcpr_as_chat("Timed out. (server-side)");
+  connection_close(conn, reason);
+  free(reason);
 }
 
 static void update_client(struct connection *conn)
@@ -440,7 +461,29 @@ static void update_client(struct connection *conn)
   }
 
   struct mcpr_packet pkt;
-  while(fread(&pkt, sizeof(pkt), 1, conn->pktstream) != EOF) packet_handler(&pkt, conn);
+  //while(fread(&pkt, sizeof(pkt), 1, conn->pktstream) == 1) packet_handler(&pkt, conn);
+
+  while(true)
+  {
+    int result = fread(&pkt, sizeof(pkt), 1, conn->pktstream);
+    nlog_info("result: %i", result);
+    sleep(2);
+    if (result == 1)
+    {
+      packet_handler(&pkt, conn);
+      continue;
+    }
+    else if(ferror(conn->pktstream))
+    {
+      if(ninerr != NULL && ninerr_is(ninerr, "ninerr_wouldblock"))
+      {
+        ninerr_print_g();
+        ninerr_set_err(NULL);
+      }
+      clearerr(conn->pktstream);
+    }
+    break;
+  }
 
   if(player != NULL)
   {
@@ -452,14 +495,12 @@ static void update_client(struct connection *conn)
 
     if(diff.tv_sec >= 30)
     {
-      char uuid[37];
-      ninuuid_to_string(&(player->uuid), uuid, LOWERCASE, false);
-      nlog_error("Player with UUID %s timed out. (server-side)", uuid);
-
-      char *reason = mcpr_as_chat("Timed out. (server-side)");
-      connection_close(conn, reason);
-      free(reason);
+      do_timeout(conn);
     }
+  }
+  else if(time(NULL) - conn->connected_at > 60) // This occurs if the client has not
+  {                                             // completed the initial connection procedure within 60 seconds.
+    do_timeout(conn);
   }
 }
 

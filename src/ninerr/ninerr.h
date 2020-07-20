@@ -58,8 +58,28 @@ struct ninerr
   void (*free)(struct ninerr *err); // may be NULL.
 };
 extern thread_local struct ninerr *ninerr; // may be NULL, usually you don't want to assign to this directly, use ninerr_set_err instead.
+
+
+/*
+ * Set the thread-local ninerr.
+ *
+ * Will free the current ninerr before replacing it with err if
+ * the current ninerr's free is not NULL.
+ *
+ * err may be NULL.
+ */
 void ninerr_set_err(struct ninerr *err); // err may be NULL.
+
+
+/*
+ * Free the current thread-local ninerr if it's free function is not NULL
+ * Sets the thread-lcoal ninerr to NULL.
+ *
+ * May be called if the current thread-local ninerr is NULL.
+ */
 void ninerr_cleanup_latest(void);
+
+
 bool ninerr_init(void);
 void ninerr_finish(void);
 struct ninerr *ninerr_from_errno(void); // may return NULL
@@ -67,6 +87,9 @@ struct ninerr *ninerr_new(const char *fmt, ...);
 struct ninerr *ninerr_arithmetic_new(void);
 int ninerr_print(const struct ninerr *err);
 int ninerr_fprint(FILE *fp, const struct ninerr *err);
+int ninerr_print_g(void);
+int ninerr_fprint_g(FILE *fp);
+bool ninerr_is(const struct ninerr *err, const char *t);
 
 
 

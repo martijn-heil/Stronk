@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <assert.h>
 #include <inttypes.h>
 #include <unistd.h>
 #include <openssl/evp.h>
@@ -180,22 +181,25 @@ static bool update_receiving_buffer(mcpr_connection *tmpconn)
     {
       void *tmpbuf = malloc(BLOCK_SIZE);
       if(tmpbuf == NULL) { ninerr_set_err(ninerr_from_errno()); return false; }
-      bool result = fread(tmpbuf, 1, BLOCK_SIZE, conn->iostream);
-      if(!result)
+      size_t result = fread(tmpbuf, BLOCK_SIZE, 1, conn->iostream);
+      if(result == 0)
       {
-        if(ninerr != NULL && strcmp(ninerr->type, "ninerr_wouldblock") == 0)
+        if(ferror(conn->iostream) && (err == EBADF || err == ECONNRESET || err == ENOTCONN))
         {
-          return true;
+          clearerr(conn->iostream);
+          mcpr_connection_close(tmpconn, NULL);
+          free(tmpbuf);
+          return false;
         }
-        else if(ninerr != NULL && strcmp(ninerr->type, "ninerr_closed") == 0)
+        else
         {
           free(tmpbuf);
-          mcpr_connection_close(tmpconn, NULL);
-          return false;
+          return true;
         }
       }
 
-      ssize_t decrypt_result = mcpr_crypto_decrypt(conn->receiving_buf.content + conn->receiving_buf.size, tmpbuf, conn->ctx_decrypt, BLOCK_SIZE);
+      ssize_t decrypt_result = mcpr_crypto_decrypt(conn->receiving_buf.content + conn->receiving_buf.size,
+          tmpbuf, conn->ctx_decrypt, BLOCK_SIZE);
       if(decrypt_result == -1) { free(tmpbuf); return false; }
       conn->receiving_buf.size += decrypt_result;
       goto again;
@@ -203,13 +207,19 @@ static bool update_receiving_buffer(mcpr_connection *tmpconn)
     else
     {
       size_t result = fread(conn->receiving_buf.content + conn->receiving_buf.size, 256, 1, conn->iostream);
-      int err = ferror(conn->iostream);
-      if(result == EOF)
+      if(result == 0)
       {
-        if(err != 0 && err != EAGAIN || err != EWOULDBLOCK) mcpr_connection_close(tmpconn, NULL);
+        if(ferror(conn->iostream) &&
+            errno != 0 &&
+            errno != EAGAIN &&
+            errno != EWOULDBLOCK)
+        {
+          clearerr(conn->iostream);
+          mcpr_connection_close(tmpconn, NULL);
+        }
         return false;
       }
-      conn->receiving_buf.size += result;
+      conn->receiving_buf.size += result * 256;
       if(result > 0) goto again;
     }
 
@@ -218,21 +228,23 @@ static bool update_receiving_buffer(mcpr_connection *tmpconn)
 
 static bool mcpr_connection_read_packet(mcpr_connection *tmpconn, struct mcpr_packet *out)
 {
+  update_receiving_buffer(tmpconn);
   struct conn *conn = (struct conn *) tmpconn;
-  if(conn->receiving_buf.size <= 0) return false;
+  DEBUG_PRINT("recvbuf.size = %zu, recvbuf.max_size %zu", conn->receiving_buf.size, conn->receiving_buf.max_size);
+  if(conn->receiving_buf.size <= 0) { return false; }
   int32_t pktlen;
   ssize_t result = mcpr_decode_varint(&pktlen, conn->receiving_buf.content, conn->receiving_buf.size);
-  if(result == -1) return true;
-  if(pktlen <= 0) { ninerr_set_err(ninerr_new("Received invalid packet length")); return false; }
+  if(result == -1) return false;
+  if(pktlen <= 0) { DEBUG_PRINT("received invalid packet length."); ninerr_set_err(ninerr_new("Received invalid packet length")); return false; }
   if((conn->receiving_buf.size - result) >= (uint32_t) pktlen)
   {
     ssize_t bytes_read = mcpr_decode_packet(out, conn->receiving_buf.content + result, conn->state, (size_t) pktlen);
-    if(bytes_read == -1) { mcpr_connection_close(tmpconn, NULL); return false; }
+    if(bytes_read == -1) { DEBUG_PRINT("error. closing connection."); mcpr_connection_close(tmpconn, NULL); return false; }
     memmove(conn->receiving_buf.content, conn->receiving_buf.content + bytes_read + result, conn->receiving_buf.size - bytes_read - result);
     conn->receiving_buf.size -= bytes_read + result;
     return true;
   }
-  else { return true; }
+  else { return false; }
 }
 
 static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t bytes)
@@ -257,17 +269,17 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
       ssize_t compression_result = mcpr_compress(compressed_data, encrypted_data, encrypted_data_length);
       if(compression_result == -1) { free(encrypted_data); free(compressed_data); return false; }
 
-      bool write_result = fwrite(compressed_data, 1, compression_result, conn->iostream);
+      size_t write_result = fwrite(compressed_data, compression_result, 1, conn->iostream);
       free(encrypted_data);
       free(compressed_data);
-      return write_result;
+      return write_result == 1; // TODO better error handling maybe
     }
     else
     {
       DEBUG_PRINT("Writing those bytes uncompressed.");
-      bool write_result = fwrite(encrypted_data, 1, encrypted_data_length, conn->iostream);
+      size_t write_result = fwrite(encrypted_data, encrypted_data_length, 1, conn->iostream);
       free(encrypted_data);
-      return write_result;
+      return write_result == 1; // TODO better error handling maybe
     }
   }
   else
@@ -281,14 +293,14 @@ static bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size
 
       ssize_t compression_result = mcpr_compress(compressed_data, in, bytes);
       if(compression_result == -1) { free(compressed_data); return false; }
-      bool write_result = fwrite(compressed_data, 1, compression_result, conn->iostream) != EOF;
+      size_t write_result = fwrite(compressed_data, compression_result, 1, conn->iostream) == compression_result;
       free(compressed_data);
-      return write_result;
+      return write_result == 1; // TODO better error handling maybe
     }
     else
     {
       DEBUG_PRINT("Writing those bytes uncompressed.");
-      return fwrite(in, 1, bytes, conn->iostream) != EOF;
+      return fwrite(in, bytes, 1, conn->iostream) == 1;
     }
   }
 }
@@ -337,14 +349,24 @@ bool mcpr_connection_is_closed(mcpr_connection *conn)
 
 static ssize_t mcpr_connection_stream_write(void *cookie, const char *buf, size_t size)
 {
-  if(size != sizeof(struct mcpr_packet)) return 0;
+  assert(size >= sizeof(struct mcpr_packet));
   return mcpr_connection_write_packet(cookie, (struct mcpr_packet *) buf);
 }
 
 static ssize_t mcpr_connection_stream_read(void *cookie, char *buf, size_t size)
 {
-  if(size != sizeof(struct mcpr_packet)) return 0;
-  if(mcpr_connection_read_packet(cookie, (struct mcpr_packet *) buf)) return sizeof(struct mcpr_packet); else return 0;
+  assert(size >= sizeof(struct mcpr_packet));
+
+  if(mcpr_connection_read_packet(cookie, (struct mcpr_packet *) buf))
+  {
+    DEBUG_PRINT("returning sizeof(mcpr_packet)");
+    return sizeof(struct mcpr_packet);
+  }
+  else
+  {
+    DEBUG_PRINT("returning -1");
+    return -1;
+  }
 }
 
 static int mcpr_connection_stream_close(void *cookie)

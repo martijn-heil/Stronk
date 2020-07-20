@@ -58,6 +58,11 @@ struct ninerr *ninerr_arithmetic_new(void)
   return err;
 }
 
+bool ninerr_is(const struct ninerr *err, const char *t)
+{
+  return strcmp(err->type, t) == 0;
+}
+
 int ninerr_print(const struct ninerr *err)
 {
   return ninerr_fprint(stderr, err);
@@ -80,6 +85,16 @@ int ninerr_fprint(FILE *fp, const struct ninerr *err)
     return fprintf(fp, "%s: %s\n", err->type, err->message);
   }
   return -1;
+}
+
+int ninerr_print_g(void)
+{
+  return ninerr_print(ninerr);
+}
+
+int ninerr_fprint_g(FILE *fp)
+{
+  return ninerr_fprint(fp, ninerr);
 }
 
 static void ninerr_free(struct ninerr *err)
@@ -197,6 +212,7 @@ void ninerr_set_err(struct ninerr *err)
 void ninerr_cleanup_latest(void)
 {
   if(ninerr != NULL && ninerr->free != NULL) ninerr->free(ninerr);
+  ninerr = NULL;
 }
 
 struct ninerr *ninerr_closed_new(char *message, bool free_message)

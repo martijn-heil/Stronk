@@ -232,6 +232,11 @@ size_t mcpr_encode_packet_bounds(const struct mcpr_packet *pkt)
     {
       switch(pkt->id)
       {
+        case MCPR_PKT_PL_CB_CHAT_MESSAGE:
+          return strlen(pkt->data.play.clientbound.chat_message.json_data +
+              MCPR_VARINT_SIZE_MAX +
+              MCPR_BYTE_SIZE);
+
         case MCPR_PKT_PL_CB_DISCONNECT:
           return 10 +
             strlen(pkt->data.play.clientbound.disconnect.reason);
@@ -753,7 +758,7 @@ size_t mcpr_encode_packet(void *out, const struct mcpr_packet *pkt)
   abort();
 }
 
-ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_state state, size_t maxlen)
+ssize_t mcpr_decode_packet(struct mcpr_packet *out, const void *in, enum mcpr_state state, size_t maxlen)
 {
   DEBUG_PRINT("in mcpr_decode_packet(state=%s, maxlen=%zu)", mcpr_state_to_string(state), maxlen);
 
@@ -766,9 +771,7 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
   ptr += bytes_read_1;
   DEBUG_PRINT("Decoding packet with id %ld", packet_id);
 
-  *out = malloc(sizeof(struct mcpr_packet));
-  if(*out == NULL) { ninerr_set_err(ninerr_from_errno()); return -1; }
-  struct mcpr_packet *pkt = *out;
+  struct mcpr_packet *pkt = out;
   if(!mcpr_get_packet_type(&(pkt->id), packet_id, state)) { ninerr_set_err(ninerr_new("Invalid packet id %ld", (long) packet_id)); return -1; }
 
   IGNORE("-Wswitch")
@@ -1080,7 +1083,6 @@ ssize_t mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_s
 
   // Shouldn't be reached anyway
   DEBUG_PRINT("Decoding for packet is not implemented yet! (state: %s)", mcpr_state_to_string(state));
-  free(*out);
   return -1;
 }
 
@@ -1116,39 +1118,39 @@ bool mcpr_get_packet_type(enum mcpr_packet_type *out, uint8_t id, enum mcpr_stat
     {
       switch(id)
       {
-        case 0x00: *out = MCPR_PKT_PL_SB_TELEPORT_CONFIRM;      return true;
-        case 0x01: *out = MCPR_PKT_PL_SB_TAB_COMPLETE;        return true;
-        case 0x02: *out = MCPR_PKT_PL_SB_CHAT_MESSAGE;        return true;
-        case 0x03: *out = MCPR_PKT_PL_SB_CLIENT_STATUS;       return true;
-        case 0x04: *out = MCPR_PKT_PL_SB_CLIENT_SETTINGS;       return true;
-        case 0x05: *out = MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;     return true;
-        case 0x06: *out = MCPR_PKT_PL_SB_ENCHANT_ITEM;        return true;
-        case 0x07: *out = MCPR_PKT_PL_SB_CLICK_WINDOW;        return true;
-        case 0x08: *out = MCPR_PKT_PL_SB_CLOSE_WINDOW;        return true;
-        case 0x09: *out = MCPR_PKT_PL_SB_PLUGIN_MESSAGE;      return true;
-        case 0x0A: *out = MCPR_PKT_PL_SB_USE_ENTITY;        return true;
-        case 0x0B: *out = MCPR_PKT_PL_SB_KEEP_ALIVE;        return true;
-        case 0x0C: *out = MCPR_PKT_PL_SB_PLAYER;          return true;
-        case 0x0D: *out = MCPR_PKT_PL_SB_PLAYER_POSITION;       return true;
+        case 0x00: *out = MCPR_PKT_PL_SB_TELEPORT_CONFIRM;          return true;
+        case 0x01: *out = MCPR_PKT_PL_SB_TAB_COMPLETE;              return true;
+        case 0x02: *out = MCPR_PKT_PL_SB_CHAT_MESSAGE;              return true;
+        case 0x03: *out = MCPR_PKT_PL_SB_CLIENT_STATUS;             return true;
+        case 0x04: *out = MCPR_PKT_PL_SB_CLIENT_SETTINGS;           return true;
+        case 0x05: *out = MCPR_PKT_PL_SB_CONFIRM_TRANSACTION;       return true;
+        case 0x06: *out = MCPR_PKT_PL_SB_ENCHANT_ITEM;              return true;
+        case 0x07: *out = MCPR_PKT_PL_SB_CLICK_WINDOW;              return true;
+        case 0x08: *out = MCPR_PKT_PL_SB_CLOSE_WINDOW;              return true;
+        case 0x09: *out = MCPR_PKT_PL_SB_PLUGIN_MESSAGE;            return true;
+        case 0x0A: *out = MCPR_PKT_PL_SB_USE_ENTITY;                return true;
+        case 0x0B: *out = MCPR_PKT_PL_SB_KEEP_ALIVE;                return true;
+        case 0x0C: *out = MCPR_PKT_PL_SB_PLAYER;                    return true;
+        case 0x0D: *out = MCPR_PKT_PL_SB_PLAYER_POSITION;           return true;
         case 0x0E: *out = MCPR_PKT_PL_SB_PLAYER_POSITION_AND_LOOK;  return true;
-        case 0x0F: *out = MCPR_PKT_PL_SB_PLAYER_LOOK;         return true;
-        case 0x10: *out = MCPR_PKT_PL_SB_VEHICLE_MOVE;        return true;
-        case 0x11: *out = MCPR_PKT_PL_SB_STEER_BOAT;        return true;
-        case 0x12: *out = MCPR_PKT_PL_SB_CRAFT_RECIPE_REQUEST;    return true;
-        case 0x13: *out = MCPR_PKT_PL_SB_PLAYER_ABILITIES;      return true;
-        case 0x14: *out = MCPR_PKT_PL_SB_PLAYER_DIGGING;      return true;
-        case 0x15: *out = MCPR_PKT_PL_SB_ENTITY_ACTION;       return true;
-        case 0x16: *out = MCPR_PKT_PL_SB_STEER_VEHICLE;       return true;
-        case 0x17: *out = MCPR_PKT_PL_SB_CRAFTING_BOOK_DATA;    return true;
-        case 0x18: *out = MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS;    return true;
-        case 0x19: *out = MCPR_PKT_PL_SB_ADVANCEMENT_TAB;       return true;
-        case 0x1A: *out = MCPR_PKT_PL_SB_HELD_ITEM_CHANGE;      return true;
+        case 0x0F: *out = MCPR_PKT_PL_SB_PLAYER_LOOK;               return true;
+        case 0x10: *out = MCPR_PKT_PL_SB_VEHICLE_MOVE;              return true;
+        case 0x11: *out = MCPR_PKT_PL_SB_STEER_BOAT;                return true;
+        case 0x12: *out = MCPR_PKT_PL_SB_CRAFT_RECIPE_REQUEST;      return true;
+        case 0x13: *out = MCPR_PKT_PL_SB_PLAYER_ABILITIES;          return true;
+        case 0x14: *out = MCPR_PKT_PL_SB_PLAYER_DIGGING;            return true;
+        case 0x15: *out = MCPR_PKT_PL_SB_ENTITY_ACTION;             return true;
+        case 0x16: *out = MCPR_PKT_PL_SB_STEER_VEHICLE;             return true;
+        case 0x17: *out = MCPR_PKT_PL_SB_CRAFTING_BOOK_DATA;        return true;
+        case 0x18: *out = MCPR_PKT_PL_SB_RESOURCE_PACK_STATUS;      return true;
+        case 0x19: *out = MCPR_PKT_PL_SB_ADVANCEMENT_TAB;           return true;
+        case 0x1A: *out = MCPR_PKT_PL_SB_HELD_ITEM_CHANGE;          return true;
         case 0x1B: *out = MCPR_PKT_PL_SB_CREATIVE_INVENTORY_ACTION; return true;
-        case 0x1C: *out = MCPR_PKT_PL_SB_UPDATE_SIGN;         return true;
-        case 0x1D: *out = MCPR_PKT_PL_SB_ANIMATION;         return true;
-        case 0x1E: *out = MCPR_PKT_PL_SB_SPECTATE;          return true;
-        case 0x1F: *out = MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT;  return true;
-        case 0X20: *out = MCPR_PKT_PL_SB_USE_ITEM;          return true;
+        case 0x1C: *out = MCPR_PKT_PL_SB_UPDATE_SIGN;               return true;
+        case 0x1D: *out = MCPR_PKT_PL_SB_ANIMATION;                 return true;
+        case 0x1E: *out = MCPR_PKT_PL_SB_SPECTATE;                  return true;
+        case 0x1F: *out = MCPR_PKT_PL_SB_PLAYER_BLOCK_PLACEMENT;    return true;
+        case 0X20: *out = MCPR_PKT_PL_SB_USE_ITEM;                  return true;
         default: return false;
       }
     }
