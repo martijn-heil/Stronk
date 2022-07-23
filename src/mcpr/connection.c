@@ -48,6 +48,7 @@
 #include "internal.h"
 
 #define BLOCK_SIZE EVP_CIPHER_block_size(EVP_aes_128_cfb8())
+#define PKTSTREAM_IOBUF_SIZE (sizeof(struct mcpr_packet))
 
 typedef void mcpr_connection;
 
@@ -65,6 +66,7 @@ struct conn
   EVP_CIPHER_CTX *ctx_decrypt;
   unsigned int reference_count;
   struct ninio_buffer receiving_buf;
+  char *pktstream_iobuf; // malloc'd length: PKTSTREAM_IOBUF_SIZE
   bool (*packet_handler)(const struct mcpr_packet *pkt, mcpr_connection *conn);
 
   bool tmp_encryption_state_available;
@@ -128,6 +130,16 @@ mcpr_connection *mcpr_connection_new(FILE *iostream)
   if(conn->receiving_buf.content == NULL) { ninerr_set_err(ninerr_from_errno()); free(conn); return NULL; }
   conn->receiving_buf.max_size = 256 * BLOCK_SIZE;
   conn->receiving_buf.size = 0;
+
+  conn->pktstream_iobuf = malloc(PKTSTREAM_IOBUF_SIZE);
+  if(conn->pktstream_iobuf == NULL)
+  {
+    ninerr_set_err(ninerr_from_errno());
+    free(conn->receiving_buf.content);
+    free(conn);
+    return NULL;
+  }
+
   conn->packet_handler = NULL;
   conn->is_closed = false;
 
@@ -139,7 +151,15 @@ mcpr_connection *mcpr_connection_new(FILE *iostream)
   };
   FILE *pktstream = fopencookie(conn, "r+", functions);
   if(pktstream == NULL) { ninerr_set_err(NULL); free(conn); return NULL; }
-  if(setvbuf(pktstream, NULL, _IOFBF, sizeof(struct mcpr_packet)) != 0) { ninerr_set_err(ninerr_from_errno()); fclose(pktstream); free(conn); return NULL; }
+  if(setvbuf(pktstream, conn->pktstream_iobuf, _IOFBF, PKTSTREAM_IOBUF_SIZE) != 0)
+  {
+    ninerr_set_err(ninerr_from_errno());
+    fclose(pktstream);
+    free(conn->receiving_buf.content);
+    free(conn->pktstream_iobuf);
+    free(conn);
+    return NULL;
+  }
   conn->pktstream = pktstream;
 
   return conn;
@@ -152,6 +172,7 @@ void mcpr_connection_free(mcpr_connection *tmpconn)
   EVP_CIPHER_CTX_free(conn->ctx_encrypt);
   EVP_CIPHER_CTX_free(conn->ctx_decrypt);
   free(conn->receiving_buf.content);
+  free(conn->pktstream_iobuf);
   free(conn);
 }
 
@@ -184,7 +205,7 @@ static bool update_receiving_buffer(mcpr_connection *tmpconn)
       size_t result = fread(tmpbuf, BLOCK_SIZE, 1, conn->iostream);
       if(result == 0)
       {
-        if(ferror(conn->iostream) && (err == EBADF || err == ECONNRESET || err == ENOTCONN))
+        if(ferror(conn->iostream) && (errno == EBADF || errno == ECONNRESET || errno == ENOTCONN))
         {
           clearerr(conn->iostream);
           mcpr_connection_close(tmpconn, NULL);
@@ -206,14 +227,15 @@ static bool update_receiving_buffer(mcpr_connection *tmpconn)
     }
     else
     {
-      size_t result = fread(conn->receiving_buf.content + conn->receiving_buf.size, 256, 1, conn->iostream);
+      size_t result = fread(conn->receiving_buf.content + conn->receiving_buf.size, 1, 256, conn->iostream);
       if(result == 0)
       {
         if(ferror(conn->iostream) &&
-            errno != 0 &&
             errno != EAGAIN &&
             errno != EWOULDBLOCK)
         {
+          ninerr_set_err(ninerr_from_errno());
+          DEBUG_PRINT("Got error: (errno: %i, %s) upon attempting to read from connection. Closing.", errno, strerror(errno));
           clearerr(conn->iostream);
           mcpr_connection_close(tmpconn, NULL);
         }
@@ -355,7 +377,7 @@ static ssize_t mcpr_connection_stream_write(void *cookie, const char *buf, size_
 
 static ssize_t mcpr_connection_stream_read(void *cookie, char *buf, size_t size)
 {
-  assert(size >= sizeof(struct mcpr_packet));
+  assert(size == sizeof(struct mcpr_packet));
 
   if(mcpr_connection_read_packet(cookie, (struct mcpr_packet *) buf))
   {
