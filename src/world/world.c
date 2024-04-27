@@ -415,6 +415,7 @@ static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_sectio
             else
             {
                 bits_used = 0;
+                tmp_result = 0;
             }
         }
     }

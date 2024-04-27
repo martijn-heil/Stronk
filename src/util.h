@@ -146,7 +146,7 @@ void timeval_to_timespec(struct timespec *ts, const struct timeval *tv);
 int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1 greater than t2?
 
 #ifndef HAVE_ASPRINTF
-    static int asprintf(char **strp, const char *fmt, ...)
+    /*static int asprintf(char **strp, const char *fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
@@ -177,7 +177,7 @@ int timespec_cmp(const struct timespec *t1, const struct timespec *t2); // Is t1
         if(result2 < 0) { free(buf); return -1; }
         *strp = buf;
         return result2;
-    }
+    }*/
     END_IGNORE()
 
     #define HAVE_ASPRINTF

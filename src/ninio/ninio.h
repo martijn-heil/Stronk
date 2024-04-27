@@ -55,7 +55,7 @@ static void ninio_buffer_read(struct ninio_buffer *in, void *out, size_t bytes) 
 }
 END_IGNORE()
 
-#ifndef HAVE_ASPRINTF
+#if defined(HAVE_ASPRINTF) && 0
     static int asprintf(char **strp, const char *fmt, ...)
     {
         va_list ap;

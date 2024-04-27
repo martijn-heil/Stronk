@@ -48,7 +48,7 @@
 #define ntoh64(x) ntohll(x)
 
 #ifndef HAVE_ASPRINTF
-    static int asprintf(char **strp, const char *fmt, ...)
+    /*static int asprintf(char **strp, const char *fmt, ...)
     {
         va_list ap;
         va_start(ap, fmt);
@@ -79,7 +79,7 @@
         if(result2 < 0) { free(buf); return -1; }
         *strp = buf;
         return result2;
-    }
+    }*/
     END_IGNORE()
 
     #define HAVE_ASPRINTF

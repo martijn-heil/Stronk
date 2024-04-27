@@ -357,7 +357,7 @@ void server_start(void)
 
 static void server_tick(void)
 {
-    nlog_debug("Current internal clock: %lu : %lu", internal_clock.tv_sec, internal_clock.tv_nsec);
+    //nlog_debug("Current internal clock: %lu : %lu", internal_clock.tv_sec, internal_clock.tv_nsec);
     net_tick();
 
 
