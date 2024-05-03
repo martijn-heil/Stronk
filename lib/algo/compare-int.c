@@ -22,7 +22,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Comparison functions for a pointer to an integer */
 
-int int_equal(void *vlocation1, void *vlocation2)
+bool int_equal(void *vlocation1, void *vlocation2)
 {
 	int *location1;
 	int *location2;

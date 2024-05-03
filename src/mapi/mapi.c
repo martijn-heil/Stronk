@@ -539,7 +539,7 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
     sprintf(url, fmt, username, server_id_hash, ip);
     json_t *response;
     int status = mapi_make_api_request(&response, url, MAPI_HTTP_GET, NULL, 0, NULL);
-    if(status < 0) { return false; }
+    if(status < 0) { return NULL; }
 
     return mapi_minecraft_has_joined_response_from_json(response);
 }

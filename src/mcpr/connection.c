@@ -101,6 +101,11 @@ void mcpr_connection_close(mcpr_connection *tmpconn, const char *reason)
     }
 }
 
+bool mcpr_connection_flush(mcpr_connection *tmpconn)
+{
+    struct conn *conn = (struct conn *) tmpconn;
+    return bstream_flush(conn->io_stream) != -1;
+}
 
 mcpr_connection *mcpr_connection_new(struct bstream *stream)
 {
@@ -219,7 +224,14 @@ bool update_receiving_buffer(mcpr_connection *tmpconn)
 bool mcpr_connection_update(mcpr_connection *tmpconn)
 {
     struct conn *conn = (struct conn *) tmpconn;
-    if(!update_receiving_buffer(tmpconn)) return false;
+    if(!update_receiving_buffer(tmpconn))
+    {
+        if (ninerr_is(ninerr, "ninerr_broken_pipe"))
+        {
+            mcpr_connection_close(tmpconn, NULL);
+        }
+        return false;
+    }
 
     while(conn->receiving_buf.size > 0)
     {
@@ -241,8 +253,17 @@ bool mcpr_connection_update(mcpr_connection *tmpconn)
         }
         else
         {
-            return true;
+            break;
         }
+    }
+
+    if(!mcpr_connection_flush(tmpconn))
+    {
+        if (ninerr_is(ninerr, "ninerr_broken_pipe"))
+        {
+            mcpr_connection_close(tmpconn, NULL);
+        }
+        return false;
     }
 
     return true;
@@ -270,17 +291,17 @@ bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t byte
             ssize_t compression_result = mcpr_compress(compressed_data, encrypted_data, encrypted_data_length);
             if(compression_result == -1) { free(encrypted_data); free(compressed_data); return false; }
 
-            bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
+            isize write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
             free(encrypted_data);
             free(compressed_data);
-            return write_result;
+            return write_result != -1;
         }
         else
         {
             DEBUG_PRINT("Writing those bytes uncompressed.");
-            bool write_result = bstream_write(conn->io_stream, encrypted_data, encrypted_data_length);
+            isize write_result = bstream_write(conn->io_stream, encrypted_data, encrypted_data_length);
             free(encrypted_data);
-            return write_result;
+            return write_result != -1;
         }
     }
     else
@@ -294,15 +315,14 @@ bool mcpr_connection_write(mcpr_connection *tmpconn, const void *in, size_t byte
 
             ssize_t compression_result = mcpr_compress(compressed_data, in, bytes);
             if(compression_result == -1) { free(compressed_data); return false; }
-            bool write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
+            isize write_result = bstream_write(conn->io_stream, compressed_data, compression_result);
             free(compressed_data);
-            return write_result;
+            return write_result != -1;
         }
         else
         {
             DEBUG_PRINT("Writing those bytes uncompressed.");
-            bool result = bstream_write(conn->io_stream, in, bytes);
-            return result;
+            return bstream_write(conn->io_stream, in, bytes);
         }
     }
 }
@@ -320,6 +340,7 @@ bool mcpr_connection_write_packet(mcpr_connection *tmpconn, const struct mcpr_pa
     memmove(buf + mcpr_varint_bounds((int32_t) pktlen), buf, pktlen);
     size_t bytes_written_1 = mcpr_encode_varint(buf, (int32_t) pktlen);
     DEBUG_PRINT("Writing packet, total size: %zu, size before prefixed length: %zu\n", (size_t) (pktlen + bytes_written_1), pktlen);
+
     if(!mcpr_connection_write(tmpconn, buf, pktlen + bytes_written_1)) { free(buf); return false; }
     free(buf);
     return true;
@@ -342,7 +363,6 @@ void mcpr_connection_set_state(mcpr_connection *conn, enum mcpr_state state)
 {
     ((struct conn *) conn)->state = state;
 }
-
 
 void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression)
 {

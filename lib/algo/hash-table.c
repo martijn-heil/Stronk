@@ -22,6 +22,8 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <stdlib.h>
 #include <string.h>
+#include <valgrind/memcheck.h>
+#include "compare-ull.h"
 
 #include "hash-table.h"
 
@@ -340,7 +342,7 @@ HashTableValue hash_table_lookup(HashTable *hash_table, HashTableKey key)
 	rover = hash_table->table[index];
 
 	while (rover != NULL) {
-		if (hash_table->equal_func(key, rover->key) != 0) {
+		if (hash_table->equal_func(key, rover->key)) {
 
 			/* Found the entry.  Return the data. */
 

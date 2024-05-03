@@ -27,6 +27,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <limits.h>
 #include <time.h>
 
@@ -35,6 +36,8 @@
 #include <sys/fcntl.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+
+#include <ninstd/types.h>
 
 #include "warnings.h"
 
@@ -114,7 +117,6 @@
 #define htonll(x) ((1==htonl(1)) ? (x) : ((uint64_t)htonl((x) & 0xFFFFFFFF) << 32) | htonl((x) >> 32))
 #define ntohll(x) ((1==ntohl(1)) ? (x) : ((uint64_t)ntohl((x) & 0xFFFFFFFF) << 32) | ntohl((x) >> 32))
 
-
 #define hton16(x) htons(x)
 #define hton32(x) htonl(x)
 #define hton64(x) htonll(x)
@@ -123,10 +125,9 @@
 #define ntoh32(x) ntohl(x)
 #define ntoh64(x) ntohll(x)
 
-
 void bswap(void *what, size_t n);
 
-
+int msleep(i64 msec);
 
 
 void timespec_diff(struct timespec *result, const struct timespec *start, const struct timespec *stop);

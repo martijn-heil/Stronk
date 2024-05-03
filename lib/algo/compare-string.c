@@ -26,7 +26,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Comparison functions for strings */
 
-int string_equal(void *string1, void *string2)
+bool string_equal(void *string1, void *string2)
 {
 	return strcmp((char *) string1, (char *) string2) == 0;
 }

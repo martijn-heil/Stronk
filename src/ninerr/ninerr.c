@@ -38,6 +38,9 @@
 thread_local struct ninerr *ninerr;
 struct ninerr ninerr_out_of_memory_struct;
 
+// For performance reasons we store this one statically as well.
+static struct ninerr ninerr_wouldblock_struct;
+
 
 bool ninerr_init(void)
 {
@@ -46,6 +49,12 @@ bool ninerr_init(void)
     ninerr_out_of_memory_struct.child = NULL;
     ninerr_out_of_memory_struct.cause = NULL;
     ninerr_out_of_memory_struct.type = "ninerr_out_of_memory";
+
+    ninerr_out_of_memory_struct.message = "Operation would block.";
+    ninerr_out_of_memory_struct.free = NULL;
+    ninerr_out_of_memory_struct.child = NULL;
+    ninerr_out_of_memory_struct.cause = NULL;
+    ninerr_out_of_memory_struct.type = "ninerr_wouldblock";
 
     return true;
 }
@@ -80,6 +89,12 @@ int ninerr_fprint(FILE *fp, const struct ninerr *err)
         return fprintf(fp, "%s: %s\n", err->type, err->message);
     }
     return -1;
+}
+
+
+bool ninerr_is(struct ninerr *err, const char *type)
+{
+    return strcmp(err->type, type) == 0;
 }
 
 static void ninerr_free(struct ninerr *err)
@@ -215,12 +230,30 @@ struct ninerr *ninerr_closed_new(char *message, bool free_message)
     return err;
 }
 
+struct ninerr *ninerr_broken_pipe_new(char *message, bool free_message)
+{
+    struct ninerr *err;
+    if(message != NULL)
+    {
+        err = ninerr_new(message, free_message);
+    }
+    else
+    {
+        err = ninerr_new("Broken pipe.");
+    }
+    if(err == NULL) return NULL;
+    err->type = "ninerr_broken_pipe";
+    return err;
+}
+
 struct ninerr *ninerr_wouldblock_new(void)
 {
-    struct ninerr *err = ninerr_new("Operation would block.");
-    if(err == NULL) return NULL;
-    err->type = "ninerr_wouldblock";
-    return err;
+    return &ninerr_wouldblock_struct;
+}
+
+bool ninerr_is_wouldblock(struct ninerr *err)
+{
+    return err == &ninerr_wouldblock_struct;
 }
 
 struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
@@ -232,6 +265,9 @@ struct ninerr *ninerr_from_errno(void) // TODO implement other errno values.
 
         case ECONNRESET:
             return ninerr_closed_new(NULL, false);
+
+        case EPIPE:
+            return ninerr_broken_pipe_new(NULL, false);
 
         case EAGAIN: // fallthrough
 //        case EWOULDBLOCK:

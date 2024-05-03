@@ -38,22 +38,9 @@ struct ninio_buffer {
     size_t max_size;
     size_t size;
 };
-IGNORE("-Wpointer-arith")
-static void ninio_buffer_read(struct ninio_buffer *in, void *out, size_t bytes) {
-    assert(in->content != NULL);
-    assert(in->size >= bytes);
-
-    memcpy(out, in->content, bytes);
-    if(in->size - bytes > 0)
-    {
-        memmove(in->content, in->content + bytes, in->size - bytes);
-    }
-    else
-    {
-        in->size = 0;
-    }
-}
-END_IGNORE()
+void ninio_buffer_read(struct ninio_buffer *in, void *out, usize bytes);
+void ninio_buffer_append(struct ninio_buffer *out, void const *restrict in, usize n);
+void ninio_buffer_shl(struct ninio_buffer *buffer, usize n);
 
 #if defined(HAVE_ASPRINTF) && 0
     static int asprintf(char **strp, const char *fmt, ...)

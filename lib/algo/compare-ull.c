@@ -22,7 +22,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Comparison functions for a pointer to an unsigned long long */
 
-int ull_equal(void *location1, void *location2)
+bool ull_equal(void *location1, void *location2)
 {
     return (*((unsigned long long *) location1)) == (*((unsigned long long *) location2));
 }

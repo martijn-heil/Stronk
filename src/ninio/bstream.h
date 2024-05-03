@@ -26,20 +26,24 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <sys/types.h>
+
+#include <ninstd/types.h>
 
 
 struct bstream
 {
     void *private; // may be NULL
-    bool (*read)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    ssize_t (*read_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
-    bool (*peek)(struct bstream *stream, void *out, size_t bytes); // May be NULL
-    ssize_t (*peek_max)(struct bstream *stream, void *out, size_t maxbytes); // May be NULL
-    bool (*write)(struct bstream *stream, const void *in, size_t bytes); // May be NULL
+    bool (*read)(struct bstream *stream, void *out, usize bytes); // May be NULL
+    isize (*read_max)(struct bstream *stream, void *out, usize maxbytes); // May be NULL
+    bool (*peek)(struct bstream *stream, void *out, usize bytes); // May be NULL
+    isize (*peek_max)(struct bstream *stream, void *out, usize maxbytes); // May be NULL
+    isize (*write)(struct bstream *stream, const void *in, usize bytes); // May be NULL
     void (*incref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
     void (*decref)(struct bstream *stream); // may be NULL, if either incref or decref is provided, the opposite function must be provided too.
-    bool (*is_available)(struct bstream *stream, size_t amount); // may be NULL
+    bool (*is_available)(struct bstream *stream, usize amount); // may be NULL
+    isize (*flush)(struct bstream *stream); // may be NULL
 };
 
 /*
@@ -52,14 +56,20 @@ struct bstream
     decref
     is_available? TODO
 */
-struct bstream *bstream_from_fd(int fd);
+struct bstream *bstream_from_fd(i32 fd);
+struct bstream *bstream_buffered(
+    struct bstream *inner_stream,
+    usize write_buf_step_size,
+    usize write_buf_initial_size,
+    usize write_frame_size);
 
-bool bstream_is_available(struct bstream *stream, size_t amount);
-ssize_t bstream_read_max(struct bstream *stream, void *buf, size_t maxbytes);
-bool bstream_read(struct bstream *stream, void *buf, size_t bytes);
-bool bstream_write(struct bstream *stream, const void *buf, size_t bytes);
-void bstream_peek(struct bstream *stream, void *out, size_t bytes);
-ssize_t bstream_peek_max(struct bstream *stream, void *out, size_t maxbytes);
+bool bstream_is_available(struct bstream *stream, usize amount);
+isize bstream_read_max(struct bstream *stream, void *buf, usize maxbytes);
+bool bstream_read(struct bstream *stream, void *buf, usize bytes);
+isize bstream_write(struct bstream *stream, const void *buf, usize bytes);
+bool bstream_peek(struct bstream *stream, void *out, usize bytes);
+isize bstream_peek_max(struct bstream *stream, void *out, usize maxbytes);
+isize bstream_flush(struct bstream *stream);
 
 // If the following two functions are called on a bstream where incref/decref is NULL, no operation will be performed.
 void bstream_incref(struct bstream *stream);
@@ -75,7 +85,7 @@ int bstream_printf(struct bstream *stream, const char *fmt, ...);
 #endif
 
 void bstream_init_black_hole(struct bstream *stream);
-void bstream_open_memory(struct bstream *out, void *buf, size_t maxlen, char *mode); // TODO implement
-bool bstream_memory_writer(struct bstream *stream, void **buf, size_t initial_size); // TODO implement
+void bstream_open_memory(struct bstream *out, void *buf, usize maxlen, char *mode); // TODO implement
+bool bstream_memory_writer(struct bstream *stream, void **buf, usize initial_size); // TODO implement
 
 #endif

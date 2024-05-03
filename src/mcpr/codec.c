@@ -45,9 +45,6 @@
 #include "mcpr/mcpr.h"
 #include "mcpr/util.h"
 
-
-
-
 // TODO better logging
 
 void mcpr_encode_bool(void *out, bool b)
@@ -147,15 +144,14 @@ size_t mcpr_encode_varint(void *output, int32_t value)
     size_t i = 0;
     do
     {
-        uint8_t tmp = (uint8_t) (value & 0x0000007F);
+        uint8_t tmp = (uint8_t) (value & 0b01111111);
         value = ((uint32_t) value)>>7;
         if(value != 0)
         {
-            tmp |= 0x80;
+            tmp |= 0b10000000;
         }
 
         out[i] = (unsigned char) tmp;
-
         i++;
     } while(value != 0);
 
@@ -167,11 +163,11 @@ size_t mcpr_varint_bounds(int32_t value)
     size_t i = 0;
     do
     {
-        uint8_t tmp = (uint8_t) (value & 0x0000007F);
+        uint8_t tmp = (uint8_t) (value & 0b01111111);
         value = ((uint32_t) value)>>7;
         if(value != 0)
         {
-            tmp |= 0x80;
+            tmp |= 0b10000000;
         }
 
         i++;
@@ -186,11 +182,11 @@ size_t mcpr_encode_varlong(void *output, int64_t value) {
     size_t i = 0;
     do
     {
-        uint8_t tmp = (uint8_t) (value & 0x0000007F);
+        uint8_t tmp = (uint8_t) (value & 0b01111111);
         value = ((uint64_t) value)>>7;
         if(value != 0)
         {
-            tmp |= 0x80;
+            tmp |= 0b10000000;
         }
 
         out[i] = (unsigned char) tmp;
@@ -310,7 +306,7 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
         tmp = *((uint8_t *) (in + i));
         //memcpy(&tmp, in + i, 1);
 
-        uint8_t value = (tmp & 0x7F); // 0x7F == 0b01111111
+        uint8_t value = (tmp & 0b01111111);
         result |= (value << (7 * i));
 
         i++;
@@ -324,7 +320,7 @@ ssize_t mcpr_decode_varint(int32_t *out, const void *in, size_t max_len)
             ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varint."));
             return -1;
         }
-    } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
+    } while ((tmp & 0b10000000) != 0);
 
     *out = result;
     return i;
@@ -340,7 +336,7 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
     {
         memcpy(&tmp, in + i, 1);
 
-        uint8_t value = (tmp & 0x7F); // 0x7F == 0b01111111
+        uint8_t value = (tmp & 0b01111111); // 0x7F == 0b01111111
         result |= (value << (7 * i));
 
         i++;
@@ -354,7 +350,7 @@ ssize_t mcpr_decode_varlong(int64_t *out, const void *in, size_t max_len)
             ninerr_set_err(ninerr_new("Exceeded given max length whilst decoding varlong."));
             return -1;
         }
-    } while ((tmp & 0x80) != 0); // 0x80 == 0b10000000
+    } while ((tmp & 0b10000000) != 0); // 0x80 == 0b10000000
 
     *out = result;
     return i;

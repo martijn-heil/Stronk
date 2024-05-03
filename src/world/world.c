@@ -123,24 +123,28 @@ West to east, north to south block changing is the fastest (as they are indexed 
 #define CHUNK_SECTIONS_PER_CHUNK 16
 #define BLOCKS_PER_CHUNK (BLOCKS_PER_CHUNK_SECTION * CHUNK_SECTIONS_PER_CHUNK)
 
-static struct chunk *load_chunk(world *world, long x, long z);
-static bool send_chunk_data(const struct player *p, const struct chunk *chunk, long x, long z, bool send_sky_light);
+static struct chunk *load_chunk(world *world, i32 x, i32 z);
+static bool send_chunk_data(const struct player *p, const struct chunk *chunk, i32 x, i32 z, bool send_sky_light);
 
 struct chunk_section {
     pthread_rwlock_t lock;
 
     struct block blocks[4096]; // 16x16x16
 };
-static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_section *section);
+static void encode_chunk_section_blocks(u64 *out, const struct chunk_section *section);
 
 struct chunk
 {
-    unsigned long long last_update;
+    u64 last_update;
     struct chunk_section sections[CHUNK_SECTIONS_PER_CHUNK]; // 16 high indexed bottom to top.
-    uint8_t biomes[256];
+    u8 biomes[256];
 };
 
-#define get_chunk_key(x, z) ((unsigned long long) (((unsigned long long) x) << 32 | ((unsigned long long) z)))
+static u64 get_chunk_key(u64 x, u64 z)
+{
+  return ((x & 0xFFFFFFFF) << 32) | ((z & 0xFFFFFFFF) >> 32);
+}
+
 struct world
 {
     HashTable *chunks;
@@ -148,10 +152,10 @@ struct world
 };
 
 struct world *default_world = NULL;
-unsigned int server_view_distance = 15;
+u64 server_view_distance = 15;
 
 
-int world_manager_init(void)
+i64 world_manager_init(void)
 {
     default_world = malloc(sizeof(struct world));
     if(default_world == NULL) { nlog_fatal("Could not allocate memory. (%s)", strerror(errno)); return -1; }
@@ -167,15 +171,15 @@ void world_manager_cleanup(void)
     // TODO free memory from world
 }
 
-static struct chunk *get_chunk(world *w, long x, long z)
+static struct chunk *get_chunk(world *w, i32 x, i32 z)
 {
-    unsigned long long key = get_chunk_key(x, z);
+    u64 key = get_chunk_key(x, z);
     struct chunk *chunk = hash_table_lookup(default_world->chunks, &key);
     return (chunk != HASH_TABLE_NULL) ? chunk : load_chunk(w, x, z);
 }
 
 IGNORE("-Wunused-parameter")
-static struct chunk *load_chunk(world *world, long x, long z)
+static struct chunk *load_chunk(world *world, i32 x, i32 z)
 {
     // TODO later we need to read a chunk from disk, but for now we just use dummy chunks filled with stone up to a certain level.
     struct chunk *chunk = malloc(sizeof(struct chunk));
@@ -184,11 +188,11 @@ static struct chunk *load_chunk(world *world, long x, long z)
     chunk->last_update = 0; // TODO
 
     // Fill the bottom 8 chunk sections with solid stone.
-    for(size_t i = 0; i < 8; i++)
+    for(usize i = 0; i < 8; i++)
     {
         struct chunk_section *chunk_section = &(chunk->sections[i]);
 
-        for(int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
+        for(i64 i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
         {
             chunk_section->blocks[i].type_id = 1;
             chunk_section->blocks[i].data = 0;
@@ -196,11 +200,11 @@ static struct chunk *load_chunk(world *world, long x, long z)
     }
 
     // Fill the top 8 chunk sections with air.
-    for(size_t i = 8; i < 16; i++)
+    for(usize i = 8; i < 16; i++)
     {
         struct chunk_section *chunk_section = &(chunk->sections[i]);
 
-        for(int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
+        for(usize i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
         {
             chunk_section->blocks[i].type_id = 0;
             chunk_section->blocks[i].data = 0;
@@ -210,7 +214,7 @@ static struct chunk *load_chunk(world *world, long x, long z)
     // Fill in biome data.
     memset(chunk->biomes, 0, 256);
 
-    unsigned long long key = get_chunk_key(x, z);
+    u64 key = get_chunk_key(x, z);
     int result = hash_table_insert(((struct world *) world)->chunks, &key, chunk);
     if(result == 0){ nlog_error("Could not put new chunk in chunk map. (%s ?)", strerror(errno)); free(chunk); return NULL; }
 
@@ -220,15 +224,15 @@ END_IGNORE()
 
 bool world_send_chunk_data1(const struct player *p) // TODO
 {
-    unsigned short view_distance = 10; // TODO proper view distance
-    long base_x = p->pos.x / 16;
-    long base_z = p->pos.z / 16;
-    for(int mod_x = -view_distance; mod_x <= view_distance; mod_x++)
+    i16 view_distance = 10; // TODO proper view distance
+    i64 base_x = p->pos.x / 16;
+    i64 base_z = p->pos.z / 16;
+    for(i64 mod_x = -view_distance; mod_x <= view_distance; mod_x++)
     {
-        for(int mod_z = -view_distance; mod_z <= view_distance; mod_z++)
+        for(i64 mod_z = -view_distance; mod_z <= view_distance; mod_z++)
         {
-            long x = base_x + mod_x;
-            long z = base_z + mod_z;
+            i64 x = base_x + mod_x;
+            i64 z = base_z + mod_z;
 
             send_chunk_data(p, get_chunk(default_world, x, z), x, z, default_world->dimension == MCPR_DIMENSION_OVERWORLD);
         }
@@ -237,87 +241,98 @@ bool world_send_chunk_data1(const struct player *p) // TODO
     return true;
 }
 
-static bool send_chunk_data(const struct player *p, const struct chunk *chunk, long x, long z, bool send_sky_light)
+static thread_local bool send_chunk_data_pkt_initialized = false;
+static thread_local struct mcpr_packet send_chunk_data_pkt;
+static thread_local void *send_chunk_data_pkt_sky_light = NULL;
+static bool initialize_send_chunk_data_pkt(void)
 {
-    nlog_debug("In send_chunk_data(player = %s, chunkX = %ld, chunkZ = %ld)", p->username, x, z);
+    if(send_chunk_data_pkt_initialized) return true;
 
-    struct mcpr_packet pkt;
-    pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
-    pkt.state = MCPR_STATE_PLAY;
-    pkt.data.play.clientbound.chunk_data.chunk_x = x;
-    pkt.data.play.clientbound.chunk_data.chunk_z = z;
-    pkt.data.play.clientbound.chunk_data.ground_up_continuous = true;
-    pkt.data.play.clientbound.chunk_data.primary_bit_mask = 0xFFFF;
-    pkt.data.play.clientbound.chunk_data.size = CHUNK_SECTIONS_PER_CHUNK;
-    pkt.data.play.clientbound.chunk_data.block_entities = NULL;
-    pkt.data.play.clientbound.chunk_data.block_entity_count = 0;
+    struct mcpr_packet *pkt = &send_chunk_data_pkt;
+    pkt->id = MCPR_PKT_PL_CB_CHUNK_DATA;
+    pkt->state = MCPR_STATE_PLAY;
+    pkt->data.play.clientbound.chunk_data.ground_up_continuous = true;
+    pkt->data.play.clientbound.chunk_data.primary_bit_mask = 0xFFFF;
+    pkt->data.play.clientbound.chunk_data.size = CHUNK_SECTIONS_PER_CHUNK;
+    pkt->data.play.clientbound.chunk_data.block_entities = NULL;
+    pkt->data.play.clientbound.chunk_data.block_entity_count = 0;
+
     void *membuf = malloc(CHUNK_SECTIONS_PER_CHUNK * sizeof(struct mcpr_chunk_section));
     if(membuf == NULL)
     {
         nlog_error("Could not allocate memory. (%s)", strerror(errno));
         return false;
     }
+    pkt->data.play.clientbound.chunk_data.chunk_sections = membuf;
 
-    pkt.data.play.clientbound.chunk_data.chunk_sections = membuf;
-    pkt.data.play.clientbound.chunk_data.biomes = chunk->biomes;
-
-
-    for(size_t i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
+    for(usize i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
     {
-        const struct chunk_section *section = &(chunk->sections[i]);
-
-        struct mcpr_chunk_section *mcpr_chunk_section = pkt.data.play.clientbound.chunk_data.chunk_sections + i;
+        struct mcpr_chunk_section *mcpr_chunk_section = pkt->data.play.clientbound.chunk_data.chunk_sections + i;
         mcpr_chunk_section->bits_per_block = 13;
         mcpr_chunk_section->palette_length = 0;
         mcpr_chunk_section->palette = NULL;
 
-        void *membuf2 = (send_sky_light) ? malloc(BLOCKS_PER_CHUNK_SECTION / 2 * 2 + 832 * sizeof(uint64_t)) : malloc(BLOCKS_PER_CHUNK_SECTION / 2 + 832 * sizeof(uint64_t));
+        void *membuf2 = malloc(BLOCKS_PER_CHUNK_SECTION / 2 * 2 + 832 * sizeof(u64));
         if(membuf2 == NULL)
         {
             nlog_error("Could not allocate memory. (%s)", strerror(errno));
             return false;
         }
         mcpr_chunk_section->block_light = membuf2;
-        memset(mcpr_chunk_section->block_light, 0, BLOCKS_PER_CHUNK_SECTION / 2); // TODO block light.
+        mcpr_chunk_section->sky_light = membuf2 + BLOCKS_PER_CHUNK_SECTION / 2;
+        mcpr_chunk_section->blocks = membuf2 + BLOCKS_PER_CHUNK_SECTION / 2 * 2;
+        mcpr_chunk_section->block_array_length = 832;
+
+        send_chunk_data_pkt_sky_light = mcpr_chunk_section->sky_light;
+    }
+
+    return true;
+}
+static bool send_chunk_data(const struct player *p, const struct chunk *chunk, i32 x, i32 z, bool send_sky_light)
+{
+    nlog_debug("In send_chunk_data(player = %s, chunkX = %d, chunkZ = %d)", p->username, x, z);
+    struct mcpr_packet *pkt = &send_chunk_data_pkt;
+    if(!initialize_send_chunk_data_pkt())
+    {
+        return false;
+    }
+
+    pkt->data.play.clientbound.chunk_data.chunk_x = x;
+    pkt->data.play.clientbound.chunk_data.chunk_z = z;
+    pkt->data.play.clientbound.chunk_data.biomes = chunk->biomes;
+
+    for(usize i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
+    {
+        const struct chunk_section *section = &(chunk->sections[i]);
+        struct mcpr_chunk_section *mcpr_chunk_section = pkt->data.play.clientbound.chunk_data.chunk_sections + i;
 
         if(send_sky_light)
         {
-            mcpr_chunk_section->sky_light = membuf2 + BLOCKS_PER_CHUNK_SECTION / 2;
-            memset(mcpr_chunk_section->sky_light, ((((uint8_t) 15) << 4) | ((uint8_t) 15)), BLOCKS_PER_CHUNK_SECTION / 2); // TODO sky light.
+            mcpr_chunk_section->sky_light = send_chunk_data_pkt_sky_light;
+            memset(mcpr_chunk_section->sky_light, ((((u8) 15) << 4) | ((u8) 15)), BLOCKS_PER_CHUNK_SECTION / 2); // TODO sky light.
         }
         else
         {
             mcpr_chunk_section->sky_light = NULL;
         }
 
-
-        mcpr_chunk_section->blocks = (send_sky_light) ? membuf2 + BLOCKS_PER_CHUNK_SECTION / 2 * 2 : membuf2 + BLOCKS_PER_CHUNK_SECTION / 2;
-        mcpr_chunk_section->block_array_length = 832;
-
         encode_chunk_section_blocks(mcpr_chunk_section->blocks, section);
-	    //memset(mcpr_chunk_section->blocks, 0, 832 * sizeof(uint64_t));
     }
 
     const struct connection *conn = player_get_connection(p);
-    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
-    if(result < 0)
+    if(!mcpr_connection_write_packet(conn->conn, pkt))
     {
         nlog_error("Could not send chunk data packet.");
         ninerr_print(ninerr);
         return false;
     }
 
-    // Clean up..
-    for(int i = 0; i < CHUNK_SECTIONS_PER_CHUNK; i++)
-    {
-        free(pkt.data.play.clientbound.chunk_data.chunk_sections[i].block_light);
-    }
-    free(pkt.data.play.clientbound.chunk_data.chunk_sections);
+    //msleep(1);
     return true;
 }
 
 // section_y from 0 to 15 (inclusive)
-static bool send_chunk_section_data(const struct player *p, const struct chunk_section *section, long long chunk_x, long long chunk_z, unsigned char section_y)
+static bool send_chunk_section_data(const struct player *p, const struct chunk_section *section, i64 chunk_x, i64 chunk_z, u8 section_y)
 {
     struct mcpr_packet pkt;
     pkt.id = MCPR_PKT_PL_CB_CHUNK_DATA;
@@ -331,7 +346,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
     pkt.data.play.clientbound.chunk_data.size = 1;
 
 
-    void *membuf = malloc(sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2 + 832 * sizeof(uint64_t));
+    void *membuf = malloc(sizeof(struct mcpr_chunk_section) + BLOCKS_PER_CHUNK_SECTION / 2 + 832 * sizeof(i64));
     if(membuf == NULL)
     {
         nlog_error("Could not allocate memory. (%s)", strerror(errno));
@@ -356,8 +371,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
     pkt.data.play.clientbound.chunk_data.chunk_sections[section_y] = mcpr_chunk_section;
 
     struct connection *conn = p->conn;
-    ssize_t result = mcpr_connection_write_packet(conn->conn, &pkt);
-    if(result < 0)
+    if(!mcpr_connection_write_packet(conn->conn, &pkt))
     {
         nlog_error("Could not send chunk data packet.");
         ninerr_print(ninerr);
@@ -370,7 +384,7 @@ static bool send_chunk_section_data(const struct player *p, const struct chunk_s
 }
 
 
-int32_t generate_new_entity_id(void)
+i32 generate_new_entity_id(void)
 {
     pthread_mutex_lock(&entity_id_counter_mutex);
     int32_t tmp = ++entity_id_counter;
@@ -378,15 +392,15 @@ int32_t generate_new_entity_id(void)
     return tmp;
 }
 
-static void encode_chunk_section_blocks(uint64_t *out, const struct chunk_section *section)
+static void encode_chunk_section_blocks(u64 *out, const struct chunk_section *section)
 {
     uint_fast8_t bits_used = 0;
-    uint64_t tmp_result = 0;
-    size_t block_data_index = 0;
-    for(unsigned int i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
+    u64 tmp_result = 0;
+    usize block_data_index = 0;
+    for(usize i = 0; i < BLOCKS_PER_CHUNK_SECTION; i++)
     {
         const struct block *block = &(section->blocks[i]);
-        uint64_t current_block_data = ((((uint64_t) block->type_id) << 4) | ((uint64_t) block->data)); // This line has been tested, it works.
+        u64 current_block_data = ((((u64) block->type_id) << 4) | ((u64) block->data)); // This line has been tested, it works.
         tmp_result |= (current_block_data << bits_used);
         bits_used += 13;
 

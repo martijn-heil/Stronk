@@ -22,7 +22,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Comparison functions for a generic void pointer */
 
-int pointer_equal(void *location1, void *location2)
+bool pointer_equal(void *location1, void *location2)
 {
 	return location1 == location2;
 }

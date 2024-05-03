@@ -67,6 +67,8 @@ struct ninerr *ninerr_new(const char *fmt, ...);
 struct ninerr *ninerr_arithmetic_new(void);
 int ninerr_print(const struct ninerr *err);
 int ninerr_fprint(FILE *fp, const struct ninerr *err);
+bool ninerr_is_wouldblock(struct ninerr *err);
+bool ninerr_is(struct ninerr *err, const char *type);
 
 
 
@@ -84,6 +86,7 @@ struct ninerr_file_not_found
 };
 
 struct ninerr *ninerr_closed_new(char *message, bool free_message); // message can be NULL
+struct ninerr *ninerr_broken_pipe_new(char *message, bool free_message); // message can be NULL
 struct ninerr *ninerr_wouldblock_new(void);
 
 #endif

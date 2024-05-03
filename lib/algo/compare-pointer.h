@@ -31,10 +31,6 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #ifndef ALGORITHM_COMPARE_POINTER_H
 #define ALGORITHM_COMPARE_POINTER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * Compare two pointers to determine if they are equal.  
  *
@@ -44,7 +40,7 @@ extern "C" {
  *                        are not equal.
  */
 
-int pointer_equal(void *location1, void *location2);
+bool pointer_equal(void *location1, void *location2);
 
 /**
  * Compare two pointers.
@@ -58,10 +54,6 @@ int pointer_equal(void *location1, void *location2);
  */
 
 int pointer_compare(void *location1, void *location2);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* #ifndef ALGORITHM_COMPARE_POINTER_H */
 

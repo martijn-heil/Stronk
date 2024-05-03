@@ -45,9 +45,7 @@ CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #ifndef ALGORITHM_HASH_TABLE_H
 #define ALGORITHM_HASH_TABLE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stddef.h>
 
 /**
  * A hash table structure.
@@ -93,7 +91,7 @@ struct _HashTableIterator {
  * A null @ref HashTableValue.
  */
 
-#define HASH_TABLE_NULL ((void *) 0)
+#define HASH_TABLE_NULL NULL
 
 /**
  * Hash function used to generate hash values for keys used in a hash
@@ -112,7 +110,7 @@ typedef unsigned long long (*HashTableHashFunc)(HashTableKey value);
  *           not equal.
  */
 
-typedef int (*HashTableEqualFunc)(HashTableKey value1, HashTableKey value2);
+typedef bool (*HashTableEqualFunc)(HashTableKey value1, HashTableKey value2);
 
 /**
  * Type of function used to free keys when entries are removed from a
@@ -244,9 +242,5 @@ int hash_table_iter_has_more(HashTableIterator *iterator);
  */
 
 HashTableValue hash_table_iter_next(HashTableIterator *iterator);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* #ifndef ALGORITHM_HASH_TABLE_H */

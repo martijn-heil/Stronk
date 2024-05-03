@@ -45,5 +45,6 @@ void mcpr_connection_set_compression(mcpr_connection *tmpconn, bool compression)
 enum mcpr_state mcpr_connection_get_state(mcpr_connection *conn);
 void mcpr_connection_set_state(mcpr_connection *conn, enum mcpr_state state);
 void mcpr_connection_close(mcpr_connection *conn, const char *reason);
+bool mcpr_connection_flush(mcpr_connection *conn);
 
 #endif

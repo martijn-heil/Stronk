@@ -23,6 +23,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+#include <errno.h>
 
 #include <sys/time.h>
 
@@ -149,3 +150,24 @@ void ms_to_timespec(struct timespec *ts, unsigned long long ms)
 // {
 //     // TODO implement
 // }
+
+int msleep(int64 msec)
+{
+    struct timespec ts;
+    int res;
+
+    if (msec < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = msec / 1000;
+    ts.tv_nsec = (msec % 1000) * 1000000;
+
+    do {
+        res = nanosleep(&ts, &ts);
+    } while (res && errno == EINTR);
+
+    return res;
+}

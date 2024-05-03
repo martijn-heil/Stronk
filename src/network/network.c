@@ -150,6 +150,15 @@ static int make_server_socket (uint16_t port)
         return -1;
     }
 
+    int yes=1;
+    //char yes='1'; // Solaris people use this
+    // lose the pesky "Address already in use" error message
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof yes) == -1)
+    {
+        nlog_fatal("Could not setsockopt SO_REUSEADDR");
+        return -1;
+    } 
+
     // Give the socket a name.
     name.sin_family = AF_INET;
     name.sin_port = hton16(port);
@@ -184,9 +193,9 @@ void connection_close(struct connection *conn, const char *disconnect_message)
     bstream_decref(conn->iostream);
     mcpr_connection_decref(conn->conn);
     free(conn->server_address_used);
-    free(conn);
 
     nlog_info("Connection at address %p closed.", (void *) conn);
+    free(conn);
 }
 
 static bool packet_handler(const struct mcpr_packet *pkt, mcpr_connection *conn)
@@ -346,13 +355,24 @@ static void accept_incoming_connections(void)
 
         if(fcntl(newfd, F_SETFL, O_NONBLOCK) == -1)
         {
-            nlog_fatal("Could not set O_NONBLOCK flag for incoming connection. (%s)", strerror(errno));
-            if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", strerror(errno));
+            const char *err = strerror(errno);
+            nlog_fatal("Could not set O_NONBLOCK flag for incoming connection. (%s)", err);
+            if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", err);
             continue;
         }
 
-        struct bstream *stream = bstream_from_fd(newfd);
-        if(stream == NULL)
+        int so_sndbuf;
+        socklen_t so_sndbuf_len = sizeof(so_sndbuf);
+        if(getsockopt(newfd, SOL_SOCKET, SO_SNDBUF, &so_sndbuf, &so_sndbuf_len) == -1)
+        {
+            const char *err = strerror(errno);
+            nlog_fatal("Could not get SO_SNDBUF value for incoming connection. (%s)", err);
+            if(close(newfd) == -1) nlog_error("Error closing socket after previous error. (%s)", err);
+            continue;
+        }
+
+        struct bstream *rawstream = bstream_from_fd(newfd);
+        if(rawstream == NULL)
         {
             if(ninerr != NULL && ninerr->message != NULL)
             {
@@ -363,6 +383,14 @@ static void accept_incoming_connections(void)
                 nlog_error("Could not create bstream from new file descriptor.");
             }
         }
+
+        usize write_buf_step_size = 1024;
+        usize write_buf_initial_size = write_buf_step_size;
+        usize write_frame_size = (usize) so_sndbuf;
+        struct bstream *stream = bstream_buffered(rawstream, write_buf_step_size, write_buf_initial_size, write_frame_size);
+        nlog_debug("Using write buffering for incoming connection with frame size: %zu, step size: %zu, initial size: %zu", 
+            write_frame_size, write_buf_step_size, write_buf_initial_size);
+
         mcpr_connection *conn = mcpr_connection_new(stream);
         if(conn == NULL)
         {
@@ -422,7 +450,7 @@ static void update_client(struct connection *conn)
             keep_alive.data.play.clientbound.keep_alive.keep_alive_id = 0;
 
 
-            if(mcpr_connection_write_packet(conn->conn, &keep_alive) < 0)
+            if(!mcpr_connection_write_packet(conn->conn, &keep_alive))
             {
                 if(strcmp(ninerr->type, "ninerr_closed") == 0)
                 {

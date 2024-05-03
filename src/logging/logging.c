@@ -27,6 +27,7 @@
 #include <string.h>
 #include <errno.h>
 #include <locale.h>
+#include <pthread.h>
 
 #include <sys/types.h>
 #include <features.h>
@@ -102,8 +103,20 @@ struct bstream *bstream_debug;
 struct logger *nlogger;
 static struct logger nlogger_raw;
 
-static void vnlog(const char *filename, size_t filename_len, const char *func, size_t func_len, int line, enum log_level level, const char *fmt, va_list ap)
+static void vnlog(
+    const char *filename,
+    size_t filename_len,
+    const char *func,
+    size_t func_len,
+    int line,
+    enum log_level level,
+    const char *fmt,
+    va_list ap)
 {
+    pthread_t thread = pthread_self();
+    char thread_name[17];
+    pthread_getname_np(thread, thread_name, 16);
+
     char *msg;
     int len = vasprintf(&msg, fmt, ap);
     if(len == -1) return;
@@ -111,7 +124,7 @@ static void vnlog(const char *filename, size_t filename_len, const char *func, s
     {
         msg[len-1] = '\0';
     }
-    zlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), "%s", msg);
+    zlog(_zc, filename, filename_len, func, func_len, line, log_level_to_zlog(level), "[%s], %s", thread_name, msg);
     free(msg);
 }
 
