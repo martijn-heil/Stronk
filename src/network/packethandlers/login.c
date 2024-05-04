@@ -225,7 +225,7 @@ static struct hp_result send_post_login_sequence(struct connection *conn)
     player_abilities_pkt.data.play.clientbound.player_abilities.allow_flying = player->allow_flying;
     player_abilities_pkt.data.play.clientbound.player_abilities.is_flying = player->is_flying;
     player_abilities_pkt.data.play.clientbound.player_abilities.flying_speed = player->flying_speed;
-    player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = 1.0;
+    player_abilities_pkt.data.play.clientbound.player_abilities.field_of_view_modifier = player->walking_speed;
     player_abilities_pkt.data.play.clientbound.player_abilities.creative_mode = false;
 
     if(mcpr_connection_write_packet(conn->conn, &player_abilities_pkt) < 0)

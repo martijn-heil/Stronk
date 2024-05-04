@@ -38,6 +38,8 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 
+#include <ninstd/types.h>
+
 /*
     Minecraft Protocol (http://wiki.vg/Protocol)
     MCPR = MineCraft PRotocol.
