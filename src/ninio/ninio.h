@@ -31,6 +31,8 @@
 #include <assert.h>
 #include <limits.h>
 
+#include <ninstd/types.h>
+
 #include "util.h"
 
 struct ninio_buffer {
@@ -40,6 +42,7 @@ struct ninio_buffer {
 };
 void ninio_buffer_read(struct ninio_buffer *in, void *out, usize bytes);
 void ninio_buffer_append(struct ninio_buffer *out, void const *restrict in, usize n);
+void ninio_buffer_append_byte(struct ninio_buffer *out, u8 in);
 void ninio_buffer_shl(struct ninio_buffer *buffer, usize n);
 
 #if defined(HAVE_ASPRINTF) && 0

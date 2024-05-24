@@ -737,9 +737,13 @@ isize mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_sta
                     i32 shared_secret_length;
                     isize bytes_read_2 = mcpr_decode_varint(&shared_secret_length, ptr, len_left);
                     if(bytes_read_2 < 0) { free(pkt); return -1; }
+                    printf("SHARED SECRET LENGTH: %i", shared_secret_length);
                     if(shared_secret_length < 0) { ninerr_set_err(ninerr_new("Read invalid shared secret length (" PRId32 ").", shared_secret_length)); free(pkt); return -1; }
                     IGNORE("-Wtype-limits")
-                    if((u32) shared_secret_length > SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); free(pkt); return -1; }
+                    if((u32) shared_secret_length > SIZE_MAX || shared_secret_length > len_left - bytes_read_2)
+                    { 
+                        ninerr_set_err(ninerr_arithmetic_new()); free(pkt); return -1; 
+                    }
                     END_IGNORE()
                     pkt->data.login.serverbound.encryption_response.shared_secret_length = shared_secret_length;
                     ptr += bytes_read_2;
@@ -754,7 +758,10 @@ isize mcpr_decode_packet(struct mcpr_packet **out, const void *in, enum mcpr_sta
                     i32 verify_token_length;
                     isize bytes_read_3 = mcpr_decode_varint(&verify_token_length, ptr, len_left);
                     if(bytes_read_3 < 0) { free(pkt); return -1; }
-                    if(verify_token_length < 0) { ninerr_set_err(ninerr_new("Read invalid verify token length (" PRId32 ").", shared_secret_length)); free(pkt); return -1; }
+                    if(verify_token_length < 0 || verify_token_length > len_left - bytes_read_3)
+                    { 
+                        ninerr_set_err(ninerr_new("Read invalid verify token length (" PRId32 ").", verify_token_length)); free(pkt); return -1; 
+                    }
                     IGNORE("-Wtype-limits")
                     if((u32) verify_token_length > SIZE_MAX) { ninerr_set_err(ninerr_arithmetic_new()); free(pkt); return -1; }
                     END_IGNORE()

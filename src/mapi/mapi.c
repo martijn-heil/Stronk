@@ -35,6 +35,7 @@
 #include <sys/fcntl.h>
 
 #include <ninerr/ninerr.h>
+#include <ninio/ninio.h>
 #include <curl/curl.h>
 #include <jansson/jansson.h>
 #include <c11threads.h>
@@ -233,10 +234,18 @@ static size_t mapi_curl_write_callback(void *contents, size_t size, size_t nmemb
 struct mapi_auth_response *json_to_auth_response(json_t *json);
 struct mapi_refresh_response *json_to_refresh_response(json_t *json);
 static int make_authserver_request(json_t **response, const char *endpoint, const char *payload);
-static int mapi_make_api_request(json_t **output, const char *url, enum mapi_http_method http_method, char **headers, size_t header_count, const char *payload);
 static struct mapi_err_authserver_err *mapi_err_authserver_err_from_json(json_t *json, int http_code);
 static void mapi_err_authserver_err_free(struct ninerr *err);
 static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_response_from_json(json_t *json);
+static int mapi_make_api_request(
+    json_t **output,
+    enum mapi_http_method http_method,
+    const char *url,
+    char ***params,
+    size_t param_count,
+    char **headers,
+    size_t header_count,
+    const char *payload);
 
 struct mapi_curl_buffer {
     char *content;
@@ -455,7 +464,7 @@ bool mapi_username_to_uuid(struct ninuuid *output, const char *restrict player_n
     char url[strlen(fmt) + strlen(player_name) + 1];
     sprintf(&url[0], fmt, player_name);
     json_t *response;
-    int status = mapi_make_api_request(&response, url, MAPI_HTTP_GET, NULL, 0, NULL);
+    int status = mapi_make_api_request(&response, MAPI_HTTP_GET, url, NULL, 0, NULL, 0, NULL);
     if(status < 0) { return false; }
     if(status == 204) { ninerr_set_err(ninerr_new("No player found.", false)); return false; } // No player found.
 
@@ -465,7 +474,7 @@ bool mapi_username_to_uuid(struct ninuuid *output, const char *restrict player_n
     if(compressed_uuid == NULL) { ninerr_set_err(NULL); return false; } // Not a string.
     if(strlen(compressed_uuid) != 32) { ninerr_set_err(NULL); return false; } // UUID is malformed, it is not 32 characters long.
 
-    if(!ninuuid_from_string(output, compressed_uuid)) { ninerr_set_err(NULL); return false; }
+    if(!ninuuid_from_string(output, compressed_uuid, strlen(compressed_uuid))) { ninerr_set_err(NULL); return false; }
     return true;
 }
 
@@ -527,7 +536,21 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
 {
     DEBUG_PRINT("in mapi_minecraft_has_joined(username = %s, server_id_hash = %s, ip = %s)", username, server_id_hash, ip);
 
-    const char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
+    char *fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s&ip=%s";
+    const char *url;
+    char buf[strlen(server_id_hash) + strlen(fmt) + strlen(username) + ((ip != NULL) ? strlen(ip) : 0) + 1];
+    if (ip != NULL)
+    {
+        sprintf(buf, fmt, username, server_id_hash, ip);
+        url = buf;
+    }
+    else
+    {
+        fmt = "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s";
+        sprintf(buf, fmt, username, server_id_hash);
+        url = buf;
+    }
+
     // CURL *curl = curl_easy_init();
     // if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL object.")); return NULL; }
 
@@ -535,10 +558,8 @@ struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined(const char 
     //char *escaped_username = curl_easy_escape(username, );
     // curl_easy_cleanup(curl);
 
-    char url[strlen(server_id_hash) + strlen(fmt) + strlen(username) + strlen(ip) + 1];
-    sprintf(url, fmt, username, server_id_hash, ip);
     json_t *response;
-    int status = mapi_make_api_request(&response, url, MAPI_HTTP_GET, NULL, 0, NULL);
+    int status = mapi_make_api_request(&response, MAPI_HTTP_GET, url, NULL, 0, NULL, 0, NULL);
     if(status < 0) { return NULL; }
 
     return mapi_minecraft_has_joined_response_from_json(response);
@@ -677,13 +698,73 @@ static int make_authserver_request(json_t **response, const char *endpoint, cons
     return 0;
 }
 
-static int mapi_make_api_request(json_t **output, const char *url, enum mapi_http_method http_method, char **headers, size_t header_count, const char *payload) {
-    DEBUG_PRINT("in mapi_make_api_request(), arguments: url: %s, http_method: %s, header_count: %zu, payload: %s", url, mapi_http_method_to_string(http_method), header_count, payload);
+static int mapi_make_api_request(
+    json_t **output,
+    enum mapi_http_method http_method,
+    const char *url,
+    char ***params,
+    size_t param_count,
+    char **headers,
+    size_t header_count,
+    const char *payload)
+{
+    DEBUG_PRINT("in mapi_make_api_request(), arguments: url: %s, http_method: %s, header_count: %zu, payload: %s", 
+        url, mapi_http_method_to_string(http_method), header_count, payload);
 
     CURL *curl = curl_easy_init();
     if(curl == NULL) { ninerr_set_err(ninerr_new("Could not initialize CURL.")); return -1; }
 
-    curl_easy_setopt(curl, CURLOPT_URL, url);
+
+    const char *final_url = url;
+    if(params != NULL)
+    {
+        size_t url_len = strlen(url);
+        size_t buf_size = url_len + 1;
+        size_t lengths[param_count][2];
+
+        for (size_t i = 0; i < param_count; i++)
+        {
+            char *param_key = params[i][0];
+            char *param_value = params[i][1];
+            size_t param_key_len = strlen(param_key);
+            size_t param_value_len = strlen(param_value);
+            
+            // +1 for the ampersand separating get params, +1 for the = symbol
+            buf_size += param_key_len + param_value_len + 2;
+
+            lengths[i][0] = param_key_len;
+            lengths[i][1] = param_value_len;
+        }
+      
+        char buf[buf_size];
+        struct ninio_buffer buffer = {
+            .content = buf,
+            .size = 0,
+            .max_size = buf_size,
+        };
+        ninio_buffer_append(&buffer, url, url_len);
+
+        for (size_t i = 0; i < param_count; i++)
+        {
+            char separator = (i == 0) ? '?' : '&';
+            ninio_buffer_append_byte(&buffer, separator);
+
+            char *param_key = params[i][0];
+            char *param_value = params[i][1];
+            size_t param_key_len = lengths[i][0];
+            size_t param_value_len = lengths[i][1];
+
+            ninio_buffer_append(&buffer, param_key, param_key_len);
+            ninio_buffer_append_byte(&buffer, '=');
+            ninio_buffer_append(&buffer, param_value, param_value_len);
+        }
+
+        ninio_buffer_append_byte(&buffer, '\0');
+        final_url = buffer.content;
+    }
+    DEBUG_PRINT("GET %s", final_url);
+
+    curl_easy_setopt(curl, CURLOPT_URL, final_url);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "MAPI/1.0");
 
     struct curl_slist *chunk = NULL;
@@ -956,7 +1037,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
             return NULL;
         }
         size_t profile_id_len = strlen(profile_id);
-        if(!ninuuid_from_string(&(res->available_profiles[i].uuid), profile_id))
+        if(!ninuuid_from_string(&(res->available_profiles[i].uuid), profile_id, profile_id_len))
         {
             ninerr_set_err(NULL);
             free(res->client_token);
@@ -1079,7 +1160,7 @@ struct mapi_auth_response *json_to_auth_response(json_t *json)
         free(res);
         return NULL;
     }
-    if(!ninuuid_from_string(&(res->selected_profile.uuid), selected_profile_id))
+    if(!ninuuid_from_string(&(res->selected_profile.uuid), selected_profile_id, strlen(selected_profile_id)))
     {
         ninerr_set_err(NULL);
         free(res->client_token);
@@ -1472,7 +1553,8 @@ static struct mapi_minecraft_has_joined_response *mapi_minecraft_has_joined_resp
     resp->properties.signature = signature_buf;
     resp->properties.skin_blob_base64 = value_buf;
 
-    if(!ninuuid_from_string(&(resp->id), id)) { ninerr_set_err(NULL); return NULL; }
+    size_t id_len = strlen(id);
+    if(!ninuuid_from_string(&(resp->id), id, id_len)) { ninerr_set_err(NULL); return NULL; }
 
     return resp;
 }

@@ -224,7 +224,7 @@ END_IGNORE()
 
 bool world_send_chunk_data1(const struct player *p) // TODO
 {
-    i16 view_distance = 10; // TODO proper view distance
+    i16 view_distance = 5; // TODO proper view distance
     i64 base_x = p->pos.x / 16;
     i64 base_z = p->pos.z / 16;
     for(i64 mod_x = -view_distance; mod_x <= view_distance; mod_x++)

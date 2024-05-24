@@ -25,6 +25,12 @@ void ninio_buffer_append(struct ninio_buffer *out, void const *restrict in, usiz
     out->size += n;
 }
 
+void ninio_buffer_append_byte(struct ninio_buffer *out, u8 in)
+{
+    *((char *) (out->content + out->size)) = in;
+    out->size++;
+}
+
 void ninio_buffer_shl(struct ninio_buffer *buffer, usize n)
 {
     if (n == 0) return;

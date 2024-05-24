@@ -151,7 +151,7 @@ void ms_to_timespec(struct timespec *ts, unsigned long long ms)
 //     // TODO implement
 // }
 
-int msleep(int64 msec)
+int msleep(i64 msec)
 {
     struct timespec ts;
     int res;

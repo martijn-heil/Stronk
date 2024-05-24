@@ -41,6 +41,7 @@ CFLAGS := -D__FILENAME__='""' \
 	-Wno-pointer-arith \
 	-Wno-unused-parameter \
 	-Wno-unused-variable \
+	-Wno-error=implicit-function-declaration \
 	-D_POSIX_C_SOURCE \
 	-DDEBUG \
 	-DHAVE_FOPENCOOKIE \

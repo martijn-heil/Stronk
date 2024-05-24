@@ -128,7 +128,7 @@ static void vnlog(
     free(msg);
 }
 
-bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)
+isize bstreamlog_write(struct bstream *stream, const void *buf, size_t size)
 {
     enum log_level level = *((enum log_level *) stream->private);
 
@@ -142,7 +142,7 @@ bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)
     else
     {
         char *new_buf = malloc(size + 1);
-        if(new_buf == NULL) return false;
+        if(new_buf == NULL) return -1;
         free_new_buf = true;
     }
 
@@ -160,7 +160,7 @@ bool bstreamlog_write(struct bstream *stream, const void *buf, size_t size)
 
     logger_write(nlogger, "null", sizeof("null")-1, "null", sizeof("null")-1, 0, level, "%s", new_buf);
     if(free_new_buf) free(new_buf);
-    return true;
+    return size;
 }
 
 
