@@ -1,6 +1,8 @@
 #ifndef NINSTD_INT_H
 #define NINSTD_INT_H
 
+#include <sys/types.h>
+
 #define i8 int8_t
 #define i16 int16_t
 #define i32 int32_t
